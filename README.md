@@ -34,6 +34,8 @@ Code-Tutor/
 
 ## 目前階段
 
-目前正在建立專案基礎結構。第一個實作里程碑是完成 Coding Workspace 的 IDE 版面。
+目前已完成專案基礎結構與 Coding Workspace 靜態版面。下一個實作里程碑是加入可編輯的 Monaco Editor。
+
+![Code Tutor workspace preview](docs/screenshots/code-tutor-workspace.png)
 
 詳細規劃請參閱 [docs/Roadmap.md](docs/Roadmap.md) 與 [docs/Design.md](docs/Design.md)。

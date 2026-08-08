@@ -2,12 +2,13 @@
 
 ## Milestone 1：Frontend Workspace
 
-- [ ] 建立 Next.js 專案
-- [ ] 完成基本頁面與導覽
-- [ ] 完成 IDE 三欄版面
-- [ ] 加入 Monaco Editor
-- [ ] 完成 Output Panel
-- [ ] 完成 AI Tutor Panel 靜態介面
+- [x] 建立 Next.js 專案
+- [x] 完成基本頁面
+- [x] 完成 IDE 三欄版面
+- [x] 加入 Monaco Editor
+- [x] 加入瀏覽器自動儲存與 `Ctrl+S`
+- [x] 完成 Output Panel 靜態介面
+- [x] 完成 AI Tutor Panel 靜態介面
 
 ## Milestone 2：C++ Compiler
 
@@ -49,3 +50,13 @@
 ## 目前任務
 
 先完成 Milestone 1。Compiler、AI、登入與資料庫在前端工作區原型完成後再開始。
+
+## 後續：Project Mode
+
+- [ ] 加入檔案總管與資料夾樹
+- [ ] 建立、重新命名與刪除檔案／資料夾
+- [ ] 支援多檔案分頁切換
+- [ ] 儲存與還原使用者的專案結構
+- [ ] 將多檔案專案交給 Compiler 編譯
+
+第一版先維持單一 `main.cpp`。待 Monaco Editor、單檔執行流程與歷史紀錄穩定後，再升級成 Project Mode。
