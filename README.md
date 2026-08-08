@@ -34,7 +34,7 @@ Code-Tutor/
 
 ## 目前階段
 
-目前已完成專案基礎結構與 Coding Workspace 靜態版面。下一個實作里程碑是加入可編輯的 Monaco Editor。
+目前已完成 Coding Workspace、Monaco Editor、自動儲存、FastAPI Run API 與前端 Compiler 串接。下一個里程碑是安裝 Docker Desktop，完成隔離的 C++ 真實執行測試。
 
 ![Code Tutor workspace preview](docs/screenshots/code-tutor-workspace.png)
 

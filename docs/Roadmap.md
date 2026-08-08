@@ -12,11 +12,11 @@
 
 ## Milestone 2：C++ Compiler
 
-- [ ] 建立 FastAPI backend
-- [ ] 定義 Run API
+- [x] 建立 FastAPI backend
+- [x] 定義 Run API
 - [ ] 建立隔離的 Docker 編譯環境
-- [ ] 支援標準輸入與輸出
-- [ ] 處理 Compile Error、Runtime Error 與 Timeout
+- [x] 支援前端標準輸入與輸出介面
+- [x] 實作 Compile Error、Runtime Error 與 Timeout 回應
 
 ## Milestone 3：AI Tutor
 
@@ -49,7 +49,7 @@
 
 ## 目前任務
 
-先完成 Milestone 1。Compiler、AI、登入與資料庫在前端工作區原型完成後再開始。
+目前進行 Milestone 2。FastAPI 與前端 Run API 已完成，下一步是安裝 Docker Desktop、建立 Compiler image，並完成真實 C++ 執行測試。
 
 ## 後續：Project Mode
 

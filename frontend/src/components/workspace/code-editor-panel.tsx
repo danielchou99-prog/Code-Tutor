@@ -37,7 +37,12 @@ int main() {
 const storageKey = "code-tutor:main.cpp";
 type SaveStatus = "saved" | "saving" | "failed";
 
-export function CodeEditorPanel() {
+type CodeEditorPanelProps = {
+  isRunning: boolean;
+  onRun: (code: string) => void | Promise<void>;
+};
+
+export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
   const [code, setCode] = useState(initialCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -165,9 +170,12 @@ export function CodeEditorPanel() {
           </button>
           <button
             type="button"
-            className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)]"
+            onClick={() => void onRun(code)}
+            disabled={isRunning}
+            className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)] transition-opacity disabled:cursor-wait disabled:opacity-60"
           >
-            <span aria-hidden="true">▶</span> Run
+            <span aria-hidden="true">{isRunning ? "…" : "▶"}</span>
+            {isRunning ? "Running" : "Run"}
           </button>
         </div>
       </div>

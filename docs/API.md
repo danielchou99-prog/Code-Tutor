@@ -1,33 +1,76 @@
-# API 規劃
+# Code Tutor API
 
-本文件先記錄 MVP 預定介面；實作 FastAPI 時再補上完整 request、response 與錯誤格式。
+本機開發網址：`http://localhost:8000`
+
+啟動 Backend 後可開啟 `http://localhost:8000/docs` 查看 FastAPI 產生的互動式 API 文件。
+
+## Health
+
+### `GET /health`
+
+確認 API 與 Docker Compiler 是否可用。
+
+```json
+{
+  "status": "ok",
+  "compiler_available": false
+}
+```
+
+`compiler_available` 為 `false` 時，代表 Docker 尚未安裝、未啟動，或 Compiler image 尚未建立。
 
 ## Compiler
 
 ### `POST /api/run`
 
-接收 C++ 原始碼與標準輸入，回傳編譯及執行結果。
+接收單一 C++ 程式與標準輸入。
 
-## AI Tutor
+Request：
 
-### `POST /api/ai/analyze`
+```json
+{
+  "code": "#include <iostream>\nint main() { std::cout << 42; }",
+  "stdin": "",
+  "language": "cpp"
+}
+```
 
-分析程式碼與執行結果。
+限制：
 
-### `POST /api/ai/explain-error`
+- `code`：1–65,536 個字元
+- `stdin`：最多 16,384 個字元
+- `language`：MVP 僅接受 `cpp`
 
-用適合學習者的方式解釋錯誤訊息。
+Response：
 
-### `POST /api/ai/hint`
+```json
+{
+  "status": "accepted",
+  "stdout": "42",
+  "stderr": "",
+  "exit_code": 0,
+  "duration_ms": 120,
+  "truncated": false
+}
+```
 
-依提示層級提供漸進式協助。
+`status` 可能為：
 
-## History
+- `accepted`
+- `compile_error`
+- `runtime_error`
+- `timeout`
+- `service_unavailable`
 
-### `GET /api/submissions`
+Docker Compiler 不可用時回傳 HTTP 503。輸入格式錯誤或超過大小限制時回傳 HTTP 422。
 
-取得目前使用者的近期執行紀錄。
+## AI Tutor（尚未實作）
 
-### `GET /api/submissions/{id}`
+- `POST /api/ai/analyze`
+- `POST /api/ai/explain-error`
+- `POST /api/ai/hint`
 
-取得單次執行的程式碼、結果與 AI 分析。
+## History（尚未實作）
+
+- `GET /api/submissions`
+- `GET /api/submissions/{id}`
