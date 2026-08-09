@@ -119,7 +119,8 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
           <SettingsIcon />
           {t("settings")}
         </button>
-        <div className="relative" ref={languageMenuRef}>
+        <div className="relative flex items-center gap-2" ref={languageMenuRef}>
+          <span className="text-[11px] text-slate-500">{t("languageLabel")}</span>
           <button
             type="button"
             onClick={() => setLanguageMenuOpen((open) => !open)}
@@ -128,9 +129,7 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
             aria-haspopup="menu"
             aria-expanded={languageMenuOpen}
           >
-            <span>
-              {t("languageLabel")} [{t("languageName")}]
-            </span>
+            <span>{t("languageName")}</span>
             <span
               className={`text-[9px] text-slate-600 transition-transform ${languageMenuOpen ? "rotate-180" : ""}`}
               aria-hidden="true"

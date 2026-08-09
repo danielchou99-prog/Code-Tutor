@@ -163,11 +163,15 @@ if (action === "language-menu") {
   actionSucceeded = await evaluate(
     client,
     `(() => {
+      const trigger = document.querySelector('button[aria-haspopup="menu"]');
       const labels = [...document.querySelectorAll('[role="menuitemradio"]')].map(
         (item) => item.textContent.replace("✓", "").trim(),
       );
-      return labels.length === 2 &&
-        document.body.innerText.includes("語言 [繁體中文]") &&
+      return trigger &&
+        trigger.textContent.includes("繁體中文") &&
+        !trigger.textContent.includes("語言") &&
+        trigger.previousElementSibling?.textContent.trim() === "語言" &&
+        labels.length === 2 &&
         labels.includes("繁體中文") &&
         labels.includes("English") &&
         !labels.includes("中") &&
@@ -178,14 +182,19 @@ if (action === "language-menu") {
 if (action === "english") {
   actionSucceeded = await evaluate(
     client,
-    `document.documentElement.lang === "en" &&
+    `(() => {
+      const trigger = document.querySelector('button[aria-haspopup="menu"]');
+      return document.documentElement.lang === "en" &&
       document.body.innerText.includes("File") &&
-      document.body.innerText.includes("Language [English]") &&
+      trigger?.textContent.includes("English") &&
+      !trigger?.textContent.includes("Language") &&
+      trigger?.previousElementSibling?.textContent.trim() === "Language" &&
       document.body.innerText.includes("New Folder") &&
       document.body.innerText.includes("New Project") &&
       document.body.innerText.includes("C++ 基礎練習") &&
       !document.body.innerText.includes("C++ Fundamentals") &&
-      !document.body.innerText.includes("檔案")`,
+      !document.body.innerText.includes("檔案");
+    })()`,
   );
 }
 if (action === "project" || action === "run" || action === "run-blocked") {
