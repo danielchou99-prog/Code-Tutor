@@ -4,6 +4,7 @@ from contextlib import suppress
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from .ai_connections import (
     AiConnectionService,
@@ -16,6 +17,14 @@ from .ai_connections import (
     SupabaseAiConnectionStore,
 )
 from .auth import AuthenticatedUser, SupabaseTokenVerifier, get_current_user
+from .ai_tutor import (
+    AiConnectionRequired,
+    AiProviderRateLimited,
+    AiTutorBusy,
+    AiTutorService,
+    GroqTutorProvider,
+    TutorPrompt,
+)
 from .compiler import CompilerService, CompilerUnavailable, DockerCompiler
 from .config import settings
 from .interactive import DockerInteractiveCompiler, InteractiveCompilerService, READY_MARKER
@@ -24,6 +33,7 @@ from .models import (
     AuthMeResponse,
     AiConnectionRequest,
     AiConnectionStatusResponse,
+    AiTutorRequest,
     InteractiveInputRequest,
     InteractiveStartRequest,
     RunRequest,
@@ -86,6 +96,35 @@ def create_ai_connection_service() -> AiConnectionService | None:
 app.state.ai_connection_service = create_ai_connection_service()
 
 
+def create_ai_tutor_service() -> AiTutorService | None:
+    if not (
+        settings.supabase_url
+        and settings.supabase_publishable_key
+        and settings.ai_encryption_key
+    ):
+        return None
+    try:
+        cipher = FernetKeyCipher(settings.ai_encryption_key)
+    except ValueError:
+        return None
+    return AiTutorService(
+        store=SupabaseAiConnectionStore(
+            settings.supabase_url,
+            settings.supabase_publishable_key,
+            settings.ai_request_timeout_seconds,
+        ),
+        cipher=cipher,
+        provider=GroqTutorProvider(
+            model=settings.ai_model,
+            timeout_seconds=settings.ai_tutor_timeout_seconds,
+            max_completion_tokens=settings.ai_max_completion_tokens,
+        ),
+    )
+
+
+app.state.ai_tutor_service = create_ai_tutor_service()
+
+
 def get_compiler() -> CompilerService:
     return DockerCompiler(settings)
 
@@ -110,6 +149,16 @@ def get_ai_connection_service(request: Request) -> AiConnectionService:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AI connections are not configured on the server.",
+        )
+    return service
+
+
+def get_ai_tutor_service(request: Request) -> AiTutorService:
+    service: AiTutorService | None = getattr(request.app.state, "ai_tutor_service", None)
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI Tutor is not configured on the server.",
         )
     return service
 
@@ -193,6 +242,73 @@ async def remove_ai_connection(
             detail="AI connection storage is temporarily unavailable.",
         ) from error
     return AiConnectionStatusResponse(connected=False)
+
+
+@app.post("/api/ai/tutor")
+async def start_ai_tutor(
+    payload: AiTutorRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: AiTutorService = Depends(get_ai_tutor_service),
+) -> StreamingResponse:
+    if payload.action == "ask" and not payload.question.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Enter a question before sending it to AI Tutor.",
+        )
+    prompt = TutorPrompt(
+        action=payload.action,
+        code=payload.code,
+        error_output=payload.error_output,
+        question=payload.question.strip(),
+        language=payload.language,
+    )
+    try:
+        stream = await run_in_threadpool(service.start, user, prompt)
+    except AiConnectionRequired as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Connect Groq in Settings before using AI Tutor.",
+        ) from error
+    except AiTutorBusy as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Another AI Tutor response is already in progress.",
+        ) from error
+    except InvalidProviderKey as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The saved Groq API key is no longer valid. Reconnect it in Settings.",
+        ) from error
+    except AiProviderAccessDenied as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Groq denied access from this network or account.",
+        ) from error
+    except AiProviderRateLimited as error:
+        headers = (
+            {"Retry-After": str(error.retry_after_seconds)}
+            if error.retry_after_seconds is not None
+            else None
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Your Groq free-plan limit has been reached. Try again later.",
+            headers=headers,
+        ) from error
+    except (AiProviderUnavailable, AiStorageUnavailable) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI Tutor is temporarily unavailable. Try again later.",
+        ) from error
+
+    return StreamingResponse(
+        stream,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.post("/api/run", response_model=RunResponse)

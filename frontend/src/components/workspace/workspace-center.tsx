@@ -20,10 +20,14 @@ const initialInput = `5
 
 export function WorkspaceCenter({
   project,
+  onCodeChange,
   onDirtyChange,
+  onExecutionOutputChange,
 }: {
   project: FileProject;
+  onCodeChange: (code: string) => void;
   onDirtyChange: (dirty: boolean) => void;
+  onExecutionOutputChange: (output: string) => void;
 }) {
   const { t } = useLanguage();
   const [stdin, setStdin] = useState(initialInput);
@@ -34,6 +38,7 @@ export function WorkspaceCenter({
   const [interactiveOutput, setInteractiveOutput] = useState<InteractiveOutput[]>([]);
   const [interactiveStatus, setInteractiveStatus] = useState<InteractiveStatus>("idle");
   const interactiveConnection = useRef<InteractiveConnection | null>(null);
+  const interactiveTranscript = useRef("");
 
   useEffect(() => {
     return () => interactiveConnection.current?.stop();
@@ -45,12 +50,16 @@ export function WorkspaceCenter({
         interactiveConnection.current?.stop();
         setActiveTab("input");
         setInteractiveOutput([]);
+        interactiveTranscript.current = "";
+        onExecutionOutputChange("");
         setInteractiveStatus("connecting");
         setIsRunning(true);
         interactiveConnection.current = startInteractiveCpp(code, {
           onEvent: (event) => {
             if (event.type === "output") {
               setInteractiveOutput((current) => [...current, event]);
+              interactiveTranscript.current += event.data;
+              onExecutionOutputChange(interactiveTranscript.current);
             } else if (event.type === "status") {
               setInteractiveStatus(event.status);
               if (["accepted", "compile_error", "runtime_error", "timeout", "stopped"].includes(event.status)) {
@@ -77,26 +86,30 @@ export function WorkspaceCenter({
       setIsRunning(true);
 
       try {
-        setResult(await runCpp(code, stdin));
+        const nextResult = await runCpp(code, stdin);
+        setResult(nextResult);
+        onExecutionOutputChange([nextResult.stderr, nextResult.stdout].filter(Boolean).join("\n"));
       } catch (error) {
         const message =
           error instanceof Error && error.name === "AbortError"
             ? t("requestTimeout")
             : t("cannotReachApi");
 
-        setResult({
+        const failedResult: RunResult = {
           status: "service_unavailable",
           stdout: "",
           stderr: message,
           exit_code: null,
           duration_ms: 0,
           truncated: false,
-        });
+        };
+        setResult(failedResult);
+        onExecutionOutputChange(failedResult.stderr);
       } finally {
         setIsRunning(false);
       }
     },
-    [inputMode, stdin, t],
+    [inputMode, onExecutionOutputChange, stdin, t],
   );
 
   const sendInteractiveInput = (data: string) => {
@@ -117,6 +130,7 @@ export function WorkspaceCenter({
     <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:border-x">
       <CodeEditorPanel
         isRunning={isRunning}
+        onCodeChange={onCodeChange}
         onDirtyChange={onDirtyChange}
         onRun={handleRun}
         project={project}
@@ -127,7 +141,12 @@ export function WorkspaceCenter({
         inputMode={inputMode}
         interactiveOutput={interactiveOutput}
         interactiveStatus={interactiveStatus}
-        onClear={() => setResult(null)}
+        onClear={() => {
+          setResult(null);
+          setInteractiveOutput([]);
+          interactiveTranscript.current = "";
+          onExecutionOutputChange("");
+        }}
         onInputModeChange={(mode) => {
           if (isRunning) return;
           setInputMode(mode);

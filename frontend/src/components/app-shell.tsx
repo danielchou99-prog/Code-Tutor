@@ -6,9 +6,7 @@ import { FileHome } from "@/components/files/file-home";
 import { ProblemsPage } from "@/components/problems/problems-page";
 import { type PrimarySection, SiteHeader } from "@/components/site-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
-import { HistoryPanel } from "@/components/workspace/history-panel";
-import { WorkspaceCenter } from "@/components/workspace/workspace-center";
+import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { clearProjectDraft, type FileProject } from "@/lib/file-items";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
@@ -79,15 +77,12 @@ function AppContent() {
   let content;
   if (activeSection === "files" && openProject && user && openProject.ownerId === user.id) {
     content = (
-      <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(420px,1fr)_320px]">
-        <HistoryPanel project={openProject} onBack={() => protectUnsavedCode(closeProject)} />
-        <WorkspaceCenter
-          key={openProject.id}
-          onDirtyChange={setHasUnsavedCode}
-          project={openProject}
-        />
-        <AiTutorPanel />
-      </section>
+      <ProjectWorkspace
+        key={openProject.id}
+        onBack={() => protectUnsavedCode(closeProject)}
+        onDirtyChange={setHasUnsavedCode}
+        project={openProject}
+      />
     );
   } else if (activeSection === "files") {
     content = <FileHome key={user?.id ?? "guest"} onOpenProject={openUserProject} />;

@@ -59,3 +59,11 @@ class AiConnectionStatusResponse(BaseModel):
     provider: Literal["groq"] = "groq"
     key_last_four: str | None = None
     updated_at: str | None = None
+
+
+class AiTutorRequest(BaseModel):
+    action: Literal["analyze", "explain_error", "hint", "ask"]
+    code: str = Field(default="", max_length=40_000)
+    error_output: str = Field(default="", max_length=8_000)
+    question: str = Field(default="", max_length=2_000)
+    language: Literal["zh-Hant", "en"] = "zh-Hant"

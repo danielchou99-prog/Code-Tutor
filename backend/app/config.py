@@ -69,6 +69,15 @@ class Settings:
     ai_request_timeout_seconds: float = float(
         os.getenv("CODE_TUTOR_AI_REQUEST_TIMEOUT_SECONDS", "10")
     )
+    ai_tutor_timeout_seconds: float = float(
+        os.getenv("CODE_TUTOR_AI_TUTOR_TIMEOUT_SECONDS", "60")
+    )
+    ai_model: str = os.getenv(
+        "CODE_TUTOR_AI_MODEL", "llama-3.3-70b-versatile"
+    ).strip()
+    ai_max_completion_tokens: int = int(
+        os.getenv("CODE_TUTOR_AI_MAX_COMPLETION_TOKENS", "900")
+    )
 
 
 settings = Settings()

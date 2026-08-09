@@ -35,12 +35,13 @@ type SaveStatus = "saved" | "unsaved" | "saving" | "failed";
 
 type CodeEditorPanelProps = {
   isRunning: boolean;
+  onCodeChange: (code: string) => void;
   onDirtyChange: (dirty: boolean) => void;
   onRun: (code: string) => void | Promise<void>;
   project: FileProject;
 };
 
-export function CodeEditorPanel({ isRunning, onDirtyChange, onRun, project }: CodeEditorPanelProps) {
+export function CodeEditorPanel({ isRunning, onCodeChange, onDirtyChange, onRun, project }: CodeEditorPanelProps) {
   const { language, t } = useLanguage();
   const [code, setCode] = useState(defaultCppCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
@@ -77,12 +78,13 @@ export function CodeEditorPanel({ isRunning, onDirtyChange, onRun, project }: Co
 
   useEffect(() => {
     latestCode.current = code;
+    onCodeChange(code);
     if (!hasLoadedSavedCode) return;
     const dirty = code !== savedCode;
     onDirtyChange(dirty);
     if (dirty) saveProjectDraft(project.id, code);
     else clearProjectDraft(project.id);
-  }, [code, hasLoadedSavedCode, onDirtyChange, project.id, savedCode]);
+  }, [code, hasLoadedSavedCode, onCodeChange, onDirtyChange, project.id, savedCode]);
 
   useEffect(() => {
     let cancelled = false;

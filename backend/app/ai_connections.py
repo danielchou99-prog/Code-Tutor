@@ -38,9 +38,13 @@ def secure_http_request(
     timeout: float,
     json: dict[str, str] | None = None,
 ) -> httpx.Response:
-    ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    with httpx.Client(verify=ssl_context, timeout=timeout) as client:
+    with secure_http_client(timeout) as client:
         return client.request(method, url, headers=headers, json=json)
+
+
+def secure_http_client(timeout: float) -> httpx.Client:
+    ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    return httpx.Client(verify=ssl_context, timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -150,6 +154,18 @@ class SupabaseAiConnectionStore:
             key_last_four=str(record.get("key_last_four", "")) or None,
             updated_at=str(record.get("updated_at", "")) or None,
         )
+
+    def get_encrypted_key(self, user: AuthenticatedUser) -> str | None:
+        query = (
+            f"?user_id=eq.{quote(user.user_id)}&provider=eq.groq"
+            "&select=encrypted_key&limit=1"
+        )
+        response = self._request("GET", f"{self.base_url}{query}", self._headers(user))
+        records = response.json()
+        if not isinstance(records, list) or not records:
+            return None
+        encrypted_key = records[0].get("encrypted_key")
+        return encrypted_key if isinstance(encrypted_key, str) and encrypted_key else None
 
     def upsert(
         self,
