@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [run]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [project|problems|run|run-blocked]",
   );
 }
 
@@ -113,6 +113,63 @@ await loaded;
 await sleep(4_000);
 
 let actionSucceeded = action === "none";
+if (action === "project" || action === "run" || action === "run-blocked") {
+  const opened = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.includes("C++ 基礎練習"),
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!opened) throw new Error("Project card was not found.");
+  await sleep(4_000);
+  if (action === "project") {
+    actionSucceeded = await evaluate(
+      client,
+      `[...document.querySelectorAll("button")].some(
+        (candidate) => candidate.textContent.includes("Run"),
+      ) && document.body.innerText.includes("INPUT") && document.body.innerText.includes("OUTPUT")`,
+    );
+  }
+}
+if (action === "problems") {
+  const clicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.trim() === "題目",
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!clicked) throw new Error("Problems navigation button was not found.");
+  await sleep(1_000);
+  const tagClicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.trim() === "#二分搜",
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!tagClicked) throw new Error("Binary search tag was not found.");
+  await sleep(500);
+  actionSucceeded = await evaluate(
+    client,
+    `document.body.innerText.includes("找到 1 題") &&
+      document.body.innerText.includes("在排序陣列中尋找目標") &&
+      !document.body.innerText.includes("迷宮的最短路徑")`,
+  );
+}
 if (action === "run" || action === "run-blocked") {
   const clicked = await evaluate(
     client,
@@ -156,6 +213,12 @@ const result = await evaluate(
       inputTabVisible: normalizedOutputText.includes("INPUT"),
       outputTabVisible: normalizedOutputText.includes("OUTPUT"),
       compilerUnavailableVisible: outputText.includes("Cannot reach the compiler API"),
+      fileHomeVisible:
+        outputText.includes("新增資料夾") && outputText.includes("新增專案"),
+      problemsVisible:
+        outputText.includes("尋找適合你的練習題") &&
+        outputText.includes("#APCS中高級") &&
+        outputText.includes("#二分搜"),
       visibleTextTail: outputText.slice(-800),
     };
   })()`,

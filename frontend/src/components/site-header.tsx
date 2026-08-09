@@ -1,9 +1,21 @@
-const primaryItems = [
-  { label: "首頁", active: false },
-  { label: "工作區", active: true },
-  { label: "測驗", active: false, comingSoon: true },
-  { label: "關於我們", active: false },
+export type PrimarySection = "home" | "files" | "problems" | "quiz" | "about";
+
+const primaryItems: Array<{
+  id: PrimarySection;
+  label: string;
+  comingSoon?: boolean;
+}> = [
+  { id: "home", label: "首頁" },
+  { id: "files", label: "檔案(File)" },
+  { id: "problems", label: "題目" },
+  { id: "quiz", label: "測驗", comingSoon: true },
+  { id: "about", label: "關於我們" },
 ];
+
+type SiteHeaderProps = {
+  activeSection: PrimarySection;
+  onSelect: (section: PrimarySection) => void;
+};
 
 function SettingsIcon() {
   return (
@@ -23,51 +35,58 @@ function UserIcon() {
   );
 }
 
-export function SiteHeader() {
+export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
   return (
-    <header className="flex min-h-16 shrink-0 items-center border-b border-white/10 bg-[#0d121c] px-4 sm:px-6">
-      <div className="flex min-w-max items-center gap-2">
+    <header className="grid shrink-0 grid-cols-[1fr_auto] items-center border-b border-white/10 bg-[#0d121c] px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:px-6">
+      <div className="flex min-w-max items-center gap-2 py-4 md:py-0">
         <span className="size-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.65)]" />
         <p className="text-sm font-semibold tracking-wide text-white">Code Tutor</p>
       </div>
 
-      <nav aria-label="主要導覽" className="ml-8 hidden h-16 items-center gap-1 md:flex">
-        {primaryItems.map((item) => (
-          <button
-            key={item.label}
-            type="button"
-            aria-current={item.active ? "page" : undefined}
-            aria-disabled={item.comingSoon || undefined}
-            className={`relative flex h-full items-center gap-1.5 px-3 text-xs transition-colors ${
-              item.active
-                ? "text-cyan-200"
-                : item.comingSoon
-                  ? "cursor-default text-slate-600"
-                  : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            {item.label}
-            {item.comingSoon && (
-              <span className="rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-0.5 text-[8px] text-slate-600">
-                即將推出
-              </span>
-            )}
-            {item.active && <span className="absolute inset-x-3 bottom-0 h-px bg-cyan-300" />}
-          </button>
-        ))}
+      <nav
+        aria-label="主要導覽"
+        className="order-3 col-span-2 flex h-12 max-w-full items-center justify-start gap-0 overflow-x-auto md:order-none md:col-span-1 md:h-16 md:justify-self-center md:overflow-visible"
+      >
+        {primaryItems.map((item) => {
+          const active = activeSection === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => !item.comingSoon && onSelect(item.id)}
+              aria-current={active ? "page" : undefined}
+              aria-disabled={item.comingSoon || undefined}
+              className={`relative flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs transition-colors lg:px-3 ${
+                active
+                  ? "text-cyan-200"
+                  : item.comingSoon
+                    ? "cursor-default text-slate-600"
+                    : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {item.label}
+              {item.comingSoon && (
+                <span className="hidden rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-0.5 text-[8px] text-slate-600 xl:inline">
+                  即將推出
+                </span>
+              )}
+              {active && <span className="absolute inset-x-2.5 bottom-0 h-px bg-cyan-300" />}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="ml-auto flex items-center gap-1 sm:gap-2">
+      <div className="flex items-center justify-self-end gap-1 sm:gap-2">
         <button
           type="button"
-          className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200 lg:flex"
+          className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200 xl:flex"
         >
           <SettingsIcon />
           設定
         </button>
         <button
           type="button"
-          className="hidden items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-[11px] text-slate-400 transition-colors hover:border-white/15 sm:flex"
+          className="hidden items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-[11px] text-slate-400 transition-colors hover:border-white/15 lg:flex"
           aria-label="選擇顯示語言，目前為繁體中文"
         >
           <span aria-hidden="true">文</span>

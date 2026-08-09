@@ -1,0 +1,69 @@
+"use client";
+
+import { useState } from "react";
+
+import { FileHome } from "@/components/files/file-home";
+import { ProblemsPage } from "@/components/problems/problems-page";
+import { type PrimarySection, SiteHeader } from "@/components/site-header";
+import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
+import { HistoryPanel } from "@/components/workspace/history-panel";
+import { WorkspaceCenter } from "@/components/workspace/workspace-center";
+
+const sectionContent: Record<"home" | "about", { title: string; detail: string }> = {
+  home: {
+    title: "歡迎來到 Code Tutor",
+    detail: "從檔案建立練習專案，或到題目頁尋找下一個程式挑戰。",
+  },
+  about: {
+    title: "關於 Code Tutor",
+    detail: "一個結合程式執行、題目練習與學習提示的 C++ 學習空間。",
+  },
+};
+
+export function AppShell() {
+  const [activeSection, setActiveSection] = useState<PrimarySection>("files");
+  const [openProject, setOpenProject] = useState<string | null>(null);
+
+  const selectSection = (section: PrimarySection) => {
+    setActiveSection(section);
+    if (section === "files") setOpenProject(null);
+  };
+
+  let content;
+  if (activeSection === "files" && openProject) {
+    content = (
+      <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(420px,1fr)_320px]">
+        <HistoryPanel />
+        <WorkspaceCenter />
+        <AiTutorPanel />
+      </section>
+    );
+  } else if (activeSection === "files") {
+    content = (
+      <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <HistoryPanel />
+        <FileHome onOpenProject={setOpenProject} />
+      </section>
+    );
+  } else if (activeSection === "problems") {
+    content = <ProblemsPage />;
+  } else {
+    const placeholder = sectionContent[activeSection === "about" ? "about" : "home"];
+    content = (
+      <section className="grid flex-1 place-items-center px-6 py-20 text-center">
+        <div className="max-w-xl">
+          <span className="mx-auto block size-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.6)]" />
+          <h1 className="mt-5 text-2xl font-semibold text-white">{placeholder.title}</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-500">{placeholder.detail}</p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col bg-[#090d14] text-slate-200">
+      <SiteHeader activeSection={activeSection} onSelect={selectSection} />
+      {content}
+    </main>
+  );
+}
