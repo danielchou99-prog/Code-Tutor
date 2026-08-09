@@ -16,6 +16,38 @@ export type FileItem = {
 
 export type FileProject = Pick<FileItem, "id" | "name">;
 
+const projectDraftStoragePrefix = "code-tutor:project-draft:";
+
+export function loadProjectDraft(projectId: string): string | null {
+  try {
+    const storedDraft = window.localStorage.getItem(`${projectDraftStoragePrefix}${projectId}`);
+    if (!storedDraft) return null;
+    const draft = JSON.parse(storedDraft) as { content?: unknown };
+    return typeof draft.content === "string" ? draft.content : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveProjectDraft(projectId: string, content: string) {
+  try {
+    window.localStorage.setItem(
+      `${projectDraftStoragePrefix}${projectId}`,
+      JSON.stringify({ content, updatedAt: new Date().toISOString() }),
+    );
+  } catch {
+    // A blocked or full browser storage must not stop the editor from working.
+  }
+}
+
+export function clearProjectDraft(projectId: string) {
+  try {
+    window.localStorage.removeItem(`${projectDraftStoragePrefix}${projectId}`);
+  } catch {
+    // A blocked browser storage must not stop navigation or saving.
+  }
+}
+
 export const defaultCppCode = `#include <iostream>
 #include <vector>
 using namespace std;

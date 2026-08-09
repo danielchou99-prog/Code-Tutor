@@ -10,7 +10,7 @@ import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { HistoryPanel } from "@/components/workspace/history-panel";
 import { WorkspaceCenter } from "@/components/workspace/workspace-center";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import type { FileProject } from "@/lib/file-items";
+import { clearProjectDraft, type FileProject } from "@/lib/file-items";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 
 type OpenedProject = FileProject & { ownerId: string };
@@ -48,16 +48,6 @@ function AppContent() {
     }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, [userId]);
-
-  useEffect(() => {
-    if (!hasUnsavedCode) return;
-    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warnBeforeUnload);
-    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [hasUnsavedCode]);
 
   const closeProject = useCallback(() => {
     if (user) window.localStorage.removeItem(`${openProjectStoragePrefix}${user.id}`);
@@ -139,6 +129,7 @@ function AppContent() {
         onClose={() => setPendingAction(null)}
         onConfirm={() => {
           const action = pendingAction;
+          if (openProject) clearProjectDraft(openProject.id);
           setPendingAction(null);
           setHasUnsavedCode(false);
           if (action) void action();

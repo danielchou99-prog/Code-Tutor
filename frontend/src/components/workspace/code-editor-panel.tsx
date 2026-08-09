@@ -7,9 +7,12 @@ import type { IDisposable } from "monaco-editor";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  clearProjectDraft,
   defaultCppCode,
   type FileProject,
+  loadProjectDraft,
   loadProjectContent,
+  saveProjectDraft,
   saveProjectContent,
 } from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
@@ -58,6 +61,7 @@ export function CodeEditorPanel({ isRunning, onDirtyChange, onRun, project }: Co
     try {
       const { error } = await saveProjectContent(project.id, nextCode);
       if (error) throw error;
+      clearProjectDraft(project.id);
       setSavedCode(nextCode);
       setSaveStatus(latestCode.current === nextCode ? "saved" : "unsaved");
     } catch {
@@ -74,8 +78,11 @@ export function CodeEditorPanel({ isRunning, onDirtyChange, onRun, project }: Co
   useEffect(() => {
     latestCode.current = code;
     if (!hasLoadedSavedCode) return;
-    onDirtyChange(code !== savedCode);
-  }, [code, hasLoadedSavedCode, onDirtyChange, savedCode]);
+    const dirty = code !== savedCode;
+    onDirtyChange(dirty);
+    if (dirty) saveProjectDraft(project.id, code);
+    else clearProjectDraft(project.id);
+  }, [code, hasLoadedSavedCode, onDirtyChange, project.id, savedCode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,10 +92,12 @@ export function CodeEditorPanel({ isRunning, onDirtyChange, onRun, project }: Co
       if (error) {
         setSaveStatus("failed");
       } else {
-        const nextCode = typeof data?.content === "string" ? data.content : defaultCppCode;
+        const nextSavedCode = typeof data?.content === "string" ? data.content : defaultCppCode;
+        const restoredDraft = loadProjectDraft(project.id);
+        const nextCode = restoredDraft ?? nextSavedCode;
         latestCode.current = nextCode;
         setCode(nextCode);
-        setSavedCode(nextCode);
+        setSavedCode(nextSavedCode);
         setSaveStatus("saved");
       }
       hasLoadedSavedCodeRef.current = true;
