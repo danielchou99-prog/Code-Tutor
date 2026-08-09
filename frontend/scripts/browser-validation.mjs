@@ -254,7 +254,7 @@ if (action === "interactive") {
     client,
     `(() => {
       const runButton = [...document.querySelectorAll("button")].find(
-        (button) => button.textContent.includes("執行"),
+        (button) => button.textContent.includes("Run"),
       );
       if (!runButton) return false;
       runButton.click();

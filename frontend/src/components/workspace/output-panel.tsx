@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { RunResult, RunStatus } from "@/lib/compiler-api";
 import type { InteractiveOutput, InteractiveStatus } from "@/lib/interactive-api";
@@ -78,7 +78,18 @@ export function OutputPanel({
 }: OutputPanelProps) {
   const { t } = useLanguage();
   const [consoleInput, setConsoleInput] = useState("");
+  const consoleViewportRef = useRef<HTMLDivElement>(null);
+  const consoleInputRef = useRef<HTMLInputElement>(null);
   const presentation = result ? statusPresentation[result.status] : null;
+
+  useEffect(() => {
+    const viewport = consoleViewportRef.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [interactiveOutput, interactiveStatus]);
+
+  useEffect(() => {
+    if (interactiveStatus === "running") consoleInputRef.current?.focus();
+  }, [interactiveStatus]);
 
   const interactiveStatusLabel = {
     idle: t("consoleWaiting"),
@@ -151,7 +162,7 @@ export function OutputPanel({
                     : "text-slate-600 hover:text-slate-400"
                 }`}
               >
-                {mode === "batch" ? t("batchInput") : t("interactiveConsole")}
+                {mode === "batch" ? "Text" : "Interactive Console"}
               </button>
             ))}
           </div>
@@ -167,22 +178,37 @@ export function OutputPanel({
             />
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/8 bg-[#070a10]">
-              <div className="flex items-center gap-2 border-b border-white/8 px-3 py-1.5 text-[9px] text-slate-500">
-                <span
-                  className={`size-1.5 rounded-full ${
-                    interactiveStatus === "running"
-                      ? "animate-pulse bg-emerald-400"
-                      : interactiveStatus === "error" || interactiveStatus === "compile_error"
-                        ? "bg-rose-400"
-                        : "bg-slate-600"
-                  }`}
-                  aria-hidden="true"
-                />
-                <span role="status">{interactiveStatusLabel}</span>
+              <div className="flex items-center justify-between border-b border-white/8 px-3 py-1.5 text-[9px] text-slate-500">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      interactiveStatus === "running"
+                        ? "animate-pulse bg-emerald-400"
+                        : interactiveStatus === "error" || interactiveStatus === "compile_error"
+                          ? "bg-rose-400"
+                          : "bg-slate-600"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span role="status">{interactiveStatusLabel}</span>
+                </div>
+                {isRunning && (
+                  <button
+                    type="button"
+                    onClick={onStopInteractive}
+                    className="text-rose-300 transition-colors hover:text-rose-200"
+                  >
+                    {t("stopProgram")}
+                  </button>
+                )}
               </div>
-              <div className="min-h-0 flex-1 overflow-auto p-3 font-mono text-[11px] leading-5">
+              <div
+                ref={consoleViewportRef}
+                className="min-h-0 flex-1 overflow-auto p-3 font-mono text-[11px] leading-5"
+                onClick={() => consoleInputRef.current?.focus()}
+              >
                 {interactiveOutput.length === 0 ? (
-                  <p className="text-slate-700">$ interactive session</p>
+                  <span className="whitespace-pre-wrap text-slate-700">$ interactive session{"\n"}</span>
                 ) : (
                   interactiveOutput.map((entry, index) => (
                     <span
@@ -199,36 +225,27 @@ export function OutputPanel({
                     </span>
                   ))
                 )}
-              </div>
-              <form
-                className="flex items-center gap-2 border-t border-white/8 p-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!consoleInput || !onInteractiveInput(consoleInput)) return;
-                  setConsoleInput("");
-                }}
-              >
-                <span className="font-mono text-xs text-cyan-300" aria-hidden="true">›</span>
-                <input
-                  value={consoleInput}
-                  onChange={(event) => setConsoleInput(event.target.value)}
-                  disabled={interactiveStatus !== "running"}
-                  aria-label={t("consoleInputPlaceholder")}
-                  placeholder={t("consoleInputPlaceholder")}
-                  className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-slate-200 outline-none placeholder:text-slate-700 disabled:cursor-not-allowed"
-                />
-                {isRunning ? (
-                  <button
-                    type="button"
-                    onClick={onStopInteractive}
-                    className="rounded-md border border-rose-300/15 px-2 py-1 text-[10px] text-rose-300"
-                  >
-                    {t("stopProgram")}
-                  </button>
-                ) : (
+                <form
+                  className="inline-flex max-w-full items-center gap-1 align-baseline"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!consoleInput || !onInteractiveInput(consoleInput)) return;
+                    setConsoleInput("");
+                  }}
+                >
+                  <span className="text-cyan-300" aria-hidden="true">›</span>
+                  <input
+                    ref={consoleInputRef}
+                    value={consoleInput}
+                    onChange={(event) => setConsoleInput(event.target.value)}
+                    disabled={interactiveStatus !== "running"}
+                    aria-label={t("consoleInputPlaceholder")}
+                    autoComplete="off"
+                    className="w-64 max-w-full bg-transparent font-mono text-[11px] text-slate-200 caret-cyan-300 outline-none disabled:cursor-not-allowed"
+                  />
                   <button type="submit" className="sr-only">{t("sendInput")}</button>
-                )}
-              </form>
+                </form>
+              </div>
             </div>
           )}
         </div>

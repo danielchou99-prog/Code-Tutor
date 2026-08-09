@@ -183,7 +183,7 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
             className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)] transition-opacity disabled:cursor-wait disabled:opacity-60"
           >
             <span aria-hidden="true">{isRunning ? "…" : "▶"}</span>
-            {isRunning ? t("running") : t("run")}
+            Run
           </button>
         </div>
       </div>

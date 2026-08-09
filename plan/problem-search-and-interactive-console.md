@@ -1,6 +1,6 @@
 # Code Tutor 多標籤搜尋與 Interactive Console 計畫
 
-- 文件狀態：本機 MVP 完成，等待使用者確認
+- 文件狀態：本機 MVP 與 Console 介面微調完成
 - 最後更新：2026-08-09
 - 目前階段：自動與真實 Docker 驗收完成
 
@@ -12,9 +12,9 @@
 
 - [x] 題目支援文字搜尋與單一標籤篩選。
 - [x] Compiler 支援一次送入完整 stdin 後執行。
-- [ ] 標籤按鈕一次只能選一個。
-- [ ] 搜尋欄尚未把 `#` 開頭文字解析成多個標籤。
-- [ ] 尚未提供執行期間的雙向 Interactive Console。
+- [x] 標籤按鈕已支援一次選擇多個。
+- [x] 搜尋欄已能把 `#` 開頭文字解析成多個標籤。
+- [x] 已提供執行期間的雙向 Interactive Console。
 
 ## 三、階段一：多標籤搜尋
 
@@ -83,6 +83,26 @@ Batch Input 是先把所有答案寫好再執行；Interactive Console 則像終
 
 本階段不需安裝新軟體。完成後請使用者在一般瀏覽器測試一個會先輸出提示、等待輸入、再輸出結果的 C++ 程式。
 
+## 六之一、Console 介面微調
+
+### 執行步驟
+
+- [x] 將模式名稱固定為 `Text` 與 `Interactive Console`，不隨網站語言改變。
+- [x] 將執行按鈕固定顯示 `Run`，不隨網站語言改變。
+- [x] 移除 Interactive Console 底部獨立輸入列的分隔線與按鈕區。
+- [x] 將輸入游標直接放進終端輸出區域，呈現 CMD 式互動。
+- [x] 重新執行 ESLint、production build 與瀏覽器互動測試。
+
+### 簡易說明
+
+終端機的輸入和程式輸出應出現在同一個連續區域。使用者看到程式提示後，可以直接在下一個游標位置輸入，不需要額外佔用一列獨立輸入框。
+
+### 驗收方式
+
+- 切換繁體中文與英文時，`Text`、`Interactive Console`、`Run` 文字保持不變。
+- Interactive Console 只有一個終端內容區，輸入游標位於輸出內容下方。
+- 按 Enter 仍可把資料送進正在執行的 C++ 程式。
+
 ## 七、執行與驗收紀錄
 
 - 中文搜尋輸入 `#APCS中高級 #二分搜` 後，兩個標籤同時選取並以 AND 規則留下 1 題。
@@ -95,3 +115,5 @@ Batch Input 是先把所有答案寫好再執行；Interactive Console 則像終
 - 原本 Batch Input API 回歸測試仍成功輸出 `42`。
 - Frontend ESLint 與 Next.js production build 通過。
 - 畫面證據保存於 `plan/evidence/workspace-navigation/desktop-problems-multi-tag.png` 與 `desktop-interactive-console.png`。
+- Console 介面微調後，`Text`、`Interactive Console`、`Run` 已固定為英文；輸入游標與輸出共用同一個終端區域。
+- 微調後的真實瀏覽器測試再次送入 `5 1 2 3 4 5` 並收到 `15`，ESLint 與 production build 通過。
