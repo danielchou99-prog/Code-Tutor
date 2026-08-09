@@ -298,14 +298,14 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
       />
       <div className="min-w-0 bg-[#090d14] px-5 py-6 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-6xl">
-          <nav className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500" aria-label={t("folders")}>
-          <button type="button" onClick={() => goToCrumb(-1)} className="hover:text-cyan-200">{t("fileRoot")}</button>
-          {path.map((crumb, index) => (
-            <span key={crumb.id} className="flex items-center gap-2">
-              <span className="text-slate-700">/</span>
-              <button type="button" onClick={() => goToCrumb(index)} className={index === path.length - 1 ? "text-slate-300" : "hover:text-cyan-200"}>{crumb.name}</button>
-            </span>
-          ))}
+          <nav className="flex flex-wrap items-center gap-2" aria-label={t("folders")}>
+            <button type="button" onClick={() => goToCrumb(-1)} className="text-xl font-semibold text-white hover:text-cyan-100">{t("fileRoot")}</button>
+            {path.map((crumb, index) => (
+              <span key={crumb.id} className="flex items-center gap-2 text-[11px] text-slate-500">
+                <span className="text-slate-700">/</span>
+                <button type="button" onClick={() => goToCrumb(index)} className={index === path.length - 1 ? "text-slate-300" : "hover:text-cyan-200"}>{crumb.name}</button>
+              </span>
+            ))}
           </nav>
 
         <div className="mt-5 rounded-2xl border border-white/8 bg-[#0d131d] p-4">
@@ -330,15 +330,6 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
           )}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-          <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "folder" }); }} className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-xs font-medium text-slate-300 transition-colors hover:border-cyan-300/25 hover:text-cyan-200">
-            <span className="text-base leading-none" aria-hidden="true">+</span>{t("addFolder")}
-          </button>
-          <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "project" }); }} className="flex h-9 items-center gap-2 rounded-lg bg-cyan-400 px-4 text-xs font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.12)] transition-colors hover:bg-cyan-300">
-            <span className="text-base leading-none" aria-hidden="true">+</span>{t("addProject")}
-          </button>
-        </div>
-
         {loadError && <p role="alert" className="mt-5 rounded-xl border border-rose-300/10 bg-rose-300/[0.035] p-3 text-xs text-rose-300">{loadError}</p>}
         {loading ? (
           <p className="py-16 text-center text-xs text-slate-600">{t("fileLoading")}</p>
@@ -347,7 +338,12 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
         ) : (
           <>
             <div className="mt-9">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("folders")}</p>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("folders")}</p>
+                <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "folder" }); }} className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-xs font-medium text-slate-300 transition-colors hover:border-cyan-300/25 hover:text-cyan-200">
+                  <span className="text-base leading-none" aria-hidden="true">+</span>{t("addFolder")}
+                </button>
+              </div>
               {folders.length === 0 ? <p className="mt-4 text-xs text-slate-700">{t("emptyFolders")}</p> : (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {folders.map((folder) => (
@@ -365,7 +361,12 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
             </div>
 
             <div className="mt-10">
-              <div className="flex items-end justify-between gap-4"><div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("projects")}</p><h1 className="mt-2 text-xl font-semibold text-white">{t("yourProjects")}</h1></div><p className="hidden text-[11px] text-slate-600 sm:block">{t("selectProjectHint")}</p></div>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("projectSection")}</p>
+                <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "project" }); }} className="flex h-9 items-center gap-2 rounded-lg bg-cyan-400 px-4 text-xs font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.12)] transition-colors hover:bg-cyan-300">
+                  <span className="text-base leading-none" aria-hidden="true">+</span>{t("addProject")}
+                </button>
+              </div>
               {projects.length === 0 ? <p className="mt-4 text-xs text-slate-700">{t("emptyProjects")}</p> : (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {projects.map((project) => (

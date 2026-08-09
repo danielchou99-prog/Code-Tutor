@@ -92,6 +92,20 @@
 
 驗證結果：ESLint 與 `tsc --noEmit` 通過；登入狀態的最終畫面由使用者重新整理後確認。
 
+### 8. 檔案首頁資訊層級
+
+- [x] `My files`／`我的檔案` 改為白色粗體主標題。
+- [x] 搜尋欄緊接在主標題下方。
+- [x] `Folders` 與 `New Folder` 在同一列，標題靠左、按鈕靠右。
+- [x] `Project` 與 `New Project` 在同一列，標題靠左、按鈕靠右。
+- [x] 空狀態文字分別顯示在對應區段下方。
+- [x] 移除重複的 `Your projects` 與選擇專案提示，不更動既有尺寸、配色及框線。
+- [x] 完成 ESLint、TypeScript 與 production build 驗證。
+
+簡易說明：畫面會依序呈現「位置、搜尋、資料夾、專案」，讓新增按鈕直接靠近它所管理的內容。
+
+驗證結果：ESLint、`tsc --noEmit` 與 Next.js production build 均通過。
+
 ## 四、驗收方式
 
 1. 登入後能建立資料夾，重新整理後仍存在。
