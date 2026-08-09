@@ -111,7 +111,7 @@ def test_groq_validator_maps_rejected_key_without_exposing_it(monkeypatch) -> No
     class RejectedResponse:
         status_code = 401
 
-    monkeypatch.setattr("app.ai_connections.httpx.get", lambda *args, **kwargs: RejectedResponse())
+    monkeypatch.setattr("app.ai_connections.secure_http_request", lambda *args, **kwargs: RejectedResponse())
 
     try:
         GroqKeyValidator().validate("gsk_private-value")
@@ -125,7 +125,7 @@ def test_groq_validator_maps_provider_failure(monkeypatch) -> None:
     class FailedResponse:
         status_code = 500
 
-    monkeypatch.setattr("app.ai_connections.httpx.get", lambda *args, **kwargs: FailedResponse())
+    monkeypatch.setattr("app.ai_connections.secure_http_request", lambda *args, **kwargs: FailedResponse())
 
     try:
         GroqKeyValidator().validate("gsk_private-value")

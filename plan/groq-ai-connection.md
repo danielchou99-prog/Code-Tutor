@@ -1,6 +1,6 @@
 # Code Tutor Groq AI 安全連線實作計畫
 
-- 文件狀態：程式與自動檢查完成，等待 Supabase migration、後端秘密設定與真實 Key 驗收
+- 文件狀態：程式、Supabase migration、後端秘密設定與自動檢查完成，等待真實 Key 驗收
 - 最後更新：2026-08-09
 - 前置條件：Supabase 帳號系統、後端 JWT 驗證與使用者 Groq API Key 已準備完成
 
@@ -84,6 +84,17 @@
 簡易說明：Supabase migration 與秘密環境變數需要專案擁有者權限，所以由使用者操作；程式、測試、文件與非秘密設定由開發工具完成。
 
 目前紀錄：migration 已由使用者執行；本機後端 AI service 已成功啟用，`/health` 回傳 `ok` 且 Compiler 可用。剩餘手動步驟只有在設定視窗自行輸入 Groq API Key 完成真實連線驗收。
+
+### 本機 HTTPS 憑證修正
+
+- [x] 由 `Failed to fetch` 找出舊 Backend 未載入 AI API，已停止舊程序並啟動最新版。
+- [x] 驗證 AI API 回傳 401、CORS preflight 回傳 200，且允許 `PUT`。
+- [x] 找出 Supabase 儲存失敗原因為 Windows Python `CERTIFICATE_VERIFY_FAILED`。
+- [x] 改用 Windows 系統信任憑證庫驗證 Groq 與 Supabase HTTPS，不停用 SSL 驗證。
+- [x] 重新執行後端測試，確認 31 項通過、9 項依環境略過，套件相依正常。
+- [ ] 使用真實 Groq Key 完成連線與儲存驗收。
+
+簡易說明：目前網路的 HTTPS 憑證受到 Windows 信任，但 Python 內建憑證清單不完整。改用 Windows 系統憑證庫可以解決連線，同時繼續檢查伺服器身分；不可使用 `verify=False`，否則 API Key 可能在不安全連線中外洩。
 
 ## 六、本階段不包含
 

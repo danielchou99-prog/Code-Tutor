@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+import ssl
 from typing import Protocol
 from urllib.parse import quote
 
 from cryptography.fernet import Fernet, InvalidToken
 import httpx
+import truststore
 
 from .auth import AuthenticatedUser
 
@@ -22,6 +24,19 @@ class AiProviderUnavailable(AiConnectionError):
 
 class AiStorageUnavailable(AiConnectionError):
     pass
+
+
+def secure_http_request(
+    method: str,
+    url: str,
+    *,
+    headers: dict[str, str],
+    timeout: float,
+    json: dict[str, str] | None = None,
+) -> httpx.Response:
+    ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    with httpx.Client(verify=ssl_context, timeout=timeout) as client:
+        return client.request(method, url, headers=headers, json=json)
 
 
 @dataclass(frozen=True)
@@ -80,7 +95,8 @@ class GroqKeyValidator:
 
     def validate(self, api_key: str) -> None:
         try:
-            response = httpx.get(
+            response = secure_http_request(
+                "GET",
                 self.models_url,
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=self.timeout_seconds,
@@ -170,7 +186,7 @@ class SupabaseAiConnectionStore:
         json: dict[str, str] | None = None,
     ) -> httpx.Response:
         try:
-            response = httpx.request(
+            response = secure_http_request(
                 method,
                 url,
                 headers=headers,
