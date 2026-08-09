@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type DragEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -11,6 +11,7 @@ import {
   type FileProject,
   listFileItems,
   listRecentProjects,
+  moveFileItem,
   parseHashtags,
   removeHashtags,
   updateFileItem,
@@ -147,12 +148,16 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   const [dialog, setDialog] = useState<ItemDialogState>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | "root" | null>(null);
+  const [moving, setMoving] = useState(false);
   const currentFolderId = path.at(-1)?.id ?? null;
 
-  const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete") => {
+  const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete" | "move") => {
     if (["42P01", "PGRST205"].includes(errorCode(error) ?? "")) return t("fileStorageNotReady");
     if (fallback === "save") return t("fileSaveFailed");
     if (fallback === "delete") return t("fileDeleteFailed");
+    if (fallback === "move") return t("fileMoveFailed");
     return t("fileLoadFailed");
   }, [t]);
 
@@ -270,6 +275,33 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
     setSelectedTags([]);
   };
 
+  const startDragging = (event: DragEvent<HTMLElement>, item: FileItem) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/code-tutor-file-item", item.id);
+    setDraggedItemId(item.id);
+    setLoadError(null);
+  };
+
+  const finishDragging = () => {
+    setDraggedItemId(null);
+    setDropTargetId(null);
+  };
+
+  const moveDraggedItem = async (event: DragEvent<HTMLElement>, parentId: string | null) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const itemId = draggedItemId || event.dataTransfer.getData("text/code-tutor-file-item");
+    const item = items.find((candidate) => candidate.id === itemId);
+    finishDragging();
+    if (!item || item.id === parentId || item.parent_id === parentId) return;
+
+    setMoving(true);
+    const { error } = await moveFileItem(item.id, parentId);
+    if (error) setLoadError(friendlyError(error, "move"));
+    else await refreshItems();
+    setMoving(false);
+  };
+
   const folders = filteredItems.filter((item) => item.kind === "folder");
   const projects = filteredItems.filter((item) => item.kind === "project");
   const hasFilters = Boolean(query.trim() || selectedTags.length);
@@ -299,7 +331,18 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
       <div className="min-w-0 bg-[#090d14] px-5 py-6 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <nav className="flex flex-wrap items-center gap-2" aria-label={t("folders")}>
-            <button type="button" onClick={() => goToCrumb(-1)} className="text-xl font-semibold text-white hover:text-cyan-100">{t("fileRoot")}</button>
+            <button
+              type="button"
+              onClick={() => goToCrumb(-1)}
+              onDragEnter={() => { if (draggedItemId) setDropTargetId("root"); }}
+              onDragOver={(event) => { if (draggedItemId) event.preventDefault(); }}
+              onDragLeave={() => { if (dropTargetId === "root") setDropTargetId(null); }}
+              onDrop={(event) => void moveDraggedItem(event, null)}
+              title={draggedItemId ? t("dropInRoot") : undefined}
+              className={`rounded-lg text-xl font-semibold text-white transition-colors hover:text-cyan-100 ${dropTargetId === "root" ? "bg-cyan-300/10 ring-1 ring-cyan-300/35" : ""}`}
+            >
+              {t("fileRoot")}
+            </button>
             {path.map((crumb, index) => (
               <span key={crumb.id} className="flex items-center gap-2 text-[11px] text-slate-500">
                 <span className="text-slate-700">/</span>
@@ -328,6 +371,9 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
               </div>
             </div>
           )}
+          <p className="mt-3 text-[10px] leading-4 text-slate-600" role="status">
+            {moving ? t("movingItem") : t("dragToMove")}
+          </p>
         </div>
 
         {loadError && <p role="alert" className="mt-5 rounded-xl border border-rose-300/10 bg-rose-300/[0.035] p-3 text-xs text-rose-300">{loadError}</p>}
@@ -347,7 +393,22 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
               {folders.length === 0 ? <p className="mt-4 text-xs text-slate-700">{t("emptyFolders")}</p> : (
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {folders.map((folder) => (
-                    <article key={folder.id} className="group rounded-xl border border-white/8 bg-white/[0.025] p-4 transition-colors hover:border-cyan-300/20 hover:bg-cyan-300/[0.035]">
+                    <article
+                      key={folder.id}
+                      draggable={!moving}
+                      onDragStart={(event) => startDragging(event, folder)}
+                      onDragEnd={finishDragging}
+                      onDragEnter={() => { if (draggedItemId && draggedItemId !== folder.id) setDropTargetId(folder.id); }}
+                      onDragOver={(event) => { if (draggedItemId && draggedItemId !== folder.id) event.preventDefault(); }}
+                      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null) && dropTargetId === folder.id) setDropTargetId(null); }}
+                      onDrop={(event) => void moveDraggedItem(event, folder.id)}
+                      title={dropTargetId === folder.id ? t("dropInFolder") : t("dragToMove")}
+                      className={`group cursor-grab rounded-xl border bg-white/[0.025] p-4 transition-colors active:cursor-grabbing ${
+                        dropTargetId === folder.id
+                          ? "border-cyan-300/45 bg-cyan-300/[0.08] ring-1 ring-cyan-300/25"
+                          : "border-white/8 hover:border-cyan-300/20 hover:bg-cyan-300/[0.035]"
+                      } ${draggedItemId === folder.id ? "opacity-45" : ""}`}
+                    >
                       <button type="button" onClick={() => enterFolder(folder)} className="flex w-full items-center gap-3 text-left">
                         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-300/8 text-amber-200/80"><FolderIcon /></span>
                         <span className="min-w-0"><span className="block truncate text-xs font-medium text-slate-300">{folder.name}</span><span className="mt-1 block text-[10px] text-slate-600">{t("folderType")}</span></span>
@@ -370,7 +431,14 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
               {projects.length === 0 ? <p className="mt-4 text-xs text-slate-700">{t("emptyProjects")}</p> : (
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {projects.map((project) => (
-                    <article key={project.id} className="group rounded-2xl border border-white/8 bg-[#0d131d] p-5 transition-all hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#101925]">
+                    <article
+                      key={project.id}
+                      draggable={!moving}
+                      onDragStart={(event) => startDragging(event, project)}
+                      onDragEnd={finishDragging}
+                      title={t("dragToMove")}
+                      className={`group cursor-grab rounded-2xl border border-white/8 bg-[#0d131d] p-5 transition-all active:cursor-grabbing hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#101925] ${draggedItemId === project.id ? "opacity-45" : ""}`}
+                    >
                       <button type="button" onClick={() => onOpenProject({ id: project.id, name: project.name })} className="w-full text-left">
                         <div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-xl border border-cyan-300/10 bg-cyan-300/[0.055] font-mono text-xs font-bold text-cyan-200">C++</span><span className="text-slate-600 group-hover:text-cyan-300" aria-hidden="true">↗</span></div>
                         <h2 className="mt-5 text-sm font-semibold text-slate-200">{project.name}</h2>

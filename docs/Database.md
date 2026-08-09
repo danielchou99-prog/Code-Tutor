@@ -52,6 +52,8 @@
 
 Migration：`supabase/migrations/202608090001_file_items.sql`
 
+資料夾循環保護：`supabase/migrations/202608090002_prevent_file_item_cycles.sql`
+
 已啟用 Row Level Security，登入使用者只能對 `user_id = auth.uid()` 的資料執行讀取、新增、修改與刪除。父資料夾也必須屬於同一位使用者。
 
 ## 安全要求

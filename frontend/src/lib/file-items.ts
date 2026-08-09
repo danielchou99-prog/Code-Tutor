@@ -105,6 +105,15 @@ export async function updateFileItem(id: string, name: string, tags: string[]) {
     .single();
 }
 
+export async function moveFileItem(id: string, parentId: string | null) {
+  return getSupabaseBrowserClient()
+    .from("file_items")
+    .update({ parent_id: parentId })
+    .eq("id", id)
+    .select("id,parent_id")
+    .single();
+}
+
 export async function deleteFileItem(id: string) {
   return getSupabaseBrowserClient().from("file_items").delete().eq("id", id);
 }
