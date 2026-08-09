@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { streamAiTutor, type AiTutorAction } from "@/lib/ai-tutor-api";
+import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 
 type TutorMessage = {
@@ -24,6 +25,7 @@ function messageId(): string {
 }
 
 export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput: string }) {
+  const { user } = useAuth();
   const { language, t } = useLanguage();
   const zh = language === "zh-Hant";
   const [messages, setMessages] = useState<TutorMessage[]>([]);
@@ -32,6 +34,14 @@ export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput:
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const profileName = [user?.user_metadata.display_name, user?.user_metadata.username]
+    .find((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    ?.trim();
+  const emailName = user?.email?.split("@", 1)[0]?.trim();
+  const learnerName = profileName || emailName || null;
+  const greeting = learnerName
+    ? t("tutorGreetingNamed").replace("{name}", learnerName)
+    : t("tutorGreeting");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -121,7 +131,7 @@ export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput:
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4" aria-live="polite">
         {messages.length === 0 ? (
           <div className="rounded-2xl rounded-tl-md border border-white/8 bg-white/[0.035] p-4">
-            <p className="text-xs leading-5 text-slate-300">{t("tutorGreeting")}</p>
+            <p className="text-xs leading-5 text-slate-300">{greeting}</p>
           </div>
         ) : (
           <div className="space-y-3">
