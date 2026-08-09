@@ -17,6 +17,11 @@ export type RunResult = {
   retry_after_seconds?: number;
 };
 
+export type CppSourceFile = {
+  name: string;
+  content: string;
+};
+
 function getApiUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
   if (configuredUrl) return configuredUrl.replace(/\/$/, "");
@@ -24,7 +29,7 @@ function getApiUrl(): string {
   return `${window.location.protocol}//${window.location.hostname}:8000`;
 }
 
-export async function runCpp(code: string, stdin: string): Promise<RunResult> {
+export async function runCpp(files: CppSourceFile[], stdin: string): Promise<RunResult> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 30_000);
 
@@ -32,7 +37,12 @@ export async function runCpp(code: string, stdin: string): Promise<RunResult> {
     const response = await fetch(`${getApiUrl()}/api/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, stdin, language: "cpp" }),
+      body: JSON.stringify({
+        code: files.find((file) => file.name.toLocaleLowerCase().endsWith(".cpp"))?.content ?? "",
+        files,
+        stdin,
+        language: "cpp",
+      }),
       signal: controller.signal,
     });
     const result = (await response.json()) as RunResult;

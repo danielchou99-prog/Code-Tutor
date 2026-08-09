@@ -5,6 +5,7 @@ import pytest
 
 from app.config import Settings
 from app.interactive import DockerInteractiveCompiler, READY_MARKER
+from app.models import ProjectSourceFile
 
 
 compiler = DockerInteractiveCompiler(Settings())
@@ -19,6 +20,7 @@ def test_interactive_command_keeps_compiler_security_limits() -> None:
     assert ["--cap-drop", "ALL"] == command[command.index("--cap-drop") : command.index("--cap-drop") + 2]
     assert ["--user", "65534:65534"] == command[command.index("--user") : command.index("--user") + 2]
     assert READY_MARKER in command[-1]
+    assert "g++ /source/*.cpp" in command[-1]
 
 
 @pytest.mark.skipif(
@@ -57,6 +59,40 @@ int main() {
             await session.write("18\n")
             output = await asyncio.wait_for(session.process.stdout.read(), timeout=5)
             assert output.decode() == "Hello Daniel, 18!\n"
+            assert await session.process.wait() == 0
+        finally:
+            await session.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.skipif(
+    not compiler.is_available(),
+    reason="Docker compiler is not available.",
+)
+def test_interactive_compiler_builds_multiple_project_files() -> None:
+    async def exercise() -> None:
+        files = [
+            ProjectSourceFile(
+                name="main.cpp",
+                content='#include <iostream>\n#include "helper.hpp"\nint main() { std::cout << answer() << "\\n"; }',
+            ),
+            ProjectSourceFile(name="helper.hpp", content="int answer();"),
+            ProjectSourceFile(
+                name="helper.cpp",
+                content='#include "helper.hpp"\nint answer() { return 42; }',
+            ),
+        ]
+        session = await compiler.start(files[0].content, files)
+        try:
+            assert session.process.stderr is not None
+            assert session.process.stdout is not None
+            while True:
+                line = await asyncio.wait_for(session.process.stderr.readline(), timeout=10)
+                assert line
+                if line.decode().strip() == READY_MARKER:
+                    break
+            assert (await asyncio.wait_for(session.process.stdout.read(), timeout=5)).decode() == "42\n"
             assert await session.process.wait() == 0
         finally:
             await session.close()

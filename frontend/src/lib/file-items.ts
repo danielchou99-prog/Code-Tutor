@@ -25,6 +25,10 @@ export type ProjectFile = {
   updated_at: string;
 };
 
+export type ProjectFileSource = Pick<ProjectFile, "id" | "name"> & {
+  content: string;
+};
+
 const projectDraftStoragePrefix = "code-tutor:project-draft:";
 const activeProjectFileStoragePrefix = "code-tutor:active-project-file:";
 
@@ -210,10 +214,17 @@ export async function saveProjectContent(id: string, content: string) {
 
 export function isValidProjectFileName(value: string): boolean {
   const name = value.trim();
+  const baseName = name.slice(0, name.lastIndexOf(".")).replace(/[ .]+$/u, "").toLocaleLowerCase();
+  const reservedNames = new Set([
+    "con", "prn", "aux", "nul",
+    ...Array.from({ length: 9 }, (_, index) => `com${index + 1}`),
+    ...Array.from({ length: 9 }, (_, index) => `lpt${index + 1}`),
+  ]);
   return name.length >= 1
     && name.length <= 120
-    && !name.includes("/")
-    && !name.includes("\\")
+    && baseName.length > 0
+    && !/[<>:"/\\|?*\u0000-\u001f]/u.test(name)
+    && !reservedNames.has(baseName)
     && /\.(?:cpp|h|hpp)$/iu.test(name);
 }
 
@@ -221,6 +232,14 @@ export async function listProjectFiles(projectId: string) {
   return getSupabaseBrowserClient()
     .from("project_files")
     .select("id,user_id,project_id,name,created_at,updated_at")
+    .eq("project_id", projectId)
+    .order("name", { ascending: true });
+}
+
+export async function listProjectFileSources(projectId: string) {
+  return getSupabaseBrowserClient()
+    .from("project_files")
+    .select("id,name,content")
     .eq("project_id", projectId)
     .order("name", { ascending: true });
 }

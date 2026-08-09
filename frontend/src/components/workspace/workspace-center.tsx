@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { runCpp, type RunResult } from "@/lib/compiler-api";
+import { runCpp, type CppSourceFile, type RunResult } from "@/lib/compiler-api";
 import type { FileProject, ProjectFile } from "@/lib/file-items";
 import {
   type InteractiveConnection,
@@ -51,7 +51,7 @@ export function WorkspaceCenter({
   }, []);
 
   const handleRun = useCallback(
-    async (code: string) => {
+    async (files: CppSourceFile[]) => {
       if (inputMode === "interactive") {
         interactiveConnection.current?.stop();
         setActiveTab("input");
@@ -60,7 +60,7 @@ export function WorkspaceCenter({
         onExecutionOutputChange("");
         setInteractiveStatus("connecting");
         setIsRunning(true);
-        interactiveConnection.current = startInteractiveCpp(code, {
+        interactiveConnection.current = startInteractiveCpp(files, {
           onEvent: (event) => {
             if (event.type === "output") {
               setInteractiveOutput((current) => [...current, event]);
@@ -92,7 +92,7 @@ export function WorkspaceCenter({
       setIsRunning(true);
 
       try {
-        const nextResult = await runCpp(code, stdin);
+        const nextResult = await runCpp(files, stdin);
         setResult(nextResult);
         onExecutionOutputChange([nextResult.stderr, nextResult.stdout].filter(Boolean).join("\n"));
       } catch (error) {

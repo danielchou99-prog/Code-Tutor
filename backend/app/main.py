@@ -349,7 +349,12 @@ async def run_code(
                 status="server_busy",
                 stderr="The compiler queue wait timed out. Please try again.",
             )
-        return await run_in_threadpool(compiler.run, request.code, request.stdin)
+        return await run_in_threadpool(
+            compiler.run,
+            request.code,
+            request.stdin,
+            request.files or None,
+        )
     except CompilerUnavailable as error:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return RunResponse(status="service_unavailable", stderr=str(error))
@@ -451,7 +456,10 @@ async def run_interactive(
             await send_json({"type": "error", "status": "server_busy", "message": "Queue wait timed out."})
             return
         await send_json({"type": "status", "status": "compiling"})
-        session = await compiler.start(start_request.code)
+        session = await compiler.start(
+            start_request.code,
+            start_request.files or None,
+        )
 
         stdout_task = asyncio.create_task(stream_stdout())
         stderr_task = asyncio.create_task(stream_stderr())

@@ -2,6 +2,7 @@ import pytest
 
 from app.compiler import DockerCompiler
 from app.config import Settings
+from app.models import ProjectSourceFile
 
 
 compiler = DockerCompiler(Settings())
@@ -30,6 +31,26 @@ int main() {
     assert result.stdout == "42\n"
     assert result.stderr == ""
     assert result.exit_code == 0
+
+
+def test_docker_compiler_builds_multiple_project_files() -> None:
+    files = [
+        ProjectSourceFile(
+            name="main.cpp",
+            content='#include <iostream>\n#include "helper.hpp"\nint main() { std::cout << answer() << "\\n"; }',
+        ),
+        ProjectSourceFile(name="helper.hpp", content="int answer();"),
+        ProjectSourceFile(
+            name="helper.cpp",
+            content='#include "helper.hpp"\nint answer() { return 42; }',
+        ),
+    ]
+
+    result = compiler.run(files[0].content, "", files)
+
+    assert result.status == "accepted"
+    assert result.stdout == "42\n"
+    assert result.stderr == ""
 
 
 def test_docker_compiler_reports_compile_error() -> None:

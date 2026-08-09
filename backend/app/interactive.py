@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-import os
 from pathlib import Path
 import shutil
 import tempfile
-from typing import Protocol
+from typing import Protocol, Sequence
 from uuid import uuid4
 
 from .compiler import CompilerUnavailable, DockerCompiler
 from .config import Settings
+from .models import ProjectSourceFile
 
 
 READY_MARKER = "__CODE_TUTOR_INTERACTIVE_READY__"
@@ -28,7 +28,9 @@ class InteractiveSessionProtocol(Protocol):
 class InteractiveCompilerService(Protocol):
     def is_available(self) -> bool: ...
 
-    async def start(self, code: str) -> InteractiveSessionProtocol: ...
+    async def start(
+        self, code: str, files: Sequence[ProjectSourceFile] | None = None
+    ) -> InteractiveSessionProtocol: ...
 
 
 @dataclass
@@ -92,17 +94,20 @@ class DockerInteractiveCompiler:
             and DockerCompiler(self.settings).is_available()
         )
 
-    async def start(self, code: str) -> DockerInteractiveSession:
+    async def start(
+        self, code: str, files: Sequence[ProjectSourceFile] | None = None
+    ) -> DockerInteractiveSession:
         if not self.is_available():
             raise CompilerUnavailable("Docker is not installed or unavailable.")
 
         temporary_directory = tempfile.TemporaryDirectory(prefix="code-tutor-interactive-")
         source_directory = Path(temporary_directory.name)
-        source_file = source_directory / "main.cpp"
-        source_file.write_text(code, encoding="utf-8", newline="\n")
-        if os.name != "nt":
-            source_directory.chmod(0o755)
-            source_file.chmod(0o644)
+        source_files = (
+            list(files)
+            if files
+            else [ProjectSourceFile(name="main.cpp", content=code)]
+        )
+        DockerCompiler._write_source_files(source_directory, source_files)
 
         container_name = f"code-tutor-interactive-{uuid4().hex}"
         command = self._docker_command(source_directory, container_name)
@@ -129,7 +134,7 @@ class DockerInteractiveCompiler:
     ) -> list[str]:
         script = f"""
 set -u
-g++ /source/main.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program
+g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program
 compile_status=$?
 if [ "$compile_status" -ne 0 ]; then
   exit "$compile_status"

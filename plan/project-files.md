@@ -86,7 +86,6 @@
 
 - Project 內的子資料夾。
 - 重新命名檔案與拖曳排序。
-- 將多個 `.cpp` 與標頭檔一起交給編譯器建置；本階段 Run 執行目前選取的 `.cpp`。
 - Git 版本控制與多人即時協作。
 
 ## 七、檔案導覽版面修正
@@ -102,3 +101,46 @@
 驗收方式：`main.cpp` 左側仍顯示 Project 名稱但不再有 `/`；新增第二個檔案後，左側清單立即出現，點擊可切換到該檔案。
 
 需要使用者手動操作：重新整理 Project 頁，確認分頁位置、左側檔案清單與點擊切換。
+
+## 八、多檔案共同編譯優化
+
+- 文件狀態：程式與自動測試完成，等待瀏覽器人工驗收
+- 最後更新：2026-08-09
+
+### 目標
+
+讓 Run 與 Interactive Console 不再只編譯目前分頁，而是將同一個 Project 的所有 `.cpp`、`.h`、`.hpp` 一起放入隔離容器。所有 `.cpp` 共同建置，標頭檔可由 `#include` 使用。
+
+### 目前狀態
+
+- [x] Project 已能建立、儲存、開啟與刪除多個檔案。
+- [x] 已確認原本一般 Run 只傳送目前分頁內容，並完成多檔案傳送。
+- [x] 已確認原本 Interactive Console 只傳送目前分頁內容，並完成多檔案傳送。
+- [x] Backend request 與 Docker compiler 已接受並驗證多檔案。
+
+### 執行步驟與簡易說明
+
+1. [x] 擴充 Run 與 Interactive request，接受最多 50 個合法 C++ 專案檔案。
+   簡易說明：只允許 `.cpp`、`.h`、`.hpp` 與安全檔名，避免路徑穿越或建立任意檔案。
+2. [x] 前端執行前讀取 Project 全部檔案內容，並以目前分頁的最新草稿覆蓋該檔案。
+   簡易說明：其他檔案使用 Supabase 或本機草稿內容；目前正在編輯但尚未 Save 的程式也能立即測試，不會偷偷寫回資料庫。
+3. [x] Docker compiler 將每個檔案寫入暫存來源目錄，並共同編譯所有 `.cpp`。
+   簡易說明：這和一般 C++ Project 的建置方式相同，標頭檔不單獨編譯，而是由 `.cpp` 引用。
+4. [x] 更新輸出提示，使畫面顯示正在建置整個 Project。
+   簡易說明：避免使用者誤以為只執行 `main.cpp`。
+5. [x] 增加 Backend 測試，並執行 Frontend lint、TypeScript、production build 與 Backend pytest。
+   簡易說明：確認單檔功能維持相容，多檔案與安全限制都有測試。
+
+### 驗收方式
+
+1. `main.cpp` 可以 `#include "helper.hpp"` 並呼叫另一個 `.cpp` 實作的函式。
+2. 一般 Run 和 Interactive Console 都能成功執行多檔案程式。
+3. 修改目前檔案但尚未 Save 時，Run 使用畫面上的最新內容，重新整理後仍維持原有草稿規則。
+4. 非法檔名、重複檔名、超過 50 個檔案或沒有 `.cpp` 時會被拒絕。
+5. 既有單一 `main.cpp` Project 仍能照常執行。
+
+### 需要使用者手動操作
+
+- [ ] 自動測試完成後，在瀏覽器建立 `main.cpp`、`helper.cpp`、`helper.hpp` 各一個，分別測試 Run 與 Interactive Console。
+
+簡易說明：這次不需要執行新的 Supabase migration；只有最後的實際畫面驗收需要使用者操作。

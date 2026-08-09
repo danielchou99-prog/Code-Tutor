@@ -252,7 +252,7 @@ export function OutputPanel({
       ) : (
         <div className="flex h-[calc(100%-2.5rem)] flex-col justify-between p-4 font-mono text-xs">
           <div className="min-h-0 flex-1 overflow-auto">
-            <p className="mb-2 text-slate-600">$ Run main.cpp with C++20</p>
+            <p className="mb-2 text-slate-600">$ Build project with C++20</p>
             {isRunning ? (
               <p className="animate-pulse text-cyan-300">{t("compiling")}</p>
             ) : result ? (

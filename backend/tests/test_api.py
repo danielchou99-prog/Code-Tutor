@@ -14,6 +14,7 @@ from app.main import (
     get_rate_limiter,
 )
 from app.models import RunResponse
+from app.models import ProjectSourceFile
 from app.protection import ExecutionGate, InMemoryRateLimiter
 
 
@@ -21,7 +22,12 @@ class FakeCompiler:
     def is_available(self) -> bool:
         return True
 
-    def run(self, code: str, stdin: str) -> RunResponse:
+    def run(
+        self,
+        code: str,
+        stdin: str,
+        files: list[ProjectSourceFile] | None = None,
+    ) -> RunResponse:
         return RunResponse(
             status="accepted",
             stdout="15\n",
@@ -34,7 +40,12 @@ class UnavailableCompiler:
     def is_available(self) -> bool:
         return False
 
-    def run(self, code: str, stdin: str) -> RunResponse:
+    def run(
+        self,
+        code: str,
+        stdin: str,
+        files: list[ProjectSourceFile] | None = None,
+    ) -> RunResponse:
         raise CompilerUnavailable("Docker Desktop is not running.")
 
 
@@ -49,7 +60,12 @@ class BlockingCompiler:
     def is_available(self) -> bool:
         return True
 
-    def run(self, code: str, stdin: str) -> RunResponse:
+    def run(
+        self,
+        code: str,
+        stdin: str,
+        files: list[ProjectSourceFile] | None = None,
+    ) -> RunResponse:
         with self._lock:
             self._active += 1
             self.max_active = max(self.max_active, self._active)
@@ -109,7 +125,11 @@ class FakeInteractiveCompiler:
     def is_available(self) -> bool:
         return True
 
-    async def start(self, code: str) -> FakeInteractiveSession:
+    async def start(
+        self,
+        code: str,
+        files: list[ProjectSourceFile] | None = None,
+    ) -> FakeInteractiveSession:
         assert code == "int main() {}"
         self.session = FakeInteractiveSession()
         return self.session
@@ -172,6 +192,45 @@ def test_run_returns_compiler_result() -> None:
 
 def test_run_rejects_empty_code() -> None:
     response = client.post("/api/run", json={"code": "", "stdin": ""})
+
+    assert response.status_code == 422
+
+
+def test_run_rejects_duplicate_project_file_names() -> None:
+    response = client.post(
+        "/api/run",
+        json={
+            "code": "int main() {}",
+            "files": [
+                {"name": "main.cpp", "content": "int main() {}"},
+                {"name": "MAIN.CPP", "content": "int helper() {}"},
+            ],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_run_rejects_project_without_cpp_file() -> None:
+    response = client.post(
+        "/api/run",
+        json={
+            "code": "header only",
+            "files": [{"name": "helper.hpp", "content": "int helper();"}],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_run_rejects_unsafe_cross_platform_file_name() -> None:
+    response = client.post(
+        "/api/run",
+        json={
+            "code": "int main() {}",
+            "files": [{"name": "../main.cpp", "content": "int main() {}"}],
+        },
+    )
 
     assert response.status_code == 422
 

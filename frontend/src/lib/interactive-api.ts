@@ -1,3 +1,5 @@
+import type { CppSourceFile } from "@/lib/compiler-api";
+
 export type InteractiveStatus =
   | "idle"
   | "connecting"
@@ -39,14 +41,19 @@ function getWebSocketUrl(): string {
 }
 
 export function startInteractiveCpp(
-  code: string,
+  files: CppSourceFile[],
   handlers: InteractiveHandlers,
 ): InteractiveConnection {
   const socket = new WebSocket(getWebSocketUrl());
   let intentionallyStopped = false;
 
   socket.addEventListener("open", () => {
-    socket.send(JSON.stringify({ type: "start", code, language: "cpp" }));
+    socket.send(JSON.stringify({
+      type: "start",
+      code: files.find((file) => file.name.toLocaleLowerCase().endsWith(".cpp"))?.content ?? "",
+      files,
+      language: "cpp",
+    }));
   });
   socket.addEventListener("message", (message) => {
     handlers.onEvent(JSON.parse(String(message.data)) as InteractiveEvent);

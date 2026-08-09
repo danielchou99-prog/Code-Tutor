@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 from app.compiler import (
     COMPILE_ERROR_MARKER,
@@ -8,6 +9,7 @@ from app.compiler import (
     DockerCompiler,
 )
 from app.config import Settings
+from app.models import ProjectSourceFile
 
 
 def compiler() -> DockerCompiler:
@@ -63,3 +65,21 @@ def test_docker_command_contains_sandbox_limits() -> None:
     assert "--pids-limit 64" in combined
     assert "--memory 512m" in combined
     assert "code-tutor-compiler:local" in command
+    assert "g++ /source/*.cpp" in combined
+
+
+def test_writes_all_project_sources() -> None:
+    sources = [
+        ProjectSourceFile(name="main.cpp", content='#include "helper.hpp"\nint main() {}'),
+        ProjectSourceFile(name="helper.hpp", content="int helper();"),
+        ProjectSourceFile(name="helper.cpp", content="int helper() { return 1; }"),
+    ]
+
+    with patch.object(Path, "write_text") as write_text:
+        DockerCompiler._write_source_files(Path("C:/project-sources"), sources)
+
+    assert [call.args[0] for call in write_text.call_args_list] == [
+        '#include "helper.hpp"\nint main() {}',
+        "int helper();",
+        "int helper() { return 1; }",
+    ]

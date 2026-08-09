@@ -13,15 +13,18 @@ import {
   deleteProjectFile,
   isValidProjectFileName,
   listProjectFiles,
+  listProjectFileSources,
   loadActiveProjectFileId,
   loadProjectDraft,
   loadProjectFileContent,
   type FileProject,
   type ProjectFile,
+  type ProjectFileSource,
   saveActiveProjectFileId,
   saveProjectDraft,
   saveProjectFileContent,
 } from "@/lib/file-items";
+import type { CppSourceFile } from "@/lib/compiler-api";
 import { useLanguage } from "@/lib/language-context";
 
 function EditorLoading() {
@@ -46,7 +49,7 @@ type CodeEditorPanelProps = {
   onDirtyChange: (dirty: boolean) => void;
   onFileRequestHandled: () => void;
   onProjectFilesChange: (files: ProjectFile[], activeFileId: string | null) => void;
-  onRun: (code: string) => void | Promise<void>;
+  onRun: (files: CppSourceFile[]) => void | Promise<void>;
   project: FileProject;
   requestedFileId: string | null;
 };
@@ -96,6 +99,8 @@ export function CodeEditorPanel({
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProjectFile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [preparingRun, setPreparingRun] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
   const [pendingFileAction, setPendingFileAction] = useState<(() => void) | null>(null);
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
   const cursorListener = useRef<IDisposable | null>(null);
@@ -391,13 +396,33 @@ export function CodeEditorPanel({
     });
   };
 
+  const runProject = async () => {
+    if (!activeFile || preparingRun || isRunning) return;
+    setPreparingRun(true);
+    setRunError(null);
+    const { data, error } = await listProjectFileSources(project.id);
+    if (error || !data) {
+      setRunError(zh ? "無法讀取 Project 檔案，請稍後再試。" : "Project files could not be read. Try again.");
+      setPreparingRun(false);
+      return;
+    }
+    const sources = (data as ProjectFileSource[]).map((file) => ({
+      name: file.name,
+      content: file.id === activeFile.id
+        ? code
+        : (loadProjectDraft(project.id, file.id) ?? file.content),
+    }));
+    setPreparingRun(false);
+    await onRun(sources);
+  };
+
   const statusLabel = {
     saved: t("saved"),
     unsaved: zh ? "尚未儲存" : "Unsaved",
     saving: t("saving"),
     failed: t("saveFailed"),
   }[displayedSaveStatus];
-  const canRun = Boolean(activeFile && activeFile.name.toLocaleLowerCase().endsWith(".cpp"));
+  const canRun = Boolean(activeFile && files.some((file) => file.name.toLocaleLowerCase().endsWith(".cpp")));
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-[#0c111b]">
@@ -517,9 +542,9 @@ export function CodeEditorPanel({
           </button>
           <button
             type="button"
-            onClick={() => void onRun(code)}
-            disabled={isRunning || !canRun}
-            title={!canRun && activeFile ? (zh ? "只有 .cpp 檔案可以執行" : "Only .cpp files can run") : undefined}
+            onClick={() => void runProject()}
+            disabled={isRunning || preparingRun || !canRun}
+            title={!canRun && activeFile ? (zh ? "Project 至少需要一個 .cpp 檔案" : "The project needs at least one .cpp file") : undefined}
             className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)] transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             <span aria-hidden="true">▶</span>
@@ -527,6 +552,12 @@ export function CodeEditorPanel({
           </button>
         </div>
       </div>
+
+      {runError ? (
+        <div className="shrink-0 border-b border-rose-400/15 bg-rose-400/[0.04] px-4 py-2 text-[10px] text-rose-300" role="alert">
+          {runError}
+        </div>
+      ) : null}
 
       {fileError ? (
         <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">

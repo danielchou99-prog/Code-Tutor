@@ -7,10 +7,10 @@ import shutil
 import subprocess
 import tempfile
 import time
-from typing import Protocol
+from typing import Protocol, Sequence
 
 from .config import Settings
-from .models import RunResponse
+from .models import ProjectSourceFile, RunResponse
 
 
 COMPILE_ERROR_MARKER = "__CODE_TUTOR_COMPILE_ERROR__"
@@ -25,7 +25,12 @@ class CompilerUnavailable(RuntimeError):
 class CompilerService(Protocol):
     def is_available(self) -> bool: ...
 
-    def run(self, code: str, stdin: str) -> RunResponse: ...
+    def run(
+        self,
+        code: str,
+        stdin: str,
+        files: Sequence[ProjectSourceFile] | None = None,
+    ) -> RunResponse: ...
 
 
 @dataclass
@@ -48,7 +53,12 @@ class DockerCompiler:
             return False
         return completed.returncode == 0
 
-    def run(self, code: str, stdin: str) -> RunResponse:
+    def run(
+        self,
+        code: str,
+        stdin: str,
+        files: Sequence[ProjectSourceFile] | None = None,
+    ) -> RunResponse:
         if not self.is_available():
             raise CompilerUnavailable(
                 "Docker is not installed or Docker Desktop is not running."
@@ -57,9 +67,12 @@ class DockerCompiler:
         started_at = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="code-tutor-") as temp_directory:
             source_directory = Path(temp_directory)
-            source_file = source_directory / "main.cpp"
-            source_file.write_text(code, encoding="utf-8", newline="\n")
-            self._make_source_readable(source_directory, source_file)
+            source_files = (
+                list(files)
+                if files
+                else [ProjectSourceFile(name="main.cpp", content=code)]
+            )
+            self._write_source_files(source_directory, source_files)
 
             command = self._docker_command(source_directory)
             try:
@@ -92,7 +105,7 @@ class DockerCompiler:
         run_timeout = self.settings.run_timeout_seconds
         script = f"""
 set -u
-g++ /source/main.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
+g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
 compile_status=$?
 if [ "$compile_status" -ne 0 ]; then
   echo {COMPILE_ERROR_MARKER} >&2
@@ -150,10 +163,17 @@ exit "$run_status"
         ]
 
     @staticmethod
-    def _make_source_readable(directory: Path, source_file: Path) -> None:
+    def _write_source_files(
+        directory: Path, source_files: Sequence[ProjectSourceFile]
+    ) -> None:
+        for source in source_files:
+            (directory / source.name).write_text(
+                source.content, encoding="utf-8", newline="\n"
+            )
         if os.name != "nt":
             directory.chmod(0o755)
-            source_file.chmod(0o644)
+            for source in source_files:
+                (directory / source.name).chmod(0o644)
 
     @staticmethod
     def _to_response(
