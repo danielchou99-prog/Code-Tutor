@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IDisposable } from "monaco-editor";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   defaultCppCode,
   type FileProject,
@@ -40,6 +41,7 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
   const [code, setCode] = useState(defaultCppCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const cursorListener = useRef<IDisposable | null>(null);
   const hasLoadedSavedCode = useRef(false);
 
@@ -122,13 +124,13 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
   };
 
   const resetCode = () => {
-    const shouldReset = window.confirm(
-      t("resetConfirm"),
-    );
-    if (!shouldReset) return;
+    setResetDialogOpen(true);
+  };
 
+  const confirmReset = () => {
     setCode(defaultCppCode);
     void persistCode(defaultCppCode);
+    setResetDialogOpen(false);
   };
 
   const statusLabel = {
@@ -232,6 +234,17 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
           <span>UTF-8</span>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={resetDialogOpen}
+        title={t("resetCodeConfirmTitle")}
+        description={t("resetConfirm")}
+        confirmLabel={t("confirmReset")}
+        cancelLabel={t("cancel")}
+        closeLabel={t("closeDialog")}
+        onClose={() => setResetDialogOpen(false)}
+        onConfirm={confirmReset}
+      />
     </section>
   );
 }

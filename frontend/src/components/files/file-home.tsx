@@ -3,6 +3,7 @@
 import { type DragEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   createFileItem,
   deleteFileItem,
@@ -151,6 +152,8 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | "root" | null>(null);
   const [moving, setMoving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const currentFolderId = path.at(-1)?.id ?? null;
 
   const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete" | "move") => {
@@ -250,15 +253,17 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
     await refreshItems();
   };
 
-  const removeItem = async (item: FileItem) => {
-    const confirmed = window.confirm(t(item.kind === "folder" ? "deleteFolderConfirm" : "deleteProjectConfirm"));
-    if (!confirmed) return;
-    const { error } = await deleteFileItem(item.id);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { error } = await deleteFileItem(deleteTarget.id);
     if (error) {
       setLoadError(friendlyError(error, "delete"));
-      return;
+    } else {
+      await refreshItems();
     }
-    await refreshItems();
+    setDeleting(false);
+    setDeleteTarget(null);
   };
 
   const enterFolder = (folder: FileItem) => {
@@ -414,7 +419,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
                         <span className="min-w-0"><span className="block truncate text-xs font-medium text-slate-300">{folder.name}</span><span className="mt-1 block text-[10px] text-slate-600">{t("folderType")}</span></span>
                       </button>
                       <ItemMeta item={folder} onTag={toggleTag} />
-                      <ItemActions item={folder} onEdit={() => { setDialogError(null); setDialog({ mode: "edit", item: folder }); }} onDelete={() => void removeItem(folder)} />
+                      <ItemActions item={folder} onEdit={() => { setDialogError(null); setDialog({ mode: "edit", item: folder }); }} onDelete={() => setDeleteTarget(folder)} />
                     </article>
                   ))}
                 </div>
@@ -444,7 +449,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
                         <h2 className="mt-5 text-sm font-semibold text-slate-200">{project.name}</h2>
                       </button>
                       <ItemMeta item={project} onTag={toggleTag} />
-                      <ItemActions item={project} onEdit={() => { setDialogError(null); setDialog({ mode: "edit", item: project }); }} onDelete={() => void removeItem(project)} />
+                      <ItemActions item={project} onEdit={() => { setDialogError(null); setDialog({ mode: "edit", item: project }); }} onDelete={() => setDeleteTarget(project)} />
                     </article>
                   ))}
                 </div>
@@ -456,6 +461,18 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
       </div>
 
       {dialog && <ItemDialog key={dialog.mode === "edit" ? dialog.item.id : dialog.kind} state={dialog} busy={saving} error={dialogError} onClose={() => setDialog(null)} onSubmit={submitDialog} />}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={t(deleteTarget?.kind === "folder" ? "deleteFolderTitle" : "deleteProjectTitle")}
+        description={t(deleteTarget?.kind === "folder" ? "deleteFolderConfirm" : "deleteProjectConfirm")}
+        confirmLabel={t("confirmDelete")}
+        cancelLabel={t("cancel")}
+        closeLabel={t("closeDialog")}
+        busy={deleting}
+        tone="danger"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+      />
     </section>
   );
 }

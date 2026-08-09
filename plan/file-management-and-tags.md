@@ -134,6 +134,21 @@
 
 驗證結果：ESLint、`tsc --noEmit` 與 Next.js production build 均通過。實際拖曳需等待 `file_items` 與循環保護 migration 套用後驗收。
 
+### 11. 統一確認對話框
+
+- [x] 建立可重複使用的 Code Tutor 深色確認對話框。
+- [x] 專案與資料夾刪除不再使用瀏覽器 `window.confirm`。
+- [x] 編輯器的重設程式碼確認一併改為站內對話框。
+- [x] 危險操作使用紅色確認按鈕，一般取消按鈕維持現有深色框線。
+- [x] 支援右上角關閉、取消、Esc、背景點擊及鍵盤焦點。
+- [x] 搜尋全站並確認沒有剩餘的 `window.alert`、`window.confirm` 或 `window.prompt`。
+- [x] 完成 ESLint、TypeScript 與 production build 驗證。
+- [ ] 登入狀態下完成刪除與重設對話框的瀏覽器外觀驗證。
+
+簡易說明：瀏覽器系統視窗無法配合網站配色。改成站內元件後，刪除、重設等確認流程會和編輯視窗維持相同深色外觀。
+
+驗證結果：全站原生彈窗搜尋結果為 0；ESLint、`tsc --noEmit` 與 Next.js production build 均通過。
+
 ## 四、驗收方式
 
 1. 登入後能建立資料夾，重新整理後仍存在。
