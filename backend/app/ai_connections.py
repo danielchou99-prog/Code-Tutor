@@ -22,6 +22,10 @@ class AiProviderUnavailable(AiConnectionError):
     pass
 
 
+class AiProviderAccessDenied(AiConnectionError):
+    pass
+
+
 class AiStorageUnavailable(AiConnectionError):
     pass
 
@@ -104,8 +108,10 @@ class GroqKeyValidator:
         except httpx.RequestError as error:
             raise AiProviderUnavailable("Groq is temporarily unavailable.") from error
 
-        if response.status_code in (401, 403):
+        if response.status_code == 401:
             raise InvalidProviderKey("Groq rejected this API key.")
+        if response.status_code == 403:
+            raise AiProviderAccessDenied("Groq denied access for this network or account.")
         if response.status_code != 200:
             raise AiProviderUnavailable("Groq could not validate the API key.")
 

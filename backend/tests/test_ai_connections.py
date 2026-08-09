@@ -2,6 +2,7 @@ from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from app.ai_connections import (
+    AiProviderAccessDenied,
     AiProviderUnavailable,
     AiConnectionService,
     ConnectionStatus,
@@ -57,6 +58,11 @@ class AcceptingValidator:
 class RejectingValidator:
     def validate(self, api_key: str) -> None:
         raise InvalidProviderKey("rejected")
+
+
+class AccessDeniedValidator:
+    def validate(self, api_key: str) -> None:
+        raise AiProviderAccessDenied("denied")
 
 
 class FakeTokenVerifier:
@@ -135,6 +141,20 @@ def test_groq_validator_maps_provider_failure(monkeypatch) -> None:
         raise AssertionError("Expected AiProviderUnavailable")
 
 
+def test_groq_validator_maps_forbidden_access_without_blaming_key(monkeypatch) -> None:
+    class ForbiddenResponse:
+        status_code = 403
+
+    monkeypatch.setattr("app.ai_connections.secure_http_request", lambda *args, **kwargs: ForbiddenResponse())
+
+    try:
+        GroqKeyValidator().validate("gsk_private-value")
+    except AiProviderAccessDenied as error:
+        assert "gsk_private-value" not in str(error)
+    else:
+        raise AssertionError("Expected AiProviderAccessDenied")
+
+
 def test_ai_connection_endpoints_require_authentication() -> None:
     client = TestClient(app)
     response = client.get("/api/ai/connection")
@@ -190,4 +210,25 @@ def test_ai_connection_endpoint_maps_rejected_key_to_safe_error() -> None:
         app.state.token_verifier = previous_verifier
 
     assert response.status_code == 400
+    assert "gsk_test-secret-1234" not in response.text
+
+
+def test_ai_connection_endpoint_maps_forbidden_access_to_actionable_error() -> None:
+    service, _store, _cipher = make_service(AccessDeniedValidator())
+    previous_verifier = app.state.token_verifier
+    app.state.token_verifier = FakeTokenVerifier()
+    app.dependency_overrides[get_ai_connection_service] = lambda: service
+    client = TestClient(app)
+    try:
+        response = client.put(
+            "/api/ai/connection",
+            headers={"Authorization": "Bearer valid-test-token"},
+            json={"api_key": "gsk_test-secret-1234"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+        app.state.token_verifier = previous_verifier
+
+    assert response.status_code == 403
+    assert "network or account" in response.text
     assert "gsk_test-secret-1234" not in response.text

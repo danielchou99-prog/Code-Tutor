@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .ai_connections import (
     AiConnectionService,
+    AiProviderAccessDenied,
     AiProviderUnavailable,
     AiStorageUnavailable,
     FernetKeyCipher,
@@ -160,6 +161,11 @@ async def connect_ai(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Groq rejected this API key. Check the key and try again.",
+        ) from error
+    except AiProviderAccessDenied as error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Groq denied access from this network or account. Check your network and Groq permissions.",
         ) from error
     except AiProviderUnavailable as error:
         raise HTTPException(
