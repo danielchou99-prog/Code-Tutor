@@ -106,6 +106,17 @@
 
 驗證結果：ESLint、`tsc --noEmit` 與 Next.js production build 均通過。
 
+### 9. 區段標題對比
+
+- [x] 主內容的 `Folders` 與 `Projects` 使用白色粗體。
+- [x] 左側的 `Folders here` 與 `Recently updated projects` 使用白色粗體。
+- [x] 不變更按鈕、卡片、框線與版面位置。
+- [x] 完成 ESLint 與 TypeScript 驗證。
+
+簡易說明：這四個文字是內容分區標題，需要比空狀態與一般說明文字更清楚，使用者才能快速掃描畫面。
+
+驗證結果：四個標題已提高為白色粗體，主內容使用 12px、左側使用 10px，以維持原本資訊層級；ESLint 與 `tsc --noEmit` 通過。
+
 ## 四、驗收方式
 
 1. 登入後能建立資料夾，重新整理後仍存在。

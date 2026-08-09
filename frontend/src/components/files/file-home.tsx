@@ -339,7 +339,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
           <>
             <div className="mt-9">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("folders")}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-white">{t("folders")}</p>
                 <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "folder" }); }} className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-xs font-medium text-slate-300 transition-colors hover:border-cyan-300/25 hover:text-cyan-200">
                   <span className="text-base leading-none" aria-hidden="true">+</span>{t("addFolder")}
                 </button>
@@ -362,7 +362,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
 
             <div className="mt-10">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("projectSection")}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.15em] text-white">{t("projects")}</p>
                 <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "project" }); }} className="flex h-9 items-center gap-2 rounded-lg bg-cyan-400 px-4 text-xs font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.12)] transition-colors hover:bg-cyan-300">
                   <span className="text-base leading-none" aria-hidden="true">+</span>{t("addProject")}
                 </button>
@@ -428,7 +428,7 @@ function FileNavigationSidebar({
       </div>
 
       <div className="mt-7 border-t border-white/6 pt-5">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("currentFolders")}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white">{t("currentFolders")}</p>
         <div className="mt-2 space-y-1">
           {folders.length === 0 ? <p className="px-2 py-2 text-[10px] leading-4 text-slate-700">{t("emptyFolders")}</p> : folders.slice(0, 6).map((folder) => (
             <button key={folder.id} type="button" onClick={() => onFolder(folder)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
@@ -439,7 +439,7 @@ function FileNavigationSidebar({
       </div>
 
       <div className="mt-7 border-t border-white/6 pt-5">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("recentProjects")}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white">{t("recentProjects")}</p>
         <div className="mt-2 space-y-1">
           {recentProjects.length === 0 ? <p className="px-2 py-2 text-[10px] leading-4 text-slate-700">{t("noRecentProjects")}</p> : recentProjects.map((project) => (
             <button key={project.id} type="button" onClick={() => onOpenProject({ id: project.id, name: project.name })} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
