@@ -107,17 +107,51 @@ const suggestedTags: Array<TagId | "all"> = [
   "graph",
 ];
 
+const hashtagPattern = /#[^\s#]+/g;
+
+function findTagId(label: string): TagId | null {
+  const normalizedLabel = label.toLocaleLowerCase();
+  for (const languageLabels of Object.values(tagLabels)) {
+    for (const [tagId, localizedLabel] of Object.entries(languageLabels)) {
+      if (
+        tagId !== "all" &&
+        localizedLabel.toLocaleLowerCase() === normalizedLabel
+      ) {
+        return tagId as TagId;
+      }
+    }
+  }
+  return null;
+}
+
 export function ProblemsPage() {
   const { language, t } = useLanguage();
   const [query, setQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState<TagId | "all">("all");
+  const [selectedTags, setSelectedTags] = useState<TagId[]>([]);
   const localizedTags = tagLabels[language];
   const textKey = language === "zh-Hant" ? "zh" : "en";
 
+  const { effectiveTags, hasUnknownHashtag } = useMemo(() => {
+    const queryHashtags = query.match(hashtagPattern) ?? [];
+    const queryTagIds = queryHashtags.map(findTagId);
+    const recognizedQueryTags = queryTagIds.filter(
+      (tag): tag is TagId => tag !== null,
+    );
+    return {
+      effectiveTags: [...new Set([...selectedTags, ...recognizedQueryTags])],
+      hasUnknownHashtag: queryTagIds.some((tag) => tag === null),
+    };
+  }, [query, selectedTags]);
+
   const filteredProblems = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase(language);
+    const normalizedQuery = query
+      .replace(hashtagPattern, " ")
+      .trim()
+      .toLocaleLowerCase(language);
     return problems.filter((problem) => {
-      const matchesTag = selectedTag === "all" || problem.tags.includes(selectedTag);
+      const matchesTags =
+        !hasUnknownHashtag &&
+        effectiveTags.every((tag) => problem.tags.includes(tag));
       const searchableText = [
         problem.title[textKey],
         problem.description[textKey],
@@ -125,9 +159,23 @@ export function ProblemsPage() {
       ]
         .join(" ")
         .toLocaleLowerCase(language);
-      return matchesTag && (!normalizedQuery || searchableText.includes(normalizedQuery));
+      return matchesTags && (!normalizedQuery || searchableText.includes(normalizedQuery));
     });
-  }, [language, localizedTags, query, selectedTag, textKey]);
+  }, [effectiveTags, hasUnknownHashtag, language, localizedTags, query, textKey]);
+
+  const toggleTag = (tag: TagId | "all") => {
+    if (tag === "all") {
+      setSelectedTags([]);
+      setQuery((current) => current.replace(hashtagPattern, " ").replace(/\s+/g, " ").trim());
+      return;
+    }
+
+    setSelectedTags((current) =>
+      current.includes(tag)
+        ? current.filter((selectedTag) => selectedTag !== tag)
+        : [...current, tag],
+    );
+  };
 
   return (
     <section className="flex-1 bg-[#090d14] px-5 py-8 sm:px-8 lg:px-12">
@@ -151,13 +199,13 @@ export function ProblemsPage() {
 
         <div className="mt-5 flex flex-wrap gap-2" aria-label={t("problemTagFilter")}>
           {suggestedTags.map((tag) => {
-            const active = selectedTag === tag;
+            const active = tag === "all" ? effectiveTags.length === 0 : effectiveTags.includes(tag);
             return (
               <button
                 key={tag}
                 type="button"
                 aria-pressed={active}
-                onClick={() => setSelectedTag(tag)}
+                onClick={() => toggleTag(tag)}
                 className={`rounded-full border px-3 py-1.5 text-[11px] transition-colors ${
                   active
                     ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-200"
@@ -221,7 +269,7 @@ export function ProblemsPage() {
               type="button"
               onClick={() => {
                 setQuery("");
-                setSelectedTag("all");
+                setSelectedTags([]);
               }}
               className="mt-3 text-xs text-cyan-300 hover:text-cyan-200"
             >

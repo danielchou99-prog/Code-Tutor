@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event, Lock
+import asyncio
 
 from fastapi.testclient import TestClient
 
@@ -8,6 +9,7 @@ from app.main import (
     app,
     get_compiler,
     get_execution_gate,
+    get_interactive_compiler,
     get_rate_limiter,
 )
 from app.models import RunResponse
@@ -55,6 +57,61 @@ class BlockingCompiler:
         with self._lock:
             self._active -= 1
         return RunResponse(status="accepted", stdout="ok", exit_code=0)
+
+
+class FakeInteractiveProcess:
+    def __init__(self) -> None:
+        self.stdout = asyncio.StreamReader()
+        self.stderr = asyncio.StreamReader()
+        self.stdin = None
+        self.returncode: int | None = None
+        self.finished = asyncio.Event()
+
+    async def wait(self) -> int:
+        await self.finished.wait()
+        assert self.returncode is not None
+        return self.returncode
+
+
+class FakeInteractiveSession:
+    def __init__(self) -> None:
+        self.process = FakeInteractiveProcess()
+        self.container_name = "fake-interactive"
+        self.inputs: list[str] = []
+        self.closed = False
+        self.process.stderr.feed_data(b"__CODE_TUTOR_INTERACTIVE_READY__\n")
+        self.process.stdout.feed_data(b"Number? ")
+
+    async def write(self, data: str) -> None:
+        self.inputs.append(data)
+        self.process.stdout.feed_data(f"Result: {data}".encode())
+        self.process.stdout.feed_eof()
+        self.process.stderr.feed_eof()
+        self.process.returncode = 0
+        self.process.finished.set()
+
+    async def close(self) -> None:
+        if self.closed:
+            return
+        self.closed = True
+        if self.process.returncode is None:
+            self.process.stdout.feed_eof()
+            self.process.stderr.feed_eof()
+            self.process.returncode = 0
+            self.process.finished.set()
+
+
+class FakeInteractiveCompiler:
+    def __init__(self) -> None:
+        self.session: FakeInteractiveSession | None = None
+
+    def is_available(self) -> bool:
+        return True
+
+    async def start(self, code: str) -> FakeInteractiveSession:
+        assert code == "int main() {}"
+        self.session = FakeInteractiveSession()
+        return self.session
 
 
 client = TestClient(app)
@@ -152,3 +209,34 @@ def test_run_limits_concurrent_compiler_executions() -> None:
 
     assert [response.status_code for response in responses] == [200, 200]
     assert compiler.max_active == 1
+
+
+def test_interactive_websocket_streams_input_and_output() -> None:
+    compiler = FakeInteractiveCompiler()
+    gate = ExecutionGate(max_concurrent=1, max_queued=0, wait_timeout_seconds=1)
+    limiter = InMemoryRateLimiter(max_requests=100, window_seconds=60)
+    app.dependency_overrides[get_interactive_compiler] = lambda: compiler
+    app.dependency_overrides[get_execution_gate] = lambda: gate
+    app.dependency_overrides[get_rate_limiter] = lambda: limiter
+
+    with client.websocket_connect("/api/run/interactive") as websocket:
+        websocket.send_json(
+            {"type": "start", "code": "int main() {}", "language": "cpp"}
+        )
+        messages = [websocket.receive_json() for _ in range(3)]
+        assert {message.get("status") for message in messages} >= {
+            "compiling",
+            "running",
+        }
+        assert any(message.get("data") == "Number? " for message in messages)
+
+        websocket.send_json({"type": "input", "data": "42\n"})
+        final_messages = [websocket.receive_json() for _ in range(2)]
+
+    app.dependency_overrides.clear()
+
+    assert compiler.session is not None
+    assert compiler.session.inputs == ["42\n"]
+    assert compiler.session.closed is True
+    assert any(message.get("data") == "Result: 42\n" for message in final_messages)
+    assert any(message.get("status") == "accepted" for message in final_messages)

@@ -16,12 +16,10 @@ const initialFolders = [
 const projects = [
   {
     name: "C++ 基礎練習",
-    description: { zh: "目前的 main.cpp 與 Online Compiler", en: "Your current main.cpp and Online Compiler" },
     updatedAt: { zh: "剛剛更新", en: "Updated just now" },
   },
   {
     name: "APCS 題目整理",
-    description: { zh: "記錄 APCS 題目的解法與測試", en: "Solutions and tests for APCS problems" },
     updatedAt: { zh: "昨天更新", en: "Updated yesterday" },
   },
 ];
@@ -123,9 +121,6 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
                   <span className="text-slate-600 transition-colors group-hover:text-cyan-300" aria-hidden="true">↗</span>
                 </div>
                 <h2 className="mt-5 text-sm font-semibold text-slate-200">{project.name}</h2>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {language === "zh-Hant" ? project.description.zh : project.description.en}
-                </p>
                 <p className="mt-5 text-[10px] text-slate-700">
                   {language === "zh-Hant" ? project.updatedAt.zh : project.updatedAt.en}
                 </p>

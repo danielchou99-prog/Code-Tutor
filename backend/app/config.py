@@ -35,6 +35,9 @@ class Settings:
     )
     compile_timeout_seconds: int = 15
     run_timeout_seconds: int = 3
+    interactive_timeout_seconds: int = int(
+        os.getenv("CODE_TUTOR_INTERACTIVE_TIMEOUT_SECONDS", "60")
+    )
     max_output_bytes: int = 65_536
     docker_binary: str = "docker"
     rate_limit_requests: int = int(os.getenv("CODE_TUTOR_RATE_LIMIT_REQUESTS", "10"))

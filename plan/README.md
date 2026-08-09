@@ -28,3 +28,5 @@
 - [Online Compiler 建立計畫](online-compiler.md)：C++ 線上編譯器、Docker 隔離環境、安全限制與上線準備。
 - [公開測試版保護計畫](public-beta-protection.md)：Rate limit、最大並行數、工作佇列、Frontend 狀態與安全 LAN 存取。
 - [檔案導覽與題目標籤計畫](workspace-navigation-and-problems.md)：置中導覽、檔案首頁、專案入口、題目搜尋與標籤篩選。
+- [多標籤搜尋與 Interactive Console 計畫](problem-search-and-interactive-console.md)：`#` 多標籤解析、專案卡片簡化、Batch Input 與即時互動 Console。
+- [免費 AI 與帳號管理計畫](ai-account-foundation.md)：Supabase Auth、使用者自備 Groq key、AI Tutor API 與安全保存方式。

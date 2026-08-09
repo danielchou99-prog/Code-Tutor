@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runCpp, type RunResult } from "@/lib/compiler-api";
+import {
+  type InteractiveConnection,
+  type InteractiveOutput,
+  type InteractiveStatus,
+  startInteractiveCpp,
+} from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
 import { CodeEditorPanel } from "./code-editor-panel";
 import { OutputPanel } from "./output-panel";
@@ -17,9 +23,49 @@ export function WorkspaceCenter() {
   const [result, setResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [activeTab, setActiveTab] = useState<"output" | "input">("output");
+  const [inputMode, setInputMode] = useState<"batch" | "interactive">("batch");
+  const [interactiveOutput, setInteractiveOutput] = useState<InteractiveOutput[]>([]);
+  const [interactiveStatus, setInteractiveStatus] = useState<InteractiveStatus>("idle");
+  const interactiveConnection = useRef<InteractiveConnection | null>(null);
+
+  useEffect(() => {
+    return () => interactiveConnection.current?.stop();
+  }, []);
 
   const handleRun = useCallback(
     async (code: string) => {
+      if (inputMode === "interactive") {
+        interactiveConnection.current?.stop();
+        setActiveTab("input");
+        setInteractiveOutput([]);
+        setInteractiveStatus("connecting");
+        setIsRunning(true);
+        interactiveConnection.current = startInteractiveCpp(code, {
+          onEvent: (event) => {
+            if (event.type === "output") {
+              setInteractiveOutput((current) => [...current, event]);
+            } else if (event.type === "status") {
+              setInteractiveStatus(event.status);
+              if (["accepted", "compile_error", "runtime_error", "timeout", "stopped"].includes(event.status)) {
+                setIsRunning(false);
+              }
+            } else {
+              setInteractiveOutput((current) => [
+                ...current,
+                { stream: "stderr", data: `${event.message}\n` },
+              ]);
+              setInteractiveStatus("error");
+              setIsRunning(false);
+            }
+          },
+          onClose: () => {
+            interactiveConnection.current = null;
+            setIsRunning(false);
+          },
+        });
+        return;
+      }
+
       setActiveTab("output");
       setIsRunning(true);
 
@@ -43,8 +89,22 @@ export function WorkspaceCenter() {
         setIsRunning(false);
       }
     },
-    [stdin, t],
+    [inputMode, stdin, t],
   );
+
+  const sendInteractiveInput = (data: string) => {
+    const line = data.endsWith("\n") ? data : `${data}\n`;
+    if (!interactiveConnection.current?.send(line)) return false;
+    setInteractiveOutput((current) => [...current, { stream: "stdin", data: line }]);
+    return true;
+  };
+
+  const stopInteractive = () => {
+    interactiveConnection.current?.stop();
+    interactiveConnection.current = null;
+    setInteractiveStatus("stopped");
+    setIsRunning(false);
+  };
 
   return (
     <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:border-x">
@@ -52,9 +112,19 @@ export function WorkspaceCenter() {
       <OutputPanel
         activeTab={activeTab}
         isRunning={isRunning}
+        inputMode={inputMode}
+        interactiveOutput={interactiveOutput}
+        interactiveStatus={interactiveStatus}
         onClear={() => setResult(null)}
+        onInputModeChange={(mode) => {
+          if (isRunning) return;
+          setInputMode(mode);
+          setActiveTab("input");
+        }}
+        onInteractiveInput={sendInteractiveInput}
         onSelectTab={setActiveTab}
         onStdinChange={setStdin}
+        onStopInteractive={stopInteractive}
         result={result}
         stdin={stdin}
       />

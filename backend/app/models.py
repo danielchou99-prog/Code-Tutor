@@ -20,6 +20,17 @@ class RunRequest(BaseModel):
     language: Literal["cpp"] = "cpp"
 
 
+class InteractiveStartRequest(BaseModel):
+    type: Literal["start"]
+    code: str = Field(min_length=1, max_length=65_536)
+    language: Literal["cpp"] = "cpp"
+
+
+class InteractiveInputRequest(BaseModel):
+    type: Literal["input"]
+    data: str = Field(max_length=4_096)
+
+
 class RunResponse(BaseModel):
     status: RunStatus
     stdout: str = ""

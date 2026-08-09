@@ -1,12 +1,21 @@
+import { useState } from "react";
+
 import type { RunResult, RunStatus } from "@/lib/compiler-api";
+import type { InteractiveOutput, InteractiveStatus } from "@/lib/interactive-api";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
 
 type OutputPanelProps = {
   activeTab: "output" | "input";
   isRunning: boolean;
+  inputMode: "batch" | "interactive";
+  interactiveOutput: InteractiveOutput[];
+  interactiveStatus: InteractiveStatus;
   onClear: () => void;
+  onInputModeChange: (mode: "batch" | "interactive") => void;
+  onInteractiveInput: (data: string) => boolean;
   onSelectTab: (tab: "output" | "input") => void;
   onStdinChange: (value: string) => void;
+  onStopInteractive: () => void;
   result: RunResult | null;
   stdin: string;
 };
@@ -55,14 +64,34 @@ const statusPresentation: Record<
 export function OutputPanel({
   activeTab,
   isRunning,
+  inputMode,
+  interactiveOutput,
+  interactiveStatus,
   onClear,
+  onInputModeChange,
+  onInteractiveInput,
   onSelectTab,
   onStdinChange,
+  onStopInteractive,
   result,
   stdin,
 }: OutputPanelProps) {
   const { t } = useLanguage();
+  const [consoleInput, setConsoleInput] = useState("");
   const presentation = result ? statusPresentation[result.status] : null;
+
+  const interactiveStatusLabel = {
+    idle: t("consoleWaiting"),
+    connecting: t("consoleConnecting"),
+    compiling: t("consoleCompiling"),
+    running: t("consoleRunning"),
+    stopped: t("consoleStopped"),
+    accepted: t("statusAccepted"),
+    compile_error: t("statusCompileError"),
+    runtime_error: t("statusRuntimeError"),
+    timeout: t("statusTimeout"),
+    error: t("statusUnavailable"),
+  }[interactiveStatus];
 
   return (
     <section className="h-52 shrink-0 border-t border-white/10 bg-[#090e16]">
@@ -107,15 +136,101 @@ export function OutputPanel({
       </div>
 
       {activeTab === "input" ? (
-        <div className="h-[calc(100%-2.5rem)] p-3">
-          <textarea
-            aria-label={t("standardInput")}
-            className="h-full w-full resize-none rounded-lg border border-white/8 bg-[#0c111b] p-3 font-mono text-xs leading-5 text-slate-300 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-300/30"
-            onChange={(event) => onStdinChange(event.target.value)}
-            placeholder={t("inputPlaceholder")}
-            spellCheck={false}
-            value={stdin}
-          />
+        <div className="flex h-[calc(100%-2.5rem)] flex-col p-3">
+          <div className="mb-2 flex items-center gap-1 rounded-lg bg-white/[0.025] p-1 self-start">
+            {(["batch", "interactive"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={inputMode === mode}
+                disabled={isRunning}
+                onClick={() => onInputModeChange(mode)}
+                className={`rounded-md px-2.5 py-1 text-[10px] transition-colors disabled:cursor-not-allowed ${
+                  inputMode === mode
+                    ? "bg-cyan-300/10 text-cyan-200"
+                    : "text-slate-600 hover:text-slate-400"
+                }`}
+              >
+                {mode === "batch" ? t("batchInput") : t("interactiveConsole")}
+              </button>
+            ))}
+          </div>
+
+          {inputMode === "batch" ? (
+            <textarea
+              aria-label={t("standardInput")}
+              className="min-h-0 flex-1 resize-none rounded-lg border border-white/8 bg-[#0c111b] p-3 font-mono text-xs leading-5 text-slate-300 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-300/30"
+              onChange={(event) => onStdinChange(event.target.value)}
+              placeholder={t("inputPlaceholder")}
+              spellCheck={false}
+              value={stdin}
+            />
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/8 bg-[#070a10]">
+              <div className="flex items-center gap-2 border-b border-white/8 px-3 py-1.5 text-[9px] text-slate-500">
+                <span
+                  className={`size-1.5 rounded-full ${
+                    interactiveStatus === "running"
+                      ? "animate-pulse bg-emerald-400"
+                      : interactiveStatus === "error" || interactiveStatus === "compile_error"
+                        ? "bg-rose-400"
+                        : "bg-slate-600"
+                  }`}
+                  aria-hidden="true"
+                />
+                <span role="status">{interactiveStatusLabel}</span>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto p-3 font-mono text-[11px] leading-5">
+                {interactiveOutput.length === 0 ? (
+                  <p className="text-slate-700">$ interactive session</p>
+                ) : (
+                  interactiveOutput.map((entry, index) => (
+                    <span
+                      key={`${index}-${entry.stream}`}
+                      className={
+                        entry.stream === "stderr"
+                          ? "whitespace-pre-wrap text-rose-300"
+                          : entry.stream === "stdin"
+                            ? "whitespace-pre-wrap text-cyan-300"
+                            : "whitespace-pre-wrap text-slate-200"
+                      }
+                    >
+                      {entry.stream === "stdin" ? `> ${entry.data}` : entry.data}
+                    </span>
+                  ))
+                )}
+              </div>
+              <form
+                className="flex items-center gap-2 border-t border-white/8 p-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!consoleInput || !onInteractiveInput(consoleInput)) return;
+                  setConsoleInput("");
+                }}
+              >
+                <span className="font-mono text-xs text-cyan-300" aria-hidden="true">›</span>
+                <input
+                  value={consoleInput}
+                  onChange={(event) => setConsoleInput(event.target.value)}
+                  disabled={interactiveStatus !== "running"}
+                  aria-label={t("consoleInputPlaceholder")}
+                  placeholder={t("consoleInputPlaceholder")}
+                  className="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-slate-200 outline-none placeholder:text-slate-700 disabled:cursor-not-allowed"
+                />
+                {isRunning ? (
+                  <button
+                    type="button"
+                    onClick={onStopInteractive}
+                    className="rounded-md border border-rose-300/15 px-2 py-1 text-[10px] text-rose-300"
+                  >
+                    {t("stopProgram")}
+                  </button>
+                ) : (
+                  <button type="submit" className="sr-only">{t("sendInput")}</button>
+                )}
+              </form>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex h-[calc(100%-2.5rem)] flex-col justify-between p-4 font-mono text-xs">

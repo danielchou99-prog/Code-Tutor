@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [project|problems|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -193,11 +193,12 @@ if (action === "english") {
       document.body.innerText.includes("New Project") &&
       document.body.innerText.includes("C++ 基礎練習") &&
       !document.body.innerText.includes("C++ Fundamentals") &&
+      !document.body.innerText.includes("Your current main.cpp and Online Compiler") &&
       !document.body.innerText.includes("檔案");
     })()`,
   );
 }
-if (action === "project" || action === "run" || action === "run-blocked") {
+if (action === "project" || action === "interactive" || action === "run" || action === "run-blocked") {
   const opened = await evaluate(
     client,
     `(() => {
@@ -220,6 +221,81 @@ if (action === "project" || action === "run" || action === "run-blocked") {
     );
   }
 }
+if (action === "interactive") {
+  const inputSelected = await evaluate(
+    client,
+    `(() => {
+      const inputTab = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent.trim() === "輸入",
+      );
+      if (!inputTab) return false;
+      inputTab.click();
+      return true;
+    })()`,
+  );
+  if (!inputSelected) throw new Error("Input tab was not found.");
+  await sleep(300);
+
+  const consoleSelected = await evaluate(
+    client,
+    `(() => {
+      const consoleButton = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent.trim() === "Interactive Console",
+      );
+      if (!consoleButton) return false;
+      consoleButton.click();
+      return true;
+    })()`,
+  );
+  if (!consoleSelected) throw new Error("Interactive Console control was not found.");
+  await sleep(300);
+
+  const runSelected = await evaluate(
+    client,
+    `(() => {
+      const runButton = [...document.querySelectorAll("button")].find(
+        (button) => button.textContent.includes("執行"),
+      );
+      if (!runButton) return false;
+      runButton.click();
+      return true;
+    })()`,
+  );
+  if (!runSelected) throw new Error("Run button was not found.");
+
+  let consoleReady = false;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    consoleReady = await evaluate(
+      client,
+      `Boolean(document.querySelector('input[aria-label="輸入內容後按 Enter…"]:not(:disabled)'))`,
+    );
+    if (consoleReady) break;
+    await sleep(500);
+  }
+  if (!consoleReady) throw new Error("Interactive Console did not become ready.");
+
+  await evaluate(
+    client,
+    `(() => {
+      const input = document.querySelector('input[aria-label="輸入內容後按 Enter…"]');
+      if (!input) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "5 1 2 3 4 5");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.form?.requestSubmit();
+      return true;
+    })()`,
+  );
+
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    actionSucceeded = await evaluate(
+      client,
+      `document.body.innerText.includes("15") && document.body.innerText.includes("程式執行成功")`,
+    );
+    if (actionSucceeded) break;
+    await sleep(500);
+  }
+}
 if (action === "problems" || action === "english-problems") {
   const englishProblems = action === "english-problems";
   const clicked = await evaluate(
@@ -235,18 +311,18 @@ if (action === "problems" || action === "english-problems") {
   );
   if (!clicked) throw new Error("Problems navigation button was not found.");
   await sleep(1_000);
-  const tagClicked = await evaluate(
+  const tagsEntered = await evaluate(
     client,
     `(() => {
-      const button = [...document.querySelectorAll("button")].find(
-        (candidate) => candidate.textContent.trim() === ${JSON.stringify(englishProblems ? "#BinarySearch" : "#二分搜")},
-      );
-      if (!button) return false;
-      button.click();
+      const input = document.querySelector('input[placeholder*="#"]');
+      if (!input) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, ${JSON.stringify(englishProblems ? "#APCSIntermediateAdvanced #BinarySearch" : "#APCS中高級 #二分搜")});
+      input.dispatchEvent(new Event("input", { bubbles: true }));
       return true;
     })()`,
   );
-  if (!tagClicked) throw new Error("Binary search tag was not found.");
+  if (!tagsEntered) throw new Error("Problem search field was not found.");
   await sleep(500);
   actionSucceeded = await evaluate(
     client,
@@ -254,11 +330,23 @@ if (action === "problems" || action === "english-problems") {
       ? `document.documentElement.lang === "en" &&
           document.body.innerText.includes("1 problems found") &&
           document.body.innerText.includes("Find a Target in a Sorted Array") &&
-          !document.body.innerText.includes("Shortest Path Through a Maze")`
+          !document.body.innerText.includes("Shortest Path Through a Maze") &&
+          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
+            (button) => button.textContent.trim() === "#APCSIntermediateAdvanced",
+          ) &&
+          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
+            (button) => button.textContent.trim() === "#BinarySearch",
+          )`
       : `document.documentElement.lang === "zh-Hant" &&
           document.body.innerText.includes("找到 1 題") &&
           document.body.innerText.includes("在排序陣列中尋找目標") &&
-          !document.body.innerText.includes("迷宮的最短路徑")`,
+          !document.body.innerText.includes("迷宮的最短路徑") &&
+          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
+            (button) => button.textContent.trim() === "#APCS中高級",
+          ) &&
+          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
+            (button) => button.textContent.trim() === "#二分搜",
+          )`,
   );
 }
 if (action === "run" || action === "run-blocked") {
