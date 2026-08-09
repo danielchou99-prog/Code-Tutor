@@ -16,11 +16,25 @@ export type FileItem = {
 
 export type FileProject = Pick<FileItem, "id" | "name">;
 
-const projectDraftStoragePrefix = "code-tutor:project-draft:";
+export type ProjectFile = {
+  id: string;
+  user_id: string;
+  project_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
 
-export function loadProjectDraft(projectId: string): string | null {
+const projectDraftStoragePrefix = "code-tutor:project-draft:";
+const activeProjectFileStoragePrefix = "code-tutor:active-project-file:";
+
+function projectDraftKey(projectId: string, fileId?: string): string {
+  return `${projectDraftStoragePrefix}${projectId}${fileId ? `:${fileId}` : ""}`;
+}
+
+export function loadProjectDraft(projectId: string, fileId?: string): string | null {
   try {
-    const storedDraft = window.localStorage.getItem(`${projectDraftStoragePrefix}${projectId}`);
+    const storedDraft = window.localStorage.getItem(projectDraftKey(projectId, fileId));
     if (!storedDraft) return null;
     const draft = JSON.parse(storedDraft) as { content?: unknown };
     return typeof draft.content === "string" ? draft.content : null;
@@ -29,10 +43,10 @@ export function loadProjectDraft(projectId: string): string | null {
   }
 }
 
-export function saveProjectDraft(projectId: string, content: string) {
+export function saveProjectDraft(projectId: string, content: string, fileId?: string) {
   try {
     window.localStorage.setItem(
-      `${projectDraftStoragePrefix}${projectId}`,
+      projectDraftKey(projectId, fileId),
       JSON.stringify({ content, updatedAt: new Date().toISOString() }),
     );
   } catch {
@@ -40,11 +54,38 @@ export function saveProjectDraft(projectId: string, content: string) {
   }
 }
 
-export function clearProjectDraft(projectId: string) {
+export function clearProjectDraft(projectId: string, fileId?: string) {
   try {
-    window.localStorage.removeItem(`${projectDraftStoragePrefix}${projectId}`);
+    if (fileId) {
+      window.localStorage.removeItem(projectDraftKey(projectId, fileId));
+      return;
+    }
+    window.localStorage.removeItem(projectDraftKey(projectId));
+    const prefix = `${projectDraftStoragePrefix}${projectId}:`;
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(prefix)) window.localStorage.removeItem(key);
+    }
   } catch {
     // A blocked browser storage must not stop navigation or saving.
+  }
+}
+
+export function loadActiveProjectFileId(projectId: string): string | null {
+  try {
+    return window.localStorage.getItem(`${activeProjectFileStoragePrefix}${projectId}`);
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveProjectFileId(projectId: string, fileId: string | null) {
+  try {
+    const key = `${activeProjectFileStoragePrefix}${projectId}`;
+    if (fileId) window.localStorage.setItem(key, fileId);
+    else window.localStorage.removeItem(key);
+  } catch {
+    // The editor still works when browser storage is unavailable.
   }
 }
 
@@ -165,4 +206,57 @@ export async function saveProjectContent(id: string, content: string) {
     .update({ content })
     .eq("id", id)
     .eq("kind", "project");
+}
+
+export function isValidProjectFileName(value: string): boolean {
+  const name = value.trim();
+  return name.length >= 1
+    && name.length <= 120
+    && !name.includes("/")
+    && !name.includes("\\")
+    && /\.(?:cpp|h|hpp)$/iu.test(name);
+}
+
+export async function listProjectFiles(projectId: string) {
+  return getSupabaseBrowserClient()
+    .from("project_files")
+    .select("id,user_id,project_id,name,created_at,updated_at")
+    .eq("project_id", projectId)
+    .order("name", { ascending: true });
+}
+
+export async function createProjectFile(input: {
+  userId: string;
+  projectId: string;
+  name: string;
+}) {
+  return getSupabaseBrowserClient()
+    .from("project_files")
+    .insert({
+      user_id: input.userId,
+      project_id: input.projectId,
+      name: input.name.trim(),
+      content: "",
+    })
+    .select("id,user_id,project_id,name,created_at,updated_at")
+    .single();
+}
+
+export async function loadProjectFileContent(fileId: string) {
+  return getSupabaseBrowserClient()
+    .from("project_files")
+    .select("content")
+    .eq("id", fileId)
+    .single();
+}
+
+export async function saveProjectFileContent(fileId: string, content: string) {
+  return getSupabaseBrowserClient()
+    .from("project_files")
+    .update({ content })
+    .eq("id", fileId);
+}
+
+export async function deleteProjectFile(fileId: string) {
+  return getSupabaseBrowserClient().from("project_files").delete().eq("id", fileId);
 }

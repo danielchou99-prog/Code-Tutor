@@ -2,7 +2,7 @@ import type { FileProject } from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
 
 export function HistoryPanel({ project, onBack }: { project: FileProject; onBack: () => void }) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   return (
     <aside className="hidden border-r border-white/6 bg-[#0b1018] p-4 lg:block lg:h-full lg:overflow-y-auto">
@@ -21,8 +21,10 @@ export function HistoryPanel({ project, onBack }: { project: FileProject; onBack
       <div className="mt-7 border-t border-white/6 pt-5">
         <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("projectFiles")}</p>
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/[0.025] px-3 py-2.5 font-mono text-[11px] text-slate-400">
-          <span className="text-cyan-300/60">C++</span>
-          <span>main.cpp</span>
+          <span className="text-cyan-300/60">Files</span>
+          <span className="font-sans text-[10px] text-slate-600">
+            {language === "zh-Hant" ? "由編輯器分頁管理" : "Managed in editor tabs"}
+          </span>
         </div>
       </div>
 
