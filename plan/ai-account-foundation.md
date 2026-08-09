@@ -1,6 +1,6 @@
 # Code Tutor 免費 AI 與帳號管理計畫
 
-- 文件狀態：規劃完成，等待帳號服務建立
+- 文件狀態：Supabase 專案已建立，等待連線資料與 Groq API key
 - 最後更新：2026-08-09
 - 建議方案：Supabase Auth + 使用者自備 Groq API key（BYOK）
 
@@ -49,7 +49,7 @@
 
 ### 階段一：帳號基礎
 
-- [ ] 建立 Supabase Free project。
+- [x] 建立 Supabase Free project。
 - [ ] 建立 email/password 註冊、登入、登出與忘記密碼頁面。
 - [ ] Backend 驗證 Supabase JWT，不信任前端自行提供的 user id。
 - [ ] 建立 `profiles`、`ai_connections`、`ai_usage` 資料表與 RLS。
@@ -88,7 +88,7 @@
 ## 六、需要使用者手動操作
 
 1. 建立或登入 Supabase 帳號，建立 Free project 並提供 Project URL 與 publishable key；service role key 只放 backend secret。
-2. 建立 Groq 帳號與 API key供個人測試；不要將 key 貼在對話、GitHub 或前端程式碼。
+2. 從官方 [Groq API Keys](https://console.groq.com/keys) 建立 API key 供個人測試；不要將 key 貼在對話、GitHub 或前端程式碼。
 3. 正式部署前建立後端加密主密鑰，並使用部署平台 Secret 管理。
 
 ## 七、目前建議
