@@ -77,11 +77,13 @@
 
 ## 五、需要使用者手動操作
 
-- [ ] 在 Supabase SQL Editor 執行本階段建立的 migration。
-- [ ] 將我產生的加密主密鑰放入 `backend/.env`；不要貼到對話或 GitHub。
+- [x] 在 Supabase SQL Editor 執行本階段建立的 migration。
+- [x] 已由本機安全設定工具產生加密主密鑰、複製 publishable key 並寫入忽略版控的 `backend/.env`，秘密未顯示於對話。
 - [ ] 在設定介面自行貼入 Groq API Key，完成真實連線測試；Key 不要貼到對話。
 
 簡易說明：Supabase migration 與秘密環境變數需要專案擁有者權限，所以由使用者操作；程式、測試、文件與非秘密設定由開發工具完成。
+
+目前紀錄：migration 已由使用者執行；本機後端 AI service 已成功啟用，`/health` 回傳 `ok` 且 Compiler 可用。剩餘手動步驟只有在設定視窗自行輸入 Groq API Key 完成真實連線驗收。
 
 ## 六、本階段不包含
 

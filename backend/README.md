@@ -30,7 +30,9 @@ User code is never executed directly on the host. Both batch and interactive run
 Set `CODE_TUTOR_SUPABASE_URL` to the public Supabase Project URL to enable account verification. The Backend verifies JWTs with Supabase JWKS and does not need a Secret/service_role key.
 
 AI connections additionally require `CODE_TUTOR_SUPABASE_PUBLISHABLE_KEY` and a
-Fernet key in `CODE_TUTOR_AI_ENCRYPTION_KEY`. Generate the Fernet key with
-`python scripts/generate_ai_encryption_key.py`, keep it only in `backend/.env`
-or a deployment secret store, and never commit it. The backend uses the user's
+Fernet key in `CODE_TUTOR_AI_ENCRYPTION_KEY`. For local development, run
+`python scripts/generate_ai_encryption_key.py --configure`; it copies the
+publishable key from `frontend/.env.local`, generates the encryption key, and
+updates the ignored `backend/.env` without printing either value. Keep the
+encryption key only in `backend/.env` or a deployment secret store, and never commit it. The backend uses the user's
 verified JWT with Supabase RLS; it does not use a Secret/service-role key.
