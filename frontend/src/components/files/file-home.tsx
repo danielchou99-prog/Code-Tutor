@@ -2,22 +2,27 @@
 
 import { useState } from "react";
 
+import { useLanguage } from "@/lib/language-context";
+
 type FileHomeProps = {
   onOpenProject: (projectName: string) => void;
 };
 
-const initialFolders = ["演算法練習", "課堂筆記"];
+const initialFolders = [
+  { zh: "演算法練習", en: "Algorithm Practice" },
+  { zh: "課堂筆記", en: "Class Notes" },
+];
 
 const projects = [
   {
     name: "C++ 基礎練習",
-    description: "目前的 main.cpp 與 Online Compiler",
-    updatedAt: "剛剛更新",
+    description: { zh: "目前的 main.cpp 與 Online Compiler", en: "Your current main.cpp and Online Compiler" },
+    updatedAt: { zh: "剛剛更新", en: "Updated just now" },
   },
   {
     name: "APCS 題目整理",
-    description: "記錄 APCS 題目的解法與測試",
-    updatedAt: "昨天更新",
+    description: { zh: "記錄 APCS 題目的解法與測試", en: "Solutions and tests for APCS problems" },
+    updatedAt: { zh: "昨天更新", en: "Updated yesterday" },
   },
 ];
 
@@ -31,17 +36,22 @@ function FolderIcon() {
 }
 
 export function FileHome({ onOpenProject }: FileHomeProps) {
-  const [folders, setFolders] = useState(initialFolders);
+  const { language, t } = useLanguage();
+  const [customFolders, setCustomFolders] = useState<string[]>([]);
+  const folderNames = [
+    ...initialFolders.map((folder) => language === "zh-Hant" ? folder.zh : folder.en),
+    ...customFolders,
+  ];
 
   const addFolder = () => {
-    const name = window.prompt("請輸入資料夾名稱");
+    const name = window.prompt(t("folderPrompt"));
     const normalizedName = name?.trim();
-    if (!normalizedName || folders.includes(normalizedName)) return;
-    setFolders((current) => [...current, normalizedName]);
+    if (!normalizedName || folderNames.includes(normalizedName)) return;
+    setCustomFolders((current) => [...current, normalizedName]);
   };
 
   const addProject = () => {
-    const name = window.prompt("請輸入新專案名稱", "未命名 C++ 專案");
+    const name = window.prompt(t("projectPrompt"), t("unnamedProject"));
     const normalizedName = name?.trim();
     if (normalizedName) onOpenProject(normalizedName);
   };
@@ -56,7 +66,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
             className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-xs font-medium text-slate-300 transition-colors hover:border-cyan-300/25 hover:text-cyan-200"
           >
             <span className="text-base leading-none" aria-hidden="true">+</span>
-            新增資料夾
+            {t("addFolder")}
           </button>
           <button
             type="button"
@@ -64,14 +74,14 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
             className="flex h-9 items-center gap-2 rounded-lg bg-cyan-400 px-4 text-xs font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.12)] transition-colors hover:bg-cyan-300"
           >
             <span className="text-base leading-none" aria-hidden="true">+</span>
-            新增專案
+            {t("addProject")}
           </button>
         </div>
 
         <div className="mt-9">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">Folders</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("folders")}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {folders.map((folder) => (
+            {folderNames.map((folder) => (
               <button
                 key={folder}
                 type="button"
@@ -82,7 +92,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
                 </span>
                 <span>
                   <span className="block text-xs font-medium text-slate-300">{folder}</span>
-                  <span className="mt-1 block text-[10px] text-slate-600">資料夾</span>
+                  <span className="mt-1 block text-[10px] text-slate-600">{t("folderType")}</span>
                 </span>
               </button>
             ))}
@@ -92,10 +102,10 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
         <div className="mt-10">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">Projects</p>
-              <h1 className="mt-2 text-xl font-semibold text-white">你的專案</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-600">{t("projects")}</p>
+              <h1 className="mt-2 text-xl font-semibold text-white">{t("yourProjects")}</h1>
             </div>
-            <p className="hidden text-[11px] text-slate-600 sm:block">選擇專案後才會開啟程式編輯器</p>
+            <p className="hidden text-[11px] text-slate-600 sm:block">{t("selectProjectHint")}</p>
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -113,8 +123,12 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
                   <span className="text-slate-600 transition-colors group-hover:text-cyan-300" aria-hidden="true">↗</span>
                 </div>
                 <h2 className="mt-5 text-sm font-semibold text-slate-200">{project.name}</h2>
-                <p className="mt-2 text-xs leading-5 text-slate-500">{project.description}</p>
-                <p className="mt-5 text-[10px] text-slate-700">{project.updatedAt}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  {language === "zh-Hant" ? project.description.zh : project.description.en}
+                </p>
+                <p className="mt-5 text-[10px] text-slate-700">
+                  {language === "zh-Hant" ? project.updatedAt.zh : project.updatedAt.en}
+                </p>
               </button>
             ))}
           </div>

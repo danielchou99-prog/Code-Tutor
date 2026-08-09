@@ -1,15 +1,21 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+import { type TranslationKey, useLanguage } from "@/lib/language-context";
+
 export type PrimarySection = "home" | "files" | "problems" | "quiz" | "about";
 
 const primaryItems: Array<{
   id: PrimarySection;
-  label: string;
+  labelKey: TranslationKey;
   comingSoon?: boolean;
 }> = [
-  { id: "home", label: "首頁" },
-  { id: "files", label: "檔案(File)" },
-  { id: "problems", label: "題目" },
-  { id: "quiz", label: "測驗", comingSoon: true },
-  { id: "about", label: "關於我們" },
+  { id: "home", labelKey: "navHome" },
+  { id: "files", labelKey: "navFiles" },
+  { id: "problems", labelKey: "navProblems" },
+  { id: "quiz", labelKey: "navQuiz", comingSoon: true },
+  { id: "about", labelKey: "navAbout" },
 ];
 
 type SiteHeaderProps = {
@@ -36,6 +42,35 @@ function UserIcon() {
 }
 
 export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
+  const { language, setLanguage, t } = useLanguage();
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const languageMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!languageMenuOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!languageMenuRef.current?.contains(event.target as Node)) {
+        setLanguageMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLanguageMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [languageMenuOpen]);
+
+  const chooseLanguage = (nextLanguage: "zh-Hant" | "en") => {
+    setLanguage(nextLanguage);
+    setLanguageMenuOpen(false);
+  };
+
   return (
     <header className="grid shrink-0 grid-cols-[1fr_auto] items-center border-b border-white/10 bg-[#0d121c] px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:px-6">
       <div className="flex min-w-max items-center gap-2 py-4 md:py-0">
@@ -44,7 +79,7 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
       </div>
 
       <nav
-        aria-label="主要導覽"
+        aria-label={t("mainNavigation")}
         className="order-3 col-span-2 flex h-12 max-w-full items-center justify-start gap-0 overflow-x-auto md:order-none md:col-span-1 md:h-16 md:justify-self-center md:overflow-visible"
       >
         {primaryItems.map((item) => {
@@ -64,10 +99,10 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
                     : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              {item.label}
+              {t(item.labelKey)}
               {item.comingSoon && (
                 <span className="hidden rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-0.5 text-[8px] text-slate-600 xl:inline">
-                  即將推出
+                  {t("comingSoon")}
                 </span>
               )}
               {active && <span className="absolute inset-x-2.5 bottom-0 h-px bg-cyan-300" />}
@@ -82,21 +117,69 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
           className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200 xl:flex"
         >
           <SettingsIcon />
-          設定
+          {t("settings")}
         </button>
-        <button
-          type="button"
-          className="hidden items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-[11px] text-slate-400 transition-colors hover:border-white/15 lg:flex"
-          aria-label="選擇顯示語言，目前為繁體中文"
-        >
-          <span aria-hidden="true">文</span>
-          繁體中文
-          <span className="text-[9px] text-slate-600" aria-hidden="true">⌄</span>
-        </button>
+        <div className="relative" ref={languageMenuRef}>
+          <button
+            type="button"
+            onClick={() => setLanguageMenuOpen((open) => !open)}
+            className="flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-2.5 py-2 text-[11px] text-slate-400 transition-colors hover:border-white/15 sm:px-3"
+            aria-label={t("languageButton")}
+            aria-haspopup="menu"
+            aria-expanded={languageMenuOpen}
+          >
+            <span>
+              {t("languageLabel")}{language === "zh-Hant" ? "：" : ": "}{t("languageName")}
+            </span>
+            <span
+              className={`text-[9px] text-slate-600 transition-transform ${languageMenuOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            >
+              ⌄
+            </span>
+          </button>
+
+          {languageMenuOpen && (
+            <div
+              role="menu"
+              aria-label={language === "zh-Hant" ? "選擇介面語言" : "Choose interface language"}
+              className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 overflow-hidden rounded-xl border border-white/10 bg-[#111824] p-1.5 shadow-2xl shadow-black/40"
+            >
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={language === "zh-Hant"}
+                onClick={() => chooseLanguage("zh-Hant")}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                  language === "zh-Hant"
+                    ? "bg-cyan-300/10 text-cyan-200"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                }`}
+              >
+                繁體中文
+                {language === "zh-Hant" && <span aria-hidden="true">✓</span>}
+              </button>
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={language === "en"}
+                onClick={() => chooseLanguage("en")}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors ${
+                  language === "en"
+                    ? "bg-cyan-300/10 text-cyan-200"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                }`}
+              >
+                English
+                {language === "en" && <span aria-hidden="true">✓</span>}
+              </button>
+            </div>
+          )}
+        </div>
         <button
           className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:border-cyan-300/30 hover:text-cyan-200"
           type="button"
-          aria-label="開啟帳號選單"
+          aria-label={t("accountMenu")}
         >
           <UserIcon />
         </button>

@@ -1,0 +1,251 @@
+"use client";
+
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+
+export type Language = "zh-Hant" | "en";
+
+const storageKey = "code-tutor:language";
+
+const translations = {
+  "zh-Hant": {
+    navHome: "首頁",
+    navFiles: "檔案",
+    navProblems: "題目",
+    navQuiz: "測驗",
+    navAbout: "關於我們",
+    comingSoon: "即將推出",
+    settings: "設定",
+    languageLabel: "語言",
+    languageName: "繁體中文",
+    languageButton: "切換介面語言，目前為繁體中文",
+    accountMenu: "開啟帳號選單",
+    mainNavigation: "主要導覽",
+    homeTitle: "歡迎來到 Code Tutor",
+    homeDetail: "從檔案建立練習專案，或到題目頁尋找下一個程式挑戰。",
+    aboutTitle: "關於 Code Tutor",
+    aboutDetail: "一個結合程式執行、題目練習與學習提示的 C++ 學習空間。",
+    addFolder: "新增資料夾",
+    addProject: "新增專案",
+    folderPrompt: "請輸入資料夾名稱",
+    projectPrompt: "請輸入新專案名稱",
+    unnamedProject: "未命名 C++ 專案",
+    folders: "資料夾",
+    projects: "專案",
+    yourProjects: "你的專案",
+    selectProjectHint: "選擇專案後才會開啟程式編輯器",
+    folderType: "資料夾",
+    problemLibrary: "題庫",
+    problemHeroTitle: "尋找適合你的練習題",
+    problemHeroDetail: "用程度與演算法標籤縮小範圍，快速找到下一題。",
+    problemSearchLabel: "搜尋題目或標籤",
+    problemSearchPlaceholder: "搜尋題目、#APCS中高級、#二分搜…",
+    problemTagFilter: "題目標籤篩選",
+    problemList: "題目列表",
+    foundProblems: "找到 {count} 題",
+    viewProblem: "查看題目 →",
+    noProblems: "找不到符合條件的題目",
+    clearFilters: "清除搜尋條件",
+    history: "歷史紀錄",
+    createNewFile: "建立新檔案",
+    searchSubmissions: "搜尋提交紀錄",
+    recentRuns: "最近執行",
+    learningFocus: "學習重點",
+    learningFocusDetail: "解二分搜尋題目時，請特別注意邊界條件。",
+    yesterday: "昨天",
+    aiTutor: "AI 導師",
+    coachMode: "引導模式",
+    tutorGreeting: "嗨 Daniel！你的程式已經可以執行。我可以協助你理解結果或找出可能的問題。",
+    quickActions: "快速操作",
+    analyzeCode: "分析程式碼",
+    analyzeCodeDetail: "檢查邏輯與程式品質",
+    explainError: "解釋錯誤",
+    explainErrorDetail: "了解編譯器輸出的訊息",
+    giveHint: "給我提示",
+    giveHintDetail: "提供方向，但不要直接給答案",
+    context: "參考內容",
+    contextDetail: "main.cpp 與最新的編譯結果會自動包含在對話中。",
+    askCode: "詢問你的程式…",
+    sendMessage: "傳送訊息",
+    saved: "已儲存",
+    saving: "儲存中…",
+    saveFailed: "儲存失敗",
+    resetConfirm: "確定要清除目前內容，並恢復預設的 C++ 範例嗎？",
+    reset: "重設",
+    resetTitle: "恢復預設程式碼",
+    run: "執行",
+    running: "執行中",
+    editorLabel: "main.cpp C++ 程式編輯器",
+    spaces: "空格：4",
+    output: "輸出",
+    input: "輸入",
+    problems: "問題",
+    clear: "清除",
+    clearOutput: "清除輸出",
+    standardInput: "標準輸入",
+    inputPlaceholder: "輸入你的 C++ 程式要讀取的資料…",
+    compiling: "正在編譯並執行…",
+    noOutput: "程式執行完成，但沒有輸出。",
+    outputTruncated: "輸出內容已被安全限制截斷。",
+    retryAfter: "大約 {seconds} 秒後再試。",
+    pressRun: "按下「執行」以編譯並執行程式。",
+    ready: "就緒",
+    statusAccepted: "程式執行成功",
+    statusCompileError: "編譯失敗",
+    statusRuntimeError: "執行階段錯誤",
+    statusTimeout: "超過執行時間限制",
+    statusUnavailable: "編譯服務目前無法使用",
+    statusRateLimited: "執行次數過多，請稍候",
+    statusServerBusy: "編譯佇列忙碌中",
+    requestTimeout: "編譯請求逾時。",
+    cannotReachApi: "無法連線到編譯器 API，請確認 FastAPI 後端已在 8000 埠啟動。",
+  },
+  en: {
+    navHome: "Home",
+    navFiles: "File",
+    navProblems: "Problems",
+    navQuiz: "Quiz",
+    navAbout: "About Us",
+    comingSoon: "Coming soon",
+    settings: "Settings",
+    languageLabel: "Language",
+    languageName: "English",
+    languageButton: "Switch interface language, currently English",
+    accountMenu: "Open account menu",
+    mainNavigation: "Main navigation",
+    homeTitle: "Welcome to Code Tutor",
+    homeDetail: "Create a practice project in File, or find your next coding challenge in Problems.",
+    aboutTitle: "About Code Tutor",
+    aboutDetail: "A C++ learning space that combines code execution, practice problems, and learning guidance.",
+    addFolder: "New Folder",
+    addProject: "New Project",
+    folderPrompt: "Enter a folder name",
+    projectPrompt: "Enter a new project name",
+    unnamedProject: "Untitled C++ Project",
+    folders: "Folders",
+    projects: "Projects",
+    yourProjects: "Your projects",
+    selectProjectHint: "The code editor opens after you select a project",
+    folderType: "Folder",
+    problemLibrary: "Problem library",
+    problemHeroTitle: "Find the right practice problem",
+    problemHeroDetail: "Use level and algorithm tags to quickly narrow down your next challenge.",
+    problemSearchLabel: "Search problems or tags",
+    problemSearchPlaceholder: "Search problems, #APCSIntermediateAdvanced, #BinarySearch…",
+    problemTagFilter: "Problem tag filters",
+    problemList: "Problem list",
+    foundProblems: "{count} problems found",
+    viewProblem: "View problem →",
+    noProblems: "No problems match your filters",
+    clearFilters: "Clear filters",
+    history: "History",
+    createNewFile: "Create new file",
+    searchSubmissions: "Search submissions",
+    recentRuns: "Recent runs",
+    learningFocus: "Learning focus",
+    learningFocusDetail: "Pay close attention to boundary conditions in binary search problems.",
+    yesterday: "Yesterday",
+    aiTutor: "AI Tutor",
+    coachMode: "Coach mode",
+    tutorGreeting: "Hi Daniel! Your code is ready to run. I can help you understand the result or spot possible problems.",
+    quickActions: "Quick actions",
+    analyzeCode: "Analyze code",
+    analyzeCodeDetail: "Review logic and quality",
+    explainError: "Explain error",
+    explainErrorDetail: "Understand compiler output",
+    giveHint: "Give me a hint",
+    giveHintDetail: "Get help without the answer",
+    context: "Context",
+    contextDetail: "main.cpp and the latest compiler output will be included automatically.",
+    askCode: "Ask about your code…",
+    sendMessage: "Send message",
+    saved: "Saved",
+    saving: "Saving…",
+    saveFailed: "Save failed",
+    resetConfirm: "Clear the current content and restore the default C++ example?",
+    reset: "Reset",
+    resetTitle: "Restore default code",
+    run: "Run",
+    running: "Running",
+    editorLabel: "main.cpp C++ code editor",
+    spaces: "Spaces: 4",
+    output: "Output",
+    input: "Input",
+    problems: "Problems",
+    clear: "Clear",
+    clearOutput: "Clear output",
+    standardInput: "Standard input",
+    inputPlaceholder: "Enter the input your C++ program should read…",
+    compiling: "Compiling and running…",
+    noOutput: "Program finished without output.",
+    outputTruncated: "Output was truncated by the safety limit.",
+    retryAfter: "Try again in about {seconds} seconds.",
+    pressRun: "Press Run to compile and execute your program.",
+    ready: "Ready",
+    statusAccepted: "Process finished successfully",
+    statusCompileError: "Compilation failed",
+    statusRuntimeError: "Runtime error",
+    statusTimeout: "Time limit exceeded",
+    statusUnavailable: "Compiler service unavailable",
+    statusRateLimited: "Too many runs — please wait",
+    statusServerBusy: "Compiler queue is busy",
+    requestTimeout: "Compiler request timed out.",
+    cannotReachApi: "Cannot reach the compiler API. Start the FastAPI backend on port 8000.",
+  },
+} as const;
+
+export type TranslationKey = keyof (typeof translations)["zh-Hant"];
+
+type LanguageContextValue = {
+  language: Language;
+  setLanguage: (language: Language) => void;
+  t: (key: TranslationKey) => string;
+};
+
+const LanguageContext = createContext<LanguageContextValue | null>(null);
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [language, setLanguageState] = useState<Language>("zh-Hant");
+
+  const setLanguage = (nextLanguage: Language) => {
+    setLanguageState(nextLanguage);
+    document.documentElement.lang = nextLanguage;
+    try {
+      window.localStorage.setItem(storageKey, nextLanguage);
+    } catch {
+      // The interface still switches when browser storage is unavailable.
+    }
+  };
+
+  useEffect(() => {
+    let restoreTimer: number | undefined;
+    try {
+      const savedLanguage = window.localStorage.getItem(storageKey);
+      if (savedLanguage === "zh-Hant" || savedLanguage === "en") {
+        document.documentElement.lang = savedLanguage;
+        restoreTimer = window.setTimeout(() => setLanguageState(savedLanguage), 0);
+      }
+    } catch {
+      // Keep Traditional Chinese as the default language.
+    }
+    return () => {
+      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
+    };
+  }, []);
+
+  const value = useMemo<LanguageContextValue>(
+    () => ({
+      language,
+      setLanguage,
+      t: (key) => translations[language][key],
+    }),
+    [language],
+  );
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+export function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error("useLanguage must be used within LanguageProvider.");
+  return context;
+}

@@ -5,13 +5,20 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IDisposable } from "monaco-editor";
 
+import { useLanguage } from "@/lib/language-context";
+
+function EditorLoading() {
+  const { language } = useLanguage();
+  return (
+    <div className="grid h-full place-items-center bg-[#0c111b] font-mono text-xs text-slate-600">
+      {language === "zh-Hant" ? "正在載入編輯器…" : "Loading editor…"}
+    </div>
+  );
+}
+
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
-  loading: () => (
-    <div className="grid h-full place-items-center bg-[#0c111b] font-mono text-xs text-slate-600">
-      Loading editor...
-    </div>
-  ),
+  loading: () => <EditorLoading />,
 });
 
 const initialCode = `#include <iostream>
@@ -43,6 +50,7 @@ type CodeEditorPanelProps = {
 };
 
 export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
+  const { t } = useLanguage();
   const [code, setCode] = useState(initialCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -120,7 +128,7 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
 
   const resetCode = () => {
     const shouldReset = window.confirm(
-      "確定要清除目前內容，並恢復預設的 C++ 範例嗎？",
+      t("resetConfirm"),
     );
     if (!shouldReset) return;
 
@@ -129,9 +137,9 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
   };
 
   const statusLabel = {
-    saved: "Saved",
-    saving: "Saving...",
-    failed: "Save failed",
+    saved: t("saved"),
+    saving: t("saving"),
+    failed: t("saveFailed"),
   }[saveStatus];
 
   return (
@@ -164,9 +172,9 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
             type="button"
             onClick={resetCode}
             className="hidden h-7 rounded-lg border border-white/8 px-2.5 text-[10px] text-slate-500 transition-colors hover:border-white/15 hover:text-slate-300 sm:block"
-            title="恢復預設程式碼"
+            title={t("resetTitle")}
           >
-            Reset
+            {t("reset")}
           </button>
           <button
             type="button"
@@ -175,7 +183,7 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
             className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)] transition-opacity disabled:cursor-wait disabled:opacity-60"
           >
             <span aria-hidden="true">{isRunning ? "…" : "▶"}</span>
-            {isRunning ? "Running" : "Run"}
+            {isRunning ? t("running") : t("run")}
           </button>
         </div>
       </div>
@@ -191,7 +199,7 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
           theme="code-tutor-dark"
           options={{
             accessibilitySupport: "auto",
-            ariaLabel: "main.cpp C++ code editor",
+          ariaLabel: t("editorLabel"),
             automaticLayout: true,
             bracketPairColorization: { enabled: true },
             cursorBlinking: "smooth",
@@ -223,7 +231,7 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
           Ln {cursor.lineNumber}, Col {cursor.column}
         </span>
         <div className="flex gap-4">
-          <span>Spaces: 4</span>
+          <span>{t("spaces")}</span>
           <span>UTF-8</span>
         </div>
       </div>

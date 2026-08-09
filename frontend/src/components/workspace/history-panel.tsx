@@ -1,18 +1,22 @@
+import { type TranslationKey, useLanguage } from "@/lib/language-context";
+
 const historyItems = [
   { title: "Binary Search", time: "10:42" },
   { title: "DFS Traversal", time: "09:18" },
-  { title: "Array Sum", time: "Yesterday" },
+  { title: "Array Sum", timeKey: "yesterday" as TranslationKey },
 ];
 
 export function HistoryPanel() {
+  const { t } = useLanguage();
+
   return (
     <aside className="hidden bg-[#0b1018] p-4 lg:block">
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-200">History</h2>
+        <h2 className="text-sm font-semibold text-slate-200">{t("history")}</h2>
         <button
           type="button"
           className="grid size-7 place-items-center rounded-lg border border-white/10 bg-white/5 text-lg leading-none text-slate-400"
-          aria-label="Create new file"
+          aria-label={t("createNewFile")}
         >
           +
         </button>
@@ -20,11 +24,11 @@ export function HistoryPanel() {
 
       <div className="mb-3 flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-xs text-slate-500">
         <span aria-hidden="true">⌕</span>
-        Search submissions
+        {t("searchSubmissions")}
       </div>
 
       <p className="mb-2 mt-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-        Recent runs
+        {t("recentRuns")}
       </p>
       <div className="space-y-1.5">
         {historyItems.map((item, index) => (
@@ -40,17 +44,19 @@ export function HistoryPanel() {
             <span className="block truncate text-xs font-medium text-slate-300">
               {item.title}
             </span>
-            <p className="mt-1.5 text-[10px] text-slate-600">{item.time}</p>
+            <p className="mt-1.5 text-[10px] text-slate-600">
+              {item.timeKey ? t(item.timeKey) : item.time}
+            </p>
           </button>
         ))}
       </div>
 
       <div className="mt-8 rounded-xl border border-violet-400/15 bg-violet-400/[0.04] p-3">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">
-          Learning focus
+          {t("learningFocus")}
         </p>
         <p className="mt-2 text-xs leading-5 text-slate-400">
-          Watch boundary conditions in binary search problems.
+          {t("learningFocusDetail")}
         </p>
       </div>
     </aside>

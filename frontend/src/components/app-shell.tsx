@@ -8,19 +8,10 @@ import { type PrimarySection, SiteHeader } from "@/components/site-header";
 import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { HistoryPanel } from "@/components/workspace/history-panel";
 import { WorkspaceCenter } from "@/components/workspace/workspace-center";
+import { LanguageProvider, useLanguage } from "@/lib/language-context";
 
-const sectionContent: Record<"home" | "about", { title: string; detail: string }> = {
-  home: {
-    title: "歡迎來到 Code Tutor",
-    detail: "從檔案建立練習專案，或到題目頁尋找下一個程式挑戰。",
-  },
-  about: {
-    title: "關於 Code Tutor",
-    detail: "一個結合程式執行、題目練習與學習提示的 C++ 學習空間。",
-  },
-};
-
-export function AppShell() {
+function AppContent() {
+  const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState<PrimarySection>("files");
   const [openProject, setOpenProject] = useState<string | null>(null);
 
@@ -48,13 +39,17 @@ export function AppShell() {
   } else if (activeSection === "problems") {
     content = <ProblemsPage />;
   } else {
-    const placeholder = sectionContent[activeSection === "about" ? "about" : "home"];
+    const isAbout = activeSection === "about";
     content = (
       <section className="grid flex-1 place-items-center px-6 py-20 text-center">
         <div className="max-w-xl">
           <span className="mx-auto block size-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.6)]" />
-          <h1 className="mt-5 text-2xl font-semibold text-white">{placeholder.title}</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-500">{placeholder.detail}</p>
+          <h1 className="mt-5 text-2xl font-semibold text-white">
+            {t(isAbout ? "aboutTitle" : "homeTitle")}
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            {t(isAbout ? "aboutDetail" : "homeDetail")}
+          </p>
         </div>
       </section>
     );
@@ -65,5 +60,13 @@ export function AppShell() {
       <SiteHeader activeSection={activeSection} onSelect={selectSection} />
       {content}
     </main>
+  );
+}
+
+export function AppShell() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 }

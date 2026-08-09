@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [project|problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [project|problems|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -112,7 +112,82 @@ await client.send("Page.navigate", { url });
 await loaded;
 await sleep(4_000);
 
+const wantsEnglish = action === "english" || action === "english-problems";
+const currentLanguage = await evaluate(client, `document.documentElement.lang`);
+if ((wantsEnglish && currentLanguage !== "en") || (!wantsEnglish && currentLanguage === "en")) {
+  const languageClicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) =>
+          candidate.getAttribute("aria-label")?.includes("interface language") ||
+          candidate.getAttribute("aria-label")?.includes("介面語言"),
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!languageClicked) throw new Error("Language switch button was not found.");
+  await sleep(200);
+  const languageOptionClicked = await evaluate(
+    client,
+    `(() => {
+      const option = [...document.querySelectorAll('[role="menuitemradio"]')].find(
+        (candidate) => candidate.textContent.includes(${JSON.stringify(wantsEnglish ? "English" : "繁體中文")}),
+      );
+      if (!option) return false;
+      option.click();
+      return true;
+    })()`,
+  );
+  if (!languageOptionClicked) throw new Error("Language menu option was not found.");
+  await sleep(500);
+}
+
 let actionSucceeded = action === "none";
+if (action === "language-menu") {
+  const opened = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.getAttribute("aria-haspopup") === "menu",
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!opened) throw new Error("Language menu button was not found.");
+  await sleep(300);
+  actionSucceeded = await evaluate(
+    client,
+    `(() => {
+      const labels = [...document.querySelectorAll('[role="menuitemradio"]')].map(
+        (item) => item.textContent.replace("✓", "").trim(),
+      );
+      return labels.length === 2 &&
+        document.body.innerText.includes("語言：繁體中文") &&
+        labels.includes("繁體中文") &&
+        labels.includes("English") &&
+        !labels.includes("中") &&
+        !labels.includes("EN");
+    })()`,
+  );
+}
+if (action === "english") {
+  actionSucceeded = await evaluate(
+    client,
+    `document.documentElement.lang === "en" &&
+      document.body.innerText.includes("File") &&
+      document.body.innerText.includes("Language: English") &&
+      document.body.innerText.includes("New Folder") &&
+      document.body.innerText.includes("New Project") &&
+      document.body.innerText.includes("C++ 基礎練習") &&
+      !document.body.innerText.includes("C++ Fundamentals") &&
+      !document.body.innerText.includes("檔案")`,
+  );
+}
 if (action === "project" || action === "run" || action === "run-blocked") {
   const opened = await evaluate(
     client,
@@ -136,12 +211,13 @@ if (action === "project" || action === "run" || action === "run-blocked") {
     );
   }
 }
-if (action === "problems") {
+if (action === "problems" || action === "english-problems") {
+  const englishProblems = action === "english-problems";
   const clicked = await evaluate(
     client,
     `(() => {
       const button = [...document.querySelectorAll("button")].find(
-        (candidate) => candidate.textContent.trim() === "題目",
+        (candidate) => candidate.textContent.trim() === ${JSON.stringify(englishProblems ? "Problems" : "題目")},
       );
       if (!button) return false;
       button.click();
@@ -154,7 +230,7 @@ if (action === "problems") {
     client,
     `(() => {
       const button = [...document.querySelectorAll("button")].find(
-        (candidate) => candidate.textContent.trim() === "#二分搜",
+        (candidate) => candidate.textContent.trim() === ${JSON.stringify(englishProblems ? "#BinarySearch" : "#二分搜")},
       );
       if (!button) return false;
       button.click();
@@ -165,9 +241,15 @@ if (action === "problems") {
   await sleep(500);
   actionSucceeded = await evaluate(
     client,
-    `document.body.innerText.includes("找到 1 題") &&
-      document.body.innerText.includes("在排序陣列中尋找目標") &&
-      !document.body.innerText.includes("迷宮的最短路徑")`,
+    englishProblems
+      ? `document.documentElement.lang === "en" &&
+          document.body.innerText.includes("1 problems found") &&
+          document.body.innerText.includes("Find a Target in a Sorted Array") &&
+          !document.body.innerText.includes("Shortest Path Through a Maze")`
+      : `document.documentElement.lang === "zh-Hant" &&
+          document.body.innerText.includes("找到 1 題") &&
+          document.body.innerText.includes("在排序陣列中尋找目標") &&
+          !document.body.innerText.includes("迷宮的最短路徑")`,
   );
 }
 if (action === "run" || action === "run-blocked") {

@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import { runCpp, type RunResult } from "@/lib/compiler-api";
+import { useLanguage } from "@/lib/language-context";
 import { CodeEditorPanel } from "./code-editor-panel";
 import { OutputPanel } from "./output-panel";
 
@@ -11,6 +12,7 @@ const initialInput = `5
 `;
 
 export function WorkspaceCenter() {
+  const { t } = useLanguage();
   const [stdin, setStdin] = useState(initialInput);
   const [result, setResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -26,8 +28,8 @@ export function WorkspaceCenter() {
       } catch (error) {
         const message =
           error instanceof Error && error.name === "AbortError"
-            ? "Compiler request timed out."
-            : "Cannot reach the compiler API. Start the FastAPI backend on port 8000.";
+            ? t("requestTimeout")
+            : t("cannotReachApi");
 
         setResult({
           status: "service_unavailable",
@@ -41,7 +43,7 @@ export function WorkspaceCenter() {
         setIsRunning(false);
       }
     },
-    [stdin],
+    [stdin, t],
   );
 
   return (
