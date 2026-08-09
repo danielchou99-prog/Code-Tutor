@@ -40,7 +40,7 @@
 ### 3. 建立設定頁分類與版面
 
 - [x] 個人資料：頭像網址、暱稱、Username、自我介紹。
-- [x] 外觀：深色／淺色、主題色、背景；未完成的淺色模式明確標示。
+- [x] 外觀：讓深色／淺色、主題色與背景實際套用到網站及 Editor。
 - [x] Compiler / Editor：預設語言、字體大小、Tab 寬度、Word Wrap。
 - [x] 版面配置：Editor、Console 與 AI 面板尺寸及方向。
 - [x] 字體：JetBrains Mono、Fira Code、Cascadia Code、Consolas。
@@ -107,6 +107,8 @@
 - Editor、Console、Workspace、Run、快捷鍵與通知已讀取共用設定。
 - 個人資料使用 Supabase user metadata；Email、密碼與全域登出使用 Supabase Auth。
 - 刪除帳號沒有使用不安全的前端管理員金鑰，等待正式部署後建立可信任後端端點。
-- 簡體中文、完整淺色模式與自動編譯保留在設定清單並明確標示尚未開放。
+- 簡體中文與自動編譯保留在設定清單並明確標示尚未開放。
+- [x] 完成全站淺色模式、Monaco 淺色主題與重新整理後的偏好還原。
+- 淺色模式已用本機瀏覽器完成實際畫面截圖驗證，證據為 `plan/evidence/settings-center/light-mode.png`。
 - Frontend ESLint、TypeScript 與 Next.js production build 通過。
 - 驗收截圖位於 `plan/evidence/settings-center/`。

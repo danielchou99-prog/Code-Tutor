@@ -3,6 +3,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
 export type AppSettings = {
+  theme: "dark" | "light";
   accent: "cyan" | "violet" | "emerald";
   background: "plain" | "grid" | "soft";
   editorFont: "JetBrains Mono" | "Fira Code" | "Cascadia Code" | "Consolas";
@@ -26,6 +27,7 @@ export type AppSettings = {
 const storageKey = "code-tutor:settings";
 
 export const defaultAppSettings: AppSettings = {
+  theme: "dark",
   accent: "cyan",
   background: "plain",
   editorFont: "Cascadia Code",
@@ -61,6 +63,7 @@ function normalizeSettings(value: unknown): AppSettings {
   return {
     ...defaultAppSettings,
     ...input,
+    theme: input.theme === "light" ? "light" : "dark",
     accent: ["cyan", "violet", "emerald"].includes(String(input.accent)) ? input.accent! : defaultAppSettings.accent,
     background: ["plain", "grid", "soft"].includes(String(input.background)) ? input.background! : defaultAppSettings.background,
     editorFont: allowedFonts.includes(input.editorFont as (typeof allowedFonts)[number]) ? input.editorFont! : defaultAppSettings.editorFont,
@@ -92,7 +95,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const colors = { cyan: "#67e8f9", violet: "#c4b5fd", emerald: "#6ee7b7" } as const;
     document.documentElement.style.setProperty("--code-tutor-accent", colors[settings.accent]);
     document.documentElement.dataset.codeTutorBackground = settings.background;
-  }, [settings.accent, settings.background]);
+    document.documentElement.dataset.codeTutorTheme = settings.theme;
+  }, [settings.accent, settings.background, settings.theme]);
 
   const value = useMemo<SettingsContextValue>(() => ({
     settings,

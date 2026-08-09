@@ -392,6 +392,28 @@ export function CodeEditorPanel({
         "editorIndentGuide.activeBackground1": "#47556988",
       },
     });
+    monaco.editor.defineTheme("code-tutor-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "keyword", foreground: "7C3AED" },
+        { token: "number", foreground: "0E7490" },
+        { token: "string", foreground: "15803D" },
+        { token: "comment", foreground: "64748B", fontStyle: "italic" },
+      ],
+      colors: {
+        "editor.background": "#F8FAFC",
+        "editor.foreground": "#1E293B",
+        "editorLineNumber.foreground": "#94A3B8",
+        "editorLineNumber.activeForeground": "#475569",
+        "editor.lineHighlightBackground": "#E2E8F066",
+        "editorCursor.foreground": "#0891B2",
+        "editor.selectionBackground": "#67E8F955",
+        "editor.inactiveSelectionBackground": "#67E8F933",
+        "editorIndentGuide.background1": "#CBD5E188",
+        "editorIndentGuide.activeBackground1": "#64748B88",
+      },
+    });
   };
 
   const handleMount: OnMount = (editor, monaco) => {
@@ -600,7 +622,7 @@ export function CodeEditorPanel({
             path={`file:///${activeFile.id}/${activeFile.name}`}
             language="cpp"
             value={code}
-            theme="code-tutor-dark"
+            theme={settings.theme === "light" ? "code-tutor-light" : "code-tutor-dark"}
             options={{
               accessibilitySupport: "auto",
               ariaLabel: `${activeFile.name} C++ ${zh ? "程式碼編輯器" : "code editor"}`,
