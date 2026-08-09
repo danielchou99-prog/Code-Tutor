@@ -129,7 +129,7 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
             aria-expanded={languageMenuOpen}
           >
             <span>
-              {t("languageLabel")}{language === "zh-Hant" ? "：" : ": "}{t("languageName")}
+              {t("languageLabel")} [{t("languageName")}]
             </span>
             <span
               className={`text-[9px] text-slate-600 transition-transform ${languageMenuOpen ? "rotate-180" : ""}`}

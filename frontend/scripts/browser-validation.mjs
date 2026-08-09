@@ -167,7 +167,7 @@ if (action === "language-menu") {
         (item) => item.textContent.replace("✓", "").trim(),
       );
       return labels.length === 2 &&
-        document.body.innerText.includes("語言：繁體中文") &&
+        document.body.innerText.includes("語言 [繁體中文]") &&
         labels.includes("繁體中文") &&
         labels.includes("English") &&
         !labels.includes("中") &&
@@ -180,7 +180,7 @@ if (action === "english") {
     client,
     `document.documentElement.lang === "en" &&
       document.body.innerText.includes("File") &&
-      document.body.innerText.includes("Language: English") &&
+      document.body.innerText.includes("Language [English]") &&
       document.body.innerText.includes("New Folder") &&
       document.body.innerText.includes("New Project") &&
       document.body.innerText.includes("C++ 基礎練習") &&
