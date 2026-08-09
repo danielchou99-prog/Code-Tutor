@@ -41,7 +41,7 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
   const [code, setCode] = useState(defaultCppCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
   const cursorListener = useRef<IDisposable | null>(null);
   const hasLoadedSavedCode = useRef(false);
 
@@ -123,14 +123,14 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
     });
   };
 
-  const resetCode = () => {
-    setResetDialogOpen(true);
+  const openClearDialog = () => {
+    setClearStep(1);
   };
 
-  const confirmReset = () => {
-    setCode(defaultCppCode);
-    void persistCode(defaultCppCode);
-    setResetDialogOpen(false);
+  const confirmClear = () => {
+    setCode("");
+    void persistCode("");
+    setClearStep(0);
   };
 
   const statusLabel = {
@@ -169,11 +169,11 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
           <span className="hidden text-[10px] text-slate-600 sm:inline">C++ 20</span>
           <button
             type="button"
-            onClick={resetCode}
+            onClick={openClearDialog}
             className="hidden h-7 rounded-lg border border-white/8 px-2.5 text-[10px] text-slate-500 transition-colors hover:border-white/15 hover:text-slate-300 sm:block"
-            title={t("resetTitle")}
+            title={t("clearCodeTitle")}
           >
-            {t("reset")}
+            Clear
           </button>
           <button
             type="button"
@@ -236,14 +236,18 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
       </div>
 
       <ConfirmDialog
-        open={resetDialogOpen}
-        title={t("resetCodeConfirmTitle")}
-        description={t("resetConfirm")}
-        confirmLabel={t("confirmReset")}
+        open={clearStep !== 0}
+        title={t(clearStep === 2 ? "clearCodeFinalTitle" : "clearCodeTitle")}
+        description={t(clearStep === 2 ? "clearCodeFinalConfirm" : "clearCodeFirstConfirm")}
+        confirmLabel={t(clearStep === 2 ? "confirmClearAll" : "continueClear")}
         cancelLabel={t("cancel")}
         closeLabel={t("closeDialog")}
-        onClose={() => setResetDialogOpen(false)}
-        onConfirm={confirmReset}
+        tone={clearStep === 2 ? "danger" : "default"}
+        onClose={() => setClearStep(0)}
+        onConfirm={() => {
+          if (clearStep === 1) setClearStep(2);
+          else confirmClear();
+        }}
       />
     </section>
   );
