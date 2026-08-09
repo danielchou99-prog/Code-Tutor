@@ -16,7 +16,10 @@ type AuthContextValue = {
   signUp: (name: string, email: string, password: string) => Promise<AuthResult>;
   sendPasswordReset: (email: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
+  signOutAll: () => Promise<AuthResult>;
+  updateEmail: (email: string) => Promise<AuthResult>;
   updatePassword: (password: string) => Promise<AuthResult>;
+  updateProfile: (profile: { display_name: string; username: string; bio: string; avatar_url: string }) => Promise<AuthResult>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -91,9 +94,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await getSupabaseBrowserClient().auth.signOut();
         return { error: error?.message ?? null };
       },
+      async signOutAll() {
+        if (!configured) return unavailableResult();
+        const { error } = await getSupabaseBrowserClient().auth.signOut({ scope: "global" });
+        return { error: error?.message ?? null };
+      },
+      async updateEmail(email) {
+        if (!configured) return unavailableResult();
+        const { error } = await getSupabaseBrowserClient().auth.updateUser(
+          { email },
+          { emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        );
+        return { error: error?.message ?? null };
+      },
       async updatePassword(password) {
         if (!configured) return unavailableResult();
         const { error } = await getSupabaseBrowserClient().auth.updateUser({ password });
+        return { error: error?.message ?? null };
+      },
+      async updateProfile(profile) {
+        if (!configured) return unavailableResult();
+        const { error } = await getSupabaseBrowserClient().auth.updateUser({ data: profile });
         return { error: error?.message ?? null };
       },
     }),

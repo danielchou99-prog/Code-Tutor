@@ -106,6 +106,10 @@ export function AccountControl({
 
   const label = user?.user_metadata.display_name || user?.email || t("guest");
   const initial = label.trim().charAt(0).toUpperCase();
+  const avatarUrl =
+    typeof user?.user_metadata.avatar_url === "string"
+      ? user.user_metadata.avatar_url.replace(/["\\\r\n]/g, "").trim()
+      : "";
 
   return (
     <div className="relative" ref={panelRef}>
@@ -127,7 +131,15 @@ export function AccountControl({
         {loading ? (
           <span className="h-2.5 w-10 animate-pulse rounded bg-slate-600" />
         ) : user ? (
-          <span className="text-xs font-semibold text-cyan-200">{initial}</span>
+          avatarUrl ? (
+            <span
+              className="size-full rounded-full bg-cover bg-center"
+              style={{ backgroundImage: `url("${avatarUrl}")` }}
+              aria-hidden="true"
+            />
+          ) : (
+            <span className="text-xs font-semibold text-cyan-200">{initial}</span>
+          )
         ) : (
           <span>Sign in</span>
         )}

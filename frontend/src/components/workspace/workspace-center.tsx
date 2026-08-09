@@ -11,6 +11,7 @@ import {
   startInteractiveCpp,
 } from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 import { CodeEditorPanel } from "./code-editor-panel";
 import { OutputPanel } from "./output-panel";
 
@@ -36,6 +37,7 @@ export function WorkspaceCenter({
   requestedFileId: string | null;
 }) {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const [stdin, setStdin] = useState(initialInput);
   const [result, setResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -43,6 +45,7 @@ export function WorkspaceCenter({
   const [inputMode, setInputMode] = useState<"batch" | "interactive">("batch");
   const [interactiveOutput, setInteractiveOutput] = useState<InteractiveOutput[]>([]);
   const [interactiveStatus, setInteractiveStatus] = useState<InteractiveStatus>("idle");
+  const [notification, setNotification] = useState<string | null>(null);
   const interactiveConnection = useRef<InteractiveConnection | null>(null);
   const interactiveTranscript = useRef("");
 
@@ -50,8 +53,20 @@ export function WorkspaceCenter({
     return () => interactiveConnection.current?.stop();
   }, []);
 
+  useEffect(() => {
+    if (!notification) return;
+    const timer = window.setTimeout(() => setNotification(null), 3_500);
+    return () => window.clearTimeout(timer);
+  }, [notification]);
+
   const handleRun = useCallback(
     async (files: CppSourceFile[]) => {
+      if (settings.clearConsoleOnRun) {
+        setResult(null);
+        setInteractiveOutput([]);
+        interactiveTranscript.current = "";
+        onExecutionOutputChange("");
+      }
       if (inputMode === "interactive") {
         interactiveConnection.current?.stop();
         setActiveTab("input");
@@ -70,6 +85,8 @@ export function WorkspaceCenter({
               setInteractiveStatus(event.status);
               if (["accepted", "compile_error", "runtime_error", "timeout", "stopped"].includes(event.status)) {
                 setIsRunning(false);
+                if (event.status === "accepted" && settings.notifySuccess) setNotification(t("statusAccepted"));
+                else if (["compile_error", "runtime_error", "timeout"].includes(event.status) && settings.notifyError) setNotification(t(event.status === "compile_error" ? "statusCompileError" : event.status === "runtime_error" ? "statusRuntimeError" : "statusTimeout"));
               }
             } else {
               setInteractiveOutput((current) => [
@@ -78,6 +95,7 @@ export function WorkspaceCenter({
               ]);
               setInteractiveStatus("error");
               setIsRunning(false);
+              if (settings.notifySystem) setNotification(event.message);
             }
           },
           onClose: () => {
@@ -95,6 +113,23 @@ export function WorkspaceCenter({
         const nextResult = await runCpp(files, stdin);
         setResult(nextResult);
         onExecutionOutputChange([nextResult.stderr, nextResult.stdout].filter(Boolean).join("\n"));
+        if (nextResult.status === "accepted" && settings.notifySuccess) {
+          setNotification(t("statusAccepted"));
+        } else if (nextResult.status !== "accepted" && settings.notifyError) {
+          const statusMessage =
+            nextResult.status === "runtime_error"
+              ? t("statusRuntimeError")
+              : nextResult.status === "timeout"
+                ? t("statusTimeout")
+                : nextResult.status === "rate_limited"
+                  ? t("statusRateLimited")
+                  : nextResult.status === "server_busy"
+                    ? t("statusServerBusy")
+                    : nextResult.status === "service_unavailable"
+                      ? t("statusUnavailable")
+                      : t("statusCompileError");
+          setNotification(statusMessage);
+        }
       } catch (error) {
         const message =
           error instanceof Error && error.name === "AbortError"
@@ -111,11 +146,12 @@ export function WorkspaceCenter({
         };
         setResult(failedResult);
         onExecutionOutputChange(failedResult.stderr);
+        if (settings.notifySystem) setNotification(failedResult.stderr);
       } finally {
         setIsRunning(false);
       }
     },
-    [inputMode, onExecutionOutputChange, stdin, t],
+    [inputMode, onExecutionOutputChange, settings, stdin, t],
   );
 
   const sendInteractiveInput = (data: string) => {
@@ -133,7 +169,8 @@ export function WorkspaceCenter({
   };
 
   return (
-    <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:h-full lg:min-h-0 lg:overflow-hidden lg:border-x">
+    <div className="relative flex min-h-[680px] min-w-0 flex-col border-white/10 lg:h-full lg:min-h-0 lg:overflow-hidden lg:border-x">
+      {notification ? <div role="status" className="absolute right-4 top-14 z-50 max-w-sm rounded-xl border border-cyan-300/15 bg-[#111824]/95 px-4 py-3 text-[11px] leading-5 text-slate-200 shadow-xl shadow-black/40">{notification}</div> : null}
       <CodeEditorPanel
         isRunning={isRunning}
         onCodeChange={onCodeChange}

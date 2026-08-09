@@ -5,12 +5,14 @@ import { useCallback, useEffect, useState } from "react";
 import { FileHome } from "@/components/files/file-home";
 import { HomePage } from "@/components/home/home-page";
 import { ProblemsPage } from "@/components/problems/problems-page";
+import { SettingsPage } from "@/components/settings/settings-page";
 import { type PrimarySection, SiteHeader } from "@/components/site-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { clearProjectDraft, type FileProject } from "@/lib/file-items";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
+import { SettingsProvider, useSettings } from "@/lib/settings-context";
 
 type OpenedProject = FileProject & { ownerId: string };
 type PendingAction = () => void | Promise<void>;
@@ -19,6 +21,7 @@ const openProjectStoragePrefix = "code-tutor:open-project:";
 
 function AppContent() {
   const { language, t } = useLanguage();
+  const { settings } = useSettings();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [activeSection, setActiveSection] = useState<PrimarySection>("home");
@@ -92,16 +95,18 @@ function AppContent() {
     content = <ProblemsPage />;
   } else if (activeSection === "home") {
     content = <HomePage onSelect={selectSection} />;
+  } else if (activeSection === "settings") {
+    content = <SettingsPage />;
   } else {
     content = (
       <section className="grid flex-1 place-items-center px-6 py-20 text-center">
         <div className="max-w-xl">
           <span className="mx-auto block size-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.6)]" />
           <h1 className="mt-5 text-2xl font-semibold text-white">
-            {t("aboutTitle")}
+            {language === "zh-Hant" ? "測驗功能即將推出" : "Quiz is coming soon"}
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            {t("aboutDetail")}
+            {language === "zh-Hant" ? "完成題庫與作答紀錄後，會在這裡提供限時與分類測驗。" : "Timed and categorized quizzes will appear here after the problem and submission systems are complete."}
           </p>
         </div>
       </section>
@@ -109,7 +114,7 @@ function AppContent() {
   }
 
   return (
-    <main className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[#090d14] text-slate-200">
+    <main className={`flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden text-slate-200 ${settings.background === "grid" ? "bg-[#090d14] bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:42px_42px]" : settings.background === "soft" ? "bg-[#090d14] bg-[radial-gradient(circle_at_70%_20%,rgba(34,211,238,0.07),transparent_32%)]" : "bg-[#090d14]"}`}>
       <SiteHeader
         activeSection={activeSection}
         onBeforeSignOut={(signOut) => protectUnsavedCode(signOut)}
@@ -140,9 +145,11 @@ function AppContent() {
 export function AppShell() {
   return (
     <LanguageProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <SettingsProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </SettingsProvider>
     </LanguageProvider>
   );
 }

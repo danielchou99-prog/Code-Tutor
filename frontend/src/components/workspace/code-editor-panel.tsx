@@ -26,6 +26,7 @@ import {
 } from "@/lib/file-items";
 import type { CppSourceFile } from "@/lib/compiler-api";
 import { useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 
 function EditorLoading() {
   const { language } = useLanguage();
@@ -82,6 +83,7 @@ export function CodeEditorPanel({
 }: CodeEditorPanelProps) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
+  const { settings } = useSettings();
   const zh = language === "zh-Hant";
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
@@ -111,6 +113,8 @@ export function CodeEditorPanel({
   const latestCode = useRef("");
   const saveCurrentRef = useRef<(nextCode: string) => void>(() => undefined);
   const openFileRequestRef = useRef<(file: ProjectFile) => void>(() => undefined);
+  const runProjectRef = useRef<() => void>(() => undefined);
+  const settingsRef = useRef(settings);
   const isDirty = hasLoadedCode && code !== savedCode;
   const displayedSaveStatus: SaveStatus = saveStatus === "saving" || saveStatus === "failed"
     ? saveStatus
@@ -118,6 +122,10 @@ export function CodeEditorPanel({
   const openFiles = openFileIds
     .map((id) => files.find((file) => file.id === id))
     .filter((file): file is ProjectFile => Boolean(file));
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const loadFile = useCallback(async (file: ProjectFile) => {
     const sequence = loadSequence.current + 1;
@@ -392,7 +400,10 @@ export function CodeEditorPanel({
     cursorListener.current?.dispose();
     cursorListener.current = editor.onDidChangeCursorPosition(({ position }) => setCursor(position));
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      saveCurrentRef.current(editor.getValue());
+      if (settingsRef.current.saveShortcutEnabled) saveCurrentRef.current(editor.getValue());
+    });
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      if (settingsRef.current.runShortcutEnabled) runProjectRef.current();
     });
   };
 
@@ -400,6 +411,19 @@ export function CodeEditorPanel({
     if (!activeFile || preparingRun || isRunning) return;
     setPreparingRun(true);
     setRunError(null);
+    if (settings.saveBeforeRun && isDirty) {
+      setSaveStatus("saving");
+      const { error: saveError } = await saveProjectFileContent(activeFile.id, code);
+      if (saveError) {
+        setSaveStatus("failed");
+        setRunError(zh ? "Run 前儲存失敗，已取消執行。" : "Save before Run failed, so the run was cancelled.");
+        setPreparingRun(false);
+        return;
+      }
+      clearProjectDraft(project.id, activeFile.id);
+      setSavedCode(code);
+      setSaveStatus("saved");
+    }
     const { data, error } = await listProjectFileSources(project.id);
     if (error || !data) {
       setRunError(zh ? "無法讀取 Project 檔案，請稍後再試。" : "Project files could not be read. Try again.");
@@ -415,6 +439,9 @@ export function CodeEditorPanel({
     setPreparingRun(false);
     await onRun(sources);
   };
+  useEffect(() => {
+    runProjectRef.current = () => { void runProject(); };
+  });
 
   const statusLabel = {
     saved: t("saved"),
@@ -580,9 +607,9 @@ export function CodeEditorPanel({
               automaticLayout: true,
               bracketPairColorization: { enabled: true },
               cursorBlinking: "smooth",
-              fontFamily: "Cascadia Code, Consolas, monospace",
+              fontFamily: `${settings.editorFont}, Consolas, monospace`,
               fontLigatures: true,
-              fontSize: 14,
+              fontSize: settings.editorFontSize,
               hideCursorInOverviewRuler: true,
               insertSpaces: true,
               lineHeight: 24,
@@ -594,8 +621,8 @@ export function CodeEditorPanel({
               scrollBeyondLastLine: false,
               scrollbar: { horizontalScrollbarSize: 8, verticalScrollbarSize: 8 },
               smoothScrolling: true,
-              tabSize: 4,
-              wordWrap: "off",
+              tabSize: settings.tabSize,
+              wordWrap: settings.wordWrap ? "on" : "off",
             }}
           />
         </div>

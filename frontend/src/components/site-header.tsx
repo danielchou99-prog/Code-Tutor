@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AccountControl } from "@/components/auth/account-control";
-import { SettingsDialog } from "@/components/settings-dialog";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 
-export type PrimarySection = "home" | "files" | "problems" | "quiz" | "about";
+export type PrimarySection = "home" | "files" | "problems" | "quiz" | "settings";
 
 const primaryItems: Array<{
   id: PrimarySection;
@@ -17,7 +17,7 @@ const primaryItems: Array<{
   { id: "files", labelKey: "navFiles" },
   { id: "problems", labelKey: "navProblems" },
   { id: "quiz", labelKey: "navQuiz", comingSoon: true },
-  { id: "about", labelKey: "navAbout" },
+  { id: "settings", labelKey: "navSettings" },
 ];
 
 type SiteHeaderProps = {
@@ -26,19 +26,11 @@ type SiteHeaderProps = {
   onSelect: (section: PrimarySection) => void;
 };
 
-function SettingsIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 fill-none stroke-current" strokeWidth="1.7">
-      <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.09h-2.7V20a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.76 15a1.7 1.7 0 0 0-1.56-1.03h-.09v-2.7h.09a1.7 1.7 0 0 0 1.56-1.03 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.09h2.7v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.09v2.7h-.09A1.7 1.7 0 0 0 19.4 15Z" />
-    </svg>
-  );
-}
-
 export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
+  const { settings } = useSettings();
+  const accentColor = { cyan: "#67e8f9", violet: "#c4b5fd", emerald: "#6ee7b7" }[settings.accent];
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,7 +61,7 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
   return (
     <header className="grid w-full min-w-0 max-w-full shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden border-b border-white/10 bg-[#0d121c] px-3 sm:px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:overflow-visible md:px-6">
       <div className="flex min-w-max items-center gap-2 py-4 md:py-0">
-        <span className="size-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.65)]" />
+        <span className="size-2 rounded-full shadow-[0_0_10px_rgba(103,232,249,0.65)]" style={{ backgroundColor: accentColor }} />
         <p className="text-sm font-semibold tracking-wide text-white">Code Tutor</p>
       </div>
 
@@ -86,6 +78,7 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
               onClick={() => !item.comingSoon && onSelect(item.id)}
               aria-current={active ? "page" : undefined}
               aria-disabled={item.comingSoon || undefined}
+              style={active ? { color: accentColor } : undefined}
               className={`relative flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs transition-colors lg:px-3 ${
                 active
                   ? "text-cyan-200"
@@ -100,21 +93,13 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
                   {t("comingSoon")}
                 </span>
               )}
-              {active && <span className="absolute inset-x-2.5 bottom-0 h-px bg-cyan-300" />}
+              {active && <span className="absolute inset-x-2.5 bottom-0 h-px" style={{ backgroundColor: accentColor }} />}
             </button>
           );
         })}
       </nav>
 
       <div className="flex min-w-0 items-center justify-self-end gap-1 sm:gap-2">
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200 sm:flex"
-        >
-          <SettingsIcon />
-          <span className="hidden xl:inline">{t("settings")}</span>
-        </button>
         <div className="relative flex items-center gap-2" ref={languageMenuRef}>
           <span className="hidden text-[11px] text-slate-500 sm:inline">{t("languageLabel")}</span>
           <button
@@ -173,7 +158,6 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
         </div>
         <AccountControl onBeforeSignOut={onBeforeSignOut} />
       </div>
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }

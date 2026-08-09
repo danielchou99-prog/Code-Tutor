@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RunResult, RunStatus } from "@/lib/compiler-api";
 import type { InteractiveOutput, InteractiveStatus } from "@/lib/interactive-api";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 
 type OutputPanelProps = {
   activeTab: "output" | "input";
@@ -77,6 +78,7 @@ export function OutputPanel({
   stdin,
 }: OutputPanelProps) {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const [consoleInput, setConsoleInput] = useState("");
   const consoleViewportRef = useRef<HTMLDivElement>(null);
   const consoleInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +107,7 @@ export function OutputPanel({
   }[interactiveStatus];
 
   return (
-    <section className="h-52 shrink-0 border-t border-white/10 bg-[#090e16]">
+    <section className="shrink-0 border-t border-white/10 bg-[#090e16]" style={{ height: settings.consoleHeight, fontFamily: `${settings.editorFont}, monospace` }}>
       <div className="flex h-10 items-center justify-between border-b border-white/8 px-4">
         <div className="flex h-full items-center gap-5 text-[11px] font-medium">
           <button
