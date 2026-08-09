@@ -7,8 +7,8 @@
 }
 
 [data-code-tutor-theme="light"] {
-  --background: #f4f7fb;
-  --foreground: #1e293b;
+  --background: #dbe8f3;
+  --foreground: #1d3145;
   color-scheme: light;
 }
 
@@ -50,20 +50,20 @@ button {
 [data-code-tutor-theme="light"] [class*="bg-[#1"],
 [data-code-tutor-theme="light"] [class~="bg-black"],
 [data-code-tutor-theme="light"] [class~="bg-slate-950"] {
-  background-color: #f8fafc !important;
+  background-color: #e7f0f7 !important;
 }
 
 [data-code-tutor-theme="light"] [class*="bg-white/"] {
-  background-color: rgba(15, 23, 42, 0.04) !important;
+  background-color: rgba(30, 64, 96, 0.06) !important;
 }
 
 [data-code-tutor-theme="light"] [class*="border-white/"] {
-  border-color: rgba(15, 23, 42, 0.12) !important;
+  border-color: rgba(45, 78, 108, 0.2) !important;
 }
 
 [data-code-tutor-theme="light"] [class~="text-white"],
 [data-code-tutor-theme="light"] [class~="text-slate-200"] {
-  color: #172033 !important;
+  color: #142b40 !important;
 }
 
 [data-code-tutor-theme="light"] [class~="text-slate-300"] {

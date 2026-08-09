@@ -1,0 +1,502 @@
+# Code Tutor 網站架構與技術白話整理
+
+- 文件狀態：第一版完成，內容依 2026-08-09 的實際程式碼整理
+- 適合讀者：剛開始接觸網站架設、想了解 Code Tutor 如何運作的人
+- 重要原則：本文件只寫目前真的有使用或已經建立的內容；尚未完成的功能會另外標示
+
+## 一、先用一句話理解這個網站
+
+Code Tutor 是一個「瀏覽器裡的 C++ 練習空間」。
+
+使用者可以註冊帳號、管理資料夾與 Project、編輯多個 C++ 檔案、執行程式，再請 AI Tutor 解釋錯誤或提供提示。
+
+網站不是由一個程式包辦全部工作，而是拆成幾個部分：
+
+```text
+使用者的瀏覽器
+      │
+      ├── Next.js 前端：顯示畫面、Editor、設定、檔案管理
+      │        │
+      │        ├── Supabase：登入、資料庫、檔案與 Project 資料
+      │        │
+      │        └── FastAPI 後端：編譯、Interactive Console、AI Tutor
+      │                    │
+      │                    ├── Docker + g++：隔離執行 C++
+      │                    ├── Groq：產生 AI 回答
+      │                    └── Supabase：驗證登入身分及讀取加密 Key
+      │
+      └── 畫面收到結果後，再呈現給使用者
+```
+
+最白話的比喻：
+
+- 前端像櫃檯，負責接收使用者操作和顯示結果。
+- 後端像工作人員，負責不能交給瀏覽器直接做的事情。
+- Supabase 像會員系統加資料倉庫。
+- Docker 像每次都準備一間獨立的小房間執行陌生程式。
+- Groq 像外部的 AI 老師。
+
+## 二、專案資料夾分工
+
+```text
+Code-Tutor/
+├── frontend/       網頁畫面與瀏覽器端功能
+├── backend/        編譯、AI、驗證與安全限制 API
+├── compiler/       C++ Docker 編譯環境
+├── supabase/       資料庫 migration
+├── docs/           較早期的設計與 API 文件
+├── plan/           每一階段的開發計畫與驗收紀錄
+├── AGENTS.md       開發時必須遵守的專案規範
+└── README.md       專案入口說明
+```
+
+### `frontend/`
+
+使用者看得到、點得到的部分幾乎都在這裡，例如首頁、檔案頁、題目頁、設定頁、Editor、Console 與 AI Tutor。
+
+### `backend/`
+
+負責安全性較高或瀏覽器無法自己完成的工作，例如：
+
+- 驗證 Supabase 登入 token。
+- 啟動 Docker 編譯 C++。
+- 保持 Interactive Console 的 WebSocket 連線。
+- 驗證、加密與讀取 Groq API Key。
+- 將程式碼和錯誤送到 Groq，並把回答逐段傳回前端。
+- 限制執行次數、排隊數量與同時執行數量。
+
+### `compiler/`
+
+包含 Dockerfile。它以 GCC 13.4 映像為基礎，提供 `g++` 和 Linux 執行環境。
+
+### `supabase/`
+
+保存 SQL migration。Migration 可以理解成「有版本紀錄的資料庫施工圖」，可重複知道資料表是何時、為什麼被建立或修改。
+
+### `plan/`
+
+每次新增重要功能前先寫計畫，完成後同步勾選進度與驗收結果，避免程式和計畫分離。
+
+## 三、前端架構
+
+### 使用的技術
+
+| 技術 | 白話用途 |
+| --- | --- |
+| Next.js 16 | 管理網站頁面、建置正式版本，以及處理登入確認路由。 |
+| React 19 | 把畫面拆成可以重複組合的元件。 |
+| TypeScript | 在執行前先檢查資料型別，降低傳錯資料造成的錯誤。 |
+| Tailwind CSS 4 | 直接用小型樣式名稱安排尺寸、顏色、間距與響應式版面。 |
+| Monaco Editor | VS Code 同系列的程式碼編輯器核心。 |
+| Supabase JavaScript SDK | 在瀏覽器處理登入，以及存取使用者自己的資料。 |
+
+### 主要畫面元件
+
+- `app-shell.tsx`：網站總控制台，決定目前顯示首頁、檔案、題目、設定或 Project。
+- `site-header.tsx`：最上方導覽、語言與帳號入口。
+- `home-page.tsx`：首頁介紹與主要入口。
+- `file-home.tsx`：資料夾、Project、標籤、搜尋、拖曳移動與新增功能。
+- `project-workspace.tsx`：組合 Project 左側檔案列表、Editor、Console 與 AI Tutor。
+- `code-editor-panel.tsx`：多檔案分頁、Monaco、Save、Clear、Run 與未儲存狀態。
+- `output-panel.tsx`：Text、Interactive Console 與執行輸出。
+- `ai-tutor-panel.tsx`：AI 分析、解釋錯誤、提示與自訂問題。
+- `settings-page.tsx`：個人資料、外觀、Editor、版面、字體、執行、快捷鍵、通知、語言、Groq 與帳號安全。
+
+### Context 是什麼
+
+網站目前使用幾個 React Context：
+
+- `AuthContext`：讓不同元件都能取得目前登入者和登入／登出功能。
+- `LanguageContext`：讓全站知道目前要顯示繁體中文或英文。
+- `SettingsContext`：保存外觀、Editor、Console、快捷鍵與通知偏好。
+
+白話來說，Context 像是網站內部的公佈欄。需要同一份資料的元件可以直接讀取，不必從最外層一層一層傳下去。
+
+### 瀏覽器本機保存的資料
+
+`localStorage` 目前用來保存：
+
+- 深色／淺色、主題色與背景。
+- Editor 字體、字體大小、Tab、Word Wrap。
+- Console 和側欄尺寸。
+- 快捷鍵與通知偏好。
+- 尚未按 Save 的本機草稿。
+- 上次開啟的 Project 與檔案。
+
+這些資料只存在目前瀏覽器，不等於已經永久存進 Supabase。真正按下 Save 後，程式內容才會送進資料庫。
+
+## 四、後端架構
+
+### 使用的技術
+
+| 技術 | 白話用途 |
+| --- | --- |
+| Python | 後端主要程式語言。 |
+| FastAPI | 接收前端請求、驗證資料並回傳 API 結果。 |
+| Uvicorn | 實際啟動 FastAPI 網站服務的伺服器。 |
+| Pydantic | 檢查傳進 API 的欄位、型別、長度與合法性。 |
+| PyJWT | 驗證 Supabase 發出的登入 token。 |
+| httpx | 後端呼叫 Supabase REST API 和 Groq API。 |
+| cryptography / Fernet | 加密使用者的 Groq API Key。 |
+| truststore | 使用作業系統信任的 HTTPS 憑證。 |
+
+### API 入口
+
+| API | 作用 |
+| --- | --- |
+| `GET /health` | 檢查後端與 Docker Compiler 是否可用。 |
+| `GET /api/auth/me` | 驗證登入 token 並回傳使用者身分。 |
+| `POST /api/run` | 一次編譯並執行 C++，完成後回傳結果。 |
+| `WS /api/run/interactive` | 建立像 CMD 一樣可以持續輸入與輸出的連線。 |
+| `GET /api/ai/connection` | 查詢目前是否已連接 Groq。 |
+| `PUT /api/ai/connection` | 驗證並加密保存 Groq API Key。 |
+| `DELETE /api/ai/connection` | 移除 Groq 連線。 |
+| `POST /api/ai/tutor` | 將程式與問題交給 Groq，逐段傳回 AI 回答。 |
+
+### HTTP 和 WebSocket 的差別
+
+- 一般 Run 使用 HTTP：前端送一次資料，後端完成後回一次結果。
+- Interactive Console 使用 WebSocket：瀏覽器與後端保持連線，可以多次輸入與持續收到輸出。
+
+## 五、資料庫與帳號
+
+### Supabase 負責什麼
+
+目前 Supabase 同時提供：
+
+- Email 註冊、登入、登出與驗證信。
+- 忘記密碼、修改密碼、修改 Email。
+- 使用者基本資料 metadata。
+- PostgreSQL 資料庫。
+- Row Level Security（RLS）。
+
+### 主要資料表
+
+#### `file_items`
+
+保存資料夾和 Project：
+
+- `kind` 是 `folder` 或 `project`。
+- `parent_id` 表示它位於哪一個資料夾。
+- `tags` 最多 8 個。
+- 同一位使用者、同一層不能有同名項目。
+- 資料夾不可移入自己或自己的子資料夾，避免形成無限循環。
+
+#### `project_files`
+
+保存一個 Project 內的程式檔：
+
+- 支援 `.cpp`、`.h`、`.hpp`。
+- 每個 Project 最多 50 個檔案。
+- 同一個 Project 內檔名不可重複。
+- 新增 Project 時會自動建立 `main.cpp`。
+
+#### `ai_connections`
+
+保存每位使用者連接的 AI Provider。目前只支援 Groq：
+
+- 資料庫保存的是加密後的 Key。
+- 另外只保存最後四碼，讓畫面辨識是哪一把 Key。
+- 前端不會再次讀回完整 Key。
+
+#### `ai_usage`
+
+預留每日 AI 使用量、輸入 token 與輸出 token 統計。資料表已建立，但完整用量計費／限制流程仍要繼續完成。
+
+### RLS 是什麼
+
+RLS 可以理解成資料庫門口的警衛。即使有人直接呼叫資料庫 API，也只能讀寫 `user_id` 等於自己登入身分的資料。
+
+## 六、C++ Online Compiler 如何工作
+
+### 一般 Run 流程
+
+```text
+按下 Run
+  → 前端收集 Project 的 C++ 檔案與 Input
+  → FastAPI 檢查格式與使用限制
+  → 建立暫存原始碼資料夾
+  → 啟動全新的 Docker container
+  → g++ 使用 C++20 編譯所有 .cpp
+  → 執行程式並取得 stdout / stderr
+  → 刪除 container 與暫存資料
+  → 將結果回傳畫面
+```
+
+### 目前的重要規格
+
+- 編譯器：GCC 13.4 的 `g++`。
+- 語言標準：C++20。
+- 編譯參數：`-O2 -pipe -Wall -Wextra`。
+- 編譯時間上限：15 秒。
+- 一般程式執行上限：3 秒。
+- Interactive session 預設上限：60 秒。
+- 單次輸出上限：65,536 bytes。
+- Docker 記憶體：512 MB。
+- Docker CPU：0.5 顆 CPU。
+- 程序數上限：64。
+- 一般預設限制：同一來源每 60 秒最多 10 次執行。
+- 同時最多 2 個執行，額外最多 4 個排隊，排隊等待 10 秒。
+
+### Docker 的安全限制
+
+執行陌生程式時會使用：
+
+- `--network none`：程式不能上網。
+- `--read-only`：container 主要檔案系統唯讀。
+- `--cap-drop ALL`：移除 Linux 額外權限。
+- `no-new-privileges`：程式不能取得更高權限。
+- 非 root 使用者：降低控制系統的能力。
+- 暫存 `/tmp`：限制大小，結束後消失。
+- CPU、記憶體、程序、時間和輸出限制：避免一個程式拖垮整台主機。
+
+這也是本專案不直接在網站主機上執行使用者程式的原因。
+
+## 七、AI Tutor 如何工作
+
+### 使用者自己的 Groq Key
+
+Code Tutor 目前不替所有人支付同一組 AI Key，而是讓每位使用者連接自己的 Groq API Key。
+
+流程如下：
+
+```text
+使用者輸入 Groq Key
+  → 後端先向 Groq 驗證
+  → 使用 Fernet 加密
+  → 加密內容存入 Supabase
+  → 使用 AI Tutor 時後端才暫時解密並呼叫 Groq
+  → 完整 Key 不會回傳到前端
+```
+
+### AI 回答方式
+
+- `Analyze code`：檢查正確性、邊界條件、複雜度和可讀性。
+- `Explain error`：用初學者能理解的方式解釋編譯或執行錯誤。
+- `Give me a hint`：優先給提示與思考問題，不直接交出完整答案。
+- 自訂問題：使用者可以直接詢問目前程式。
+- 回答採串流方式，前端不必等整篇生成完才看到文字。
+- 每位使用者同一時間只允許一個 AI 回答，避免重複消耗額度。
+
+目前預設 Groq 模型是 `llama-3.3-70b-versatile`，可由後端環境變數調整。
+
+## 八、網站規格摘要
+
+### 已完成或可使用
+
+- 響應式首頁與上方導覽。
+- 繁體中文、English。
+- Supabase Email 帳號流程。
+- 資料夾、Project、標籤、多標籤搜尋與拖曳移動。
+- 一個 Project 內建立、開啟、關閉及刪除多個 C++ 檔案。
+- Monaco Editor、手動 Save、Clear 雙重確認與未儲存警告。
+- Text Input 與 Interactive Console。
+- Docker C++20 編譯與執行。
+- AI Tutor 與使用者自己的 Groq Key。
+- 設定中心、深色／淺色、Editor 與版面偏好。
+
+### 尚未完整完成
+
+- 正式公開部署與正式網域。
+- 測驗系統。
+- 簡體中文完整翻譯。
+- 自動編譯。
+- 安全的刪除帳號後端端點。
+- 完整登入裝置清單。
+- 完整 AI 使用量計算與配額控制。
+- 多檔案一起編譯的使用者驗收仍可繼續加強。
+
+## 九、實際使用過的開發工具
+
+| 工具 | 用來做什麼 |
+| --- | --- |
+| Visual Studio Code | 查看和編輯專案檔案。 |
+| Codex | 協助分析、修改程式、建立計畫與執行檢查。 |
+| PowerShell | 在 Windows 執行開發、測試與 Git 指令。 |
+| Node.js / npm | 安裝與執行前端套件。 |
+| Python / venv / pip | 建立獨立後端環境並安裝 Python 套件。 |
+| Docker Desktop | 在 Windows 啟動 Docker Engine。 |
+| Docker | 建立並啟動隔離的 C++ container。 |
+| GCC / g++ | 真正編譯 C++20 程式。 |
+| Supabase Dashboard / SQL Editor | 建立專案、設定登入網址與執行 migration。 |
+| Groq Console | 建立使用者自己的 Groq API Key。 |
+| Git | 保存每一次程式修改。 |
+| GitHub | 保存遠端程式碼並提供協作版本。 |
+| Microsoft Edge / Chrome | 實際開啟網站、測試響應式畫面與登入流程。 |
+| ESLint | 檢查前端程式風格與常見錯誤。 |
+| TypeScript Compiler | 在執行前檢查型別。 |
+| Next.js production build | 確認網站能產生正式版本。 |
+| pytest | 自動測試後端 API、安全限制、AI 與 Compiler。 |
+
+## 十、環境變數與秘密
+
+環境變數是「放在程式外面的設定」。例如本機網址、Supabase 公開設定與加密 Key。
+
+### 可以出現在前端的公開設定
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_API_URL`
+
+這些項目雖然可以由瀏覽器看到，仍必須搭配 Supabase RLS，不能只靠隱藏字串保護資料。
+
+### 只能放在後端的秘密
+
+- `CODE_TUTOR_AI_ENCRYPTION_KEY`
+
+它負責加密 Groq Key，不能提交到 Git、貼到前端程式或公開聊天。
+
+後端不使用 Supabase `service_role` Key 完成一般操作，而是沿用使用者驗證過的 JWT 與 RLS，降低管理員權限外洩的風險。
+
+## 十一、物件導向在這個專案如何使用
+
+### 先用白話理解物件導向
+
+物件導向可以想成把「資料」和「處理這些資料的方法」裝進一個有名稱的盒子。建立不同盒子後，可以替換其中某一個實作，而不用重寫整個系統。
+
+### 1. Class 與 Instance
+
+Python 後端使用 class，例如：
+
+- `DockerCompiler`：知道如何檢查 Docker、組合安全指令、執行程式和整理結果。
+- `AiTutorService`：知道如何取得 Key、呼叫 AI Provider 和管理同時請求。
+- `FernetKeyCipher`：只負責 Key 的加密與解密。
+- `SupabaseTokenVerifier`：只負責驗證 Supabase token。
+- `InMemoryRateLimiter`：記錄請求時間並判斷是否超過限制。
+
+Class 是設計圖；像 `DockerCompiler(settings)` 建立出來的實際值才是 instance（物件）。
+
+### 2. 封裝
+
+封裝就是讓每個物件管好自己的細節。
+
+例如 API 不需要知道 Docker 指令的每一個參數，只要呼叫 `compiler.run(...)`。Docker 的暫存檔、指令與結果判斷都留在 `DockerCompiler` 內部。
+
+好處是以後更換編譯方式時，API 不必整份重寫。
+
+### 3. 抽象與 Protocol
+
+後端定義了 `CompilerService`、`TutorProvider`、`KeyCipher`、`AiConnectionStore` 等 Protocol。
+
+Protocol 像插座規格：只規定「必須有哪些方法」，不限制裡面如何完成。
+
+例如任何物件只要具有符合規格的 `run()`，理論上都能替代目前的 `DockerCompiler`。測試也能放入假的 Compiler，不必真的每次啟動 Docker。
+
+### 4. 多型
+
+多型的意思是「同一種操作，可以由不同物件用不同方式完成」。
+
+目前程式讓 FastAPI 依賴 `CompilerService` 而不是死綁所有內部細節；AI Service 也依賴 `TutorProvider` 和 `KeyCipher`。未來要增加其他 AI Provider 或遠端 Compiler 時，可以新增實作再替換。
+
+### 5. 組合
+
+`AiConnectionService` 不是把所有功能寫在同一個巨大 class，而是由三個物件組合：
+
+- Store：保存資料。
+- Cipher：加密資料。
+- Validator：驗證 Groq Key。
+
+這種做法叫組合。每一部分職責較小，比全部繼承自一個龐大父類別容易理解與測試。
+
+### 6. 繼承
+
+專案有使用繼承，但沒有濫用：
+
+- `RunRequest` 和 `InteractiveStartRequest` 繼承共用的 `ProjectSourcesMixin`。
+- 自訂錯誤類別繼承 `Exception` 或共同的 AI 錯誤父類別。
+- Pydantic 資料模型繼承 `BaseModel`，自動取得驗證與序列化功能。
+
+### 7. Dataclass
+
+`Settings`、`AuthenticatedUser`、`TutorPrompt`、`DockerCompiler` 等使用 Python dataclass。
+
+它適合「主要用來裝資料」的 class，可自動產生初始化等基本功能，減少重複程式碼。部分資料加上 `frozen=True`，代表建立後不能隨意修改。
+
+### 8. 依賴注入
+
+FastAPI 的 `Depends(...)` 和 Service 建構方式屬於依賴注入。
+
+白話來說：某個功能需要 Compiler 時，由外面把 Compiler 交給它，而不是功能自己偷偷建立。這樣正式環境能交付真的 Docker Compiler，測試時能交付假的物件。
+
+### React 為什麼看不到很多 class
+
+前端 React 目前主要使用「函式元件＋Hook」，不是傳統 class component。
+
+- TypeScript 的 `type` 和 `interface` 主要是型別規格，不是執行中的物件。
+- React 元件是負責產生畫面的函式。
+- `useState` 管理狀態，`useEffect` 處理畫面以外的同步工作，Context 分享全站資料。
+
+所以不能因為前端沒有很多 `class` 就認為沒有架構；它使用的是組合式、函數式的 React 寫法，而後端則較明顯使用物件導向。
+
+## 十二、安全設計摘要
+
+- 使用者程式只在受限制的 Docker container 內執行。
+- Supabase JWT 由後端驗證簽章、發行者、用途與到期時間。
+- 資料庫使用 RLS 隔離不同使用者。
+- Groq Key 先驗證、再加密，完整 Key 不回傳前端。
+- 前端不包含 Supabase 管理員 Key。
+- API 有資料長度、檔名、輸出、時間、頻率、同時執行與排隊限制。
+- 離開未儲存檔案、清空內容與刪除資料會有自訂確認視窗。
+
+## 十三、如何判斷一項功能放在哪裡
+
+- 只影響畫面或目前瀏覽器偏好：放前端。
+- 需要永久保存使用者資料：放 Supabase，並建立 RLS。
+- 需要秘密、外部 AI 或執行陌生程式：放後端。
+- 需要編譯 C++：交給 Docker container。
+- 需要修改資料表結構：新增 Supabase migration。
+- 需要改網站功能：先更新 `plan/` 計畫書，再實作和驗證。
+
+## 十四、開發與驗證流程
+
+```text
+確認需求
+  → 在 plan/ 寫計畫
+  → 修改小範圍程式
+  → ESLint / TypeScript / pytest
+  → Next.js production build
+  → 瀏覽器實際驗收
+  → 更新計畫核取方塊
+  → Git commit
+  → push 到 GitHub
+```
+
+不是每次都要執行所有測試。例如只改前端顏色時不必重新測試 Python Compiler，但至少要跑前端 lint、型別、build 與畫面驗證。
+
+## 十五、這份文件的製作計畫
+
+### 目標
+
+- 用不需要網站開發背景的說法，整理 Code Tutor 的實際架構與技術。
+- 清楚區分已完成和仍在規劃的內容。
+- 解釋物件導向實際出現在哪些程式，而不是只列課本名詞。
+
+### 製作前狀態
+
+- [x] 專案已有分散的 README、Design、API、Database 與各功能計畫書。
+- [x] 部分早期文件仍描述單一 `main.cpp`，和目前多檔案實作不同。
+- [x] 尚無一份同時涵蓋前端、後端、資料庫、Compiler、AI、工具與物件導向的白話總整理。
+
+### 執行步驟與簡易說明
+
+- [x] 讀取實際 package、requirements、前後端模組、Dockerfile 與 migration。
+  - 簡易說明：先看程式再寫文件，避免把預定技術誤寫成已完成。
+- [x] 整理資料流、功能邊界與目前安全限制。
+  - 簡易說明：知道資料交給誰處理，比只背工具名稱更容易理解網站。
+- [x] 整理 Python 後端的 class、Protocol、組合、繼承與依賴注入。
+  - 簡易說明：直接用本專案例子解釋物件導向。
+- [x] 列出目前已完成與尚未完成項目。
+  - 簡易說明：避免閱讀者以為畫面上規劃中的項目已可正式使用。
+
+### 驗收方式
+
+1. 文件能回答「畫面、資料、編譯、AI 分別由誰負責」。
+2. 文件列出的套件與版本可在 `package.json`、`requirements.txt` 或 Dockerfile 找到。
+3. Compiler 規格與後端 `Settings`、Docker 指令一致。
+4. 資料表與 `supabase/migrations/` 一致。
+5. 物件導向例子能對應到實際 Python class。
+
+### 需要使用者手動操作
+
+- [ ] 閱讀後標記仍不理解的名詞，我可以在本文件追加更簡單的例子或圖解。
+- [ ] 如果未來完成正式部署、測驗或其他語言，需同步更新本文件的「已完成／尚未完成」與部署架構。

@@ -110,5 +110,6 @@
 - 簡體中文與自動編譯保留在設定清單並明確標示尚未開放。
 - [x] 完成全站淺色模式、Monaco 淺色主題與重新整理後的偏好還原。
 - 淺色模式已用本機瀏覽器完成實際畫面截圖驗證，證據為 `plan/evidence/settings-center/light-mode.png`。
+- [x] 將淺色模式由接近白色調整為低亮度的淺藍灰基底，並重新驗證文字對比。
 - Frontend ESLint、TypeScript 與 Next.js production build 通過。
 - 驗收截圖位於 `plan/evidence/settings-center/`。
