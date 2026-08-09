@@ -1,6 +1,6 @@
 # Code Tutor 帳號系統實作計畫
 
-- 文件狀態：本機程式實作完成，等待填入 Supabase 公開連線資料
+- 文件狀態：Supabase 已連線，等待 Dashboard Email 設定與真實帳號驗收
 - 最後更新：2026-08-09
 - 使用方案：Supabase Auth + Next.js Cookie-based session
 
@@ -83,7 +83,7 @@ Supabase 負責安全保存密碼與寄送驗證信；Code Tutor 只呼叫官方
 
 ## 八、需要使用者手動操作
 
-1. 將 Supabase `Connect` 的 `Project URL` 與 `Publishable key` 填進已建立的 `frontend/.env.local`；Project URL 也填入 `backend/.env`。
+1. [x] 將 Supabase `Connect` 的 `Project URL` 與 `Publishable key` 填進已建立的 `frontend/.env.local`；Project URL 也填入 `backend/.env`。
 2. 絕對不要提供 `Secret key`、`service_role key`、資料庫密碼或完整 Groq API key。
 3. 按照完成後的說明，在 Supabase Dashboard 設定本機 Site URL、Redirect URL 與 Email Template。
 4. 使用自己的 Email 完成一次註冊、確認信、登入與忘記密碼測試。
@@ -92,6 +92,9 @@ Supabase 負責安全保存密碼與寄送驗證信；Code Tutor 只呼叫官方
 
 - 未設定 Supabase 時，瀏覽器可開啟帳號視窗並顯示設定提示，其他頁面仍正常。
 - 畫面證據：`plan/evidence/account-system-unconfigured.png`。
+- 公開連線資料填入後，Supabase Auth settings endpoint 回應 HTTP 200，Frontend 顯示真正的登入表單。
+- 已連線畫面證據：`plan/evidence/account-system-configured.png`。
+- Backend 已讀取 Supabase Project URL，`/health` 與 Docker Compiler 維持正常。
 - Frontend ESLint 與 Next.js production build 通過；產生 `/auth/confirm` 與 `/auth/update-password` 路由。
 - Backend 完整 33 項測試通過，包含 9 項真實 Docker，以及有效 JWT、錯誤 audience、未登入 401 與已驗證身分回應。
 - npm audit 沒有 high／critical 漏洞；既有 Monaco Editor 仍有 DOMPurify 1 low／1 moderate，`npm audit fix` 尚無法更新且未使用 `--force`。
