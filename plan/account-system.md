@@ -52,7 +52,7 @@ Supabase 負責安全保存密碼與寄送驗證信；Code Tutor 只呼叫官方
 
 - [x] 建立 `/auth/confirm`，把 Email 確認 token 換成登入 session。
 - [x] 建立 `/auth/update-password`，讓重設信返回後設定新密碼。
-- [ ] 提供 Supabase Dashboard 的 Site URL、Redirect URL 與 Email Template 手動設定步驟。
+- [x] 提供並完成 Supabase Dashboard 的本機 Site URL 與 Redirect URL 設定；免費預設寄信服務先使用預設 Email Template，不啟用自訂 SMTP。
 
 ### 簡易說明
 
@@ -85,7 +85,7 @@ Supabase 負責安全保存密碼與寄送驗證信；Code Tutor 只呼叫官方
 
 1. [x] 將 Supabase `Connect` 的 `Project URL` 與 `Publishable key` 填進已建立的 `frontend/.env.local`；Project URL 也填入 `backend/.env`。
 2. 絕對不要提供 `Secret key`、`service_role key`、資料庫密碼或完整 Groq API key。
-3. 按照完成後的說明，在 Supabase Dashboard 設定本機 Site URL、Redirect URL 與 Email Template。
+3. [x] Supabase Dashboard 已設定本機 Site URL 與 Redirect URLs；新版介面未啟用自訂 SMTP 時不可修改 Email Template，因此本機測試先使用預設模板。
 4. 使用自己的 Email 完成一次註冊、確認信、登入與忘記密碼測試。
 
 ## 九、目前驗收紀錄
@@ -95,10 +95,11 @@ Supabase 負責安全保存密碼與寄送驗證信；Code Tutor 只呼叫官方
 - 公開連線資料填入後，Supabase Auth settings endpoint 回應 HTTP 200，Frontend 顯示真正的登入表單。
 - 已連線畫面證據：`plan/evidence/account-system-configured.png`。
 - Backend 已讀取 Supabase Project URL，`/health` 與 Docker Compiler 維持正常。
+- Supabase URL Configuration 已由使用者完成，包含本機 Site URL 與 Redirect URLs。
 - Frontend ESLint 與 Next.js production build 通過；產生 `/auth/confirm` 與 `/auth/update-password` 路由。
 - Backend 完整 33 項測試通過，包含 9 項真實 Docker，以及有效 JWT、錯誤 audience、未登入 401 與已驗證身分回應。
 - npm audit 沒有 high／critical 漏洞；既有 Monaco Editor 仍有 DOMPurify 1 low／1 moderate，`npm audit fix` 尚無法更新且未使用 `--force`。
-- 真實 Supabase 註冊與 Email 流程需要填入公開連線資料後才能驗收。
+- 真實 Supabase 註冊、確認信、登入保持與忘記密碼流程等待使用者以自己的 Email 驗收。
 
 ## 十、官方依據
 
