@@ -10,6 +10,7 @@ import {
   type FileItemKind,
   type FileProject,
   listFileItems,
+  listRecentProjects,
   parseHashtags,
   removeHashtags,
   updateFileItem,
@@ -137,6 +138,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const [items, setItems] = useState<FileItem[]>([]);
+  const [recentProjects, setRecentProjects] = useState<FileItem[]>([]);
   const [path, setPath] = useState<FolderCrumb[]>([]);
   const [query, setQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -148,7 +150,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   const currentFolderId = path.at(-1)?.id ?? null;
 
   const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete") => {
-    if (errorCode(error) === "42P01") return t("fileStorageNotReady");
+    if (["42P01", "PGRST205"].includes(errorCode(error) ?? "")) return t("fileStorageNotReady");
     if (fallback === "save") return t("fileSaveFailed");
     if (fallback === "delete") return t("fileDeleteFailed");
     return t("fileLoadFailed");
@@ -158,20 +160,27 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
     if (!user) return;
     setLoading(true);
     setLoadError(null);
-    const { data, error } = await listFileItems(user.id, currentFolderId);
+    const [{ data, error }, recentResult] = await Promise.all([
+      listFileItems(user.id, currentFolderId),
+      listRecentProjects(user.id),
+    ]);
     if (error) {
       setItems([]);
       setLoadError(friendlyError(error, "load"));
     } else {
       setItems((data ?? []) as FileItem[]);
     }
+    if (!recentResult.error) setRecentProjects((recentResult.data ?? []) as FileItem[]);
     setLoading(false);
   }, [currentFolderId, friendlyError, user]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
-    void listFileItems(user.id, currentFolderId).then(({ data, error }) => {
+    void Promise.all([
+      listFileItems(user.id, currentFolderId),
+      listRecentProjects(user.id),
+    ]).then(([{ data, error }, recentResult]) => {
       if (cancelled) return;
       if (error) {
         setItems([]);
@@ -180,6 +189,7 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
         setItems((data ?? []) as FileItem[]);
         setLoadError(null);
       }
+      if (!recentResult.error) setRecentProjects((recentResult.data ?? []) as FileItem[]);
       setLoading(false);
     });
     return () => {
@@ -276,8 +286,18 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   }
 
   return (
-    <section className="min-w-0 bg-[#090d14] px-5 py-6 sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-6xl">
+    <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <FileNavigationSidebar
+        folders={items.filter((item) => item.kind === "folder")}
+        path={path}
+        recentProjects={recentProjects}
+        onFolder={enterFolder}
+        onOpenProject={onOpenProject}
+        onRoot={() => goToCrumb(-1)}
+        onCrumb={goToCrumb}
+      />
+      <div className="min-w-0 bg-[#090d14] px-5 py-6 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <button type="button" onClick={() => { setDialogError(null); setDialog({ mode: "create", kind: "folder" }); }} className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-xs font-medium text-slate-300 transition-colors hover:border-cyan-300/25 hover:text-cyan-200">
             <span className="text-base leading-none" aria-hidden="true">+</span>{t("addFolder")}
@@ -363,10 +383,71 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
             </div>
           </>
         )}
+        </div>
       </div>
 
       {dialog && <ItemDialog key={dialog.mode === "edit" ? dialog.item.id : dialog.kind} state={dialog} busy={saving} error={dialogError} onClose={() => setDialog(null)} onSubmit={submitDialog} />}
     </section>
+  );
+}
+
+function FileNavigationSidebar({
+  folders,
+  path,
+  recentProjects,
+  onFolder,
+  onOpenProject,
+  onRoot,
+  onCrumb,
+}: {
+  folders: FileItem[];
+  path: FolderCrumb[];
+  recentProjects: FileItem[];
+  onFolder: (folder: FileItem) => void;
+  onOpenProject: (project: FileProject) => void;
+  onRoot: () => void;
+  onCrumb: (index: number) => void;
+}) {
+  const { t } = useLanguage();
+
+  return (
+    <aside className="hidden border-r border-white/6 bg-[#0b1018] p-4 lg:block">
+      <h2 className="text-sm font-semibold text-slate-200">{t("fileNavigation")}</h2>
+
+      <div className="mt-5">
+        <button type="button" onClick={onRoot} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs text-slate-400 hover:bg-white/[0.035] hover:text-cyan-200">
+          <span className="text-amber-200/65"><FolderIcon /></span>
+          <span className="truncate">{t("fileRoot")}</span>
+        </button>
+        {path.map((crumb, index) => (
+          <button key={crumb.id} type="button" onClick={() => onCrumb(index)} className="flex w-full items-center gap-2 rounded-lg py-2 pl-6 pr-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
+            <span className="text-slate-700">└</span><span className="truncate">{crumb.name}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-7 border-t border-white/6 pt-5">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("currentFolders")}</p>
+        <div className="mt-2 space-y-1">
+          {folders.length === 0 ? <p className="px-2 py-2 text-[10px] leading-4 text-slate-700">{t("emptyFolders")}</p> : folders.slice(0, 6).map((folder) => (
+            <button key={folder.id} type="button" onClick={() => onFolder(folder)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
+              <span className="text-amber-200/50"><FolderIcon /></span><span className="truncate">{folder.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-7 border-t border-white/6 pt-5">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("recentProjects")}</p>
+        <div className="mt-2 space-y-1">
+          {recentProjects.length === 0 ? <p className="px-2 py-2 text-[10px] leading-4 text-slate-700">{t("noRecentProjects")}</p> : recentProjects.map((project) => (
+            <button key={project.id} type="button" onClick={() => onOpenProject({ id: project.id, name: project.name })} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
+              <span className="grid size-6 shrink-0 place-items-center rounded-md bg-cyan-300/[0.055] font-mono text-[8px] text-cyan-200/70">C++</span><span className="truncate">{project.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </aside>
   );
 }
 

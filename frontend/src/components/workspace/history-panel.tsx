@@ -1,63 +1,34 @@
-import { type TranslationKey, useLanguage } from "@/lib/language-context";
+import type { FileProject } from "@/lib/file-items";
+import { useLanguage } from "@/lib/language-context";
 
-const historyItems = [
-  { title: "Binary Search", time: "10:42" },
-  { title: "DFS Traversal", time: "09:18" },
-  { title: "Array Sum", timeKey: "yesterday" as TranslationKey },
-];
-
-export function HistoryPanel() {
+export function HistoryPanel({ project, onBack }: { project: FileProject; onBack: () => void }) {
   const { t } = useLanguage();
 
   return (
-    <aside className="hidden bg-[#0b1018] p-4 lg:block">
-      <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-200">{t("history")}</h2>
-        <button
-          type="button"
-          className="grid size-7 place-items-center rounded-lg border border-white/10 bg-white/5 text-lg leading-none text-slate-400"
-          aria-label={t("createNewFile")}
-        >
-          +
-        </button>
+    <aside className="hidden border-r border-white/6 bg-[#0b1018] p-4 lg:block">
+      <button type="button" onClick={onBack} className="flex items-center gap-2 text-[11px] text-slate-500 hover:text-cyan-200">
+        <span aria-hidden="true">←</span>{t("backToFiles")}
+      </button>
+
+      <div className="mt-6">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("currentProject")}</p>
+        <div className="mt-3 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.035] p-3">
+          <span className="grid size-8 place-items-center rounded-lg bg-cyan-300/[0.07] font-mono text-[9px] font-bold text-cyan-200">C++</span>
+          <p className="mt-3 break-words text-xs font-medium leading-5 text-slate-300">{project.name}</p>
+        </div>
       </div>
 
-      <div className="mb-3 flex items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 text-xs text-slate-500">
-        <span aria-hidden="true">⌕</span>
-        {t("searchSubmissions")}
+      <div className="mt-7 border-t border-white/6 pt-5">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("projectFiles")}</p>
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/[0.025] px-3 py-2.5 font-mono text-[11px] text-slate-400">
+          <span className="text-cyan-300/60">C++</span>
+          <span>main.cpp</span>
+        </div>
       </div>
 
-      <p className="mb-2 mt-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-        {t("recentRuns")}
-      </p>
-      <div className="space-y-1.5">
-        {historyItems.map((item, index) => (
-          <button
-            key={item.title}
-            type="button"
-            className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
-              index === 0
-                ? "border-cyan-400/20 bg-cyan-400/[0.07]"
-                : "border-transparent hover:bg-white/[0.035]"
-            }`}
-          >
-            <span className="block truncate text-xs font-medium text-slate-300">
-              {item.title}
-            </span>
-            <p className="mt-1.5 text-[10px] text-slate-600">
-              {item.timeKey ? t(item.timeKey) : item.time}
-            </p>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-8 rounded-xl border border-violet-400/15 bg-violet-400/[0.04] p-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300">
-          {t("learningFocus")}
-        </p>
-        <p className="mt-2 text-xs leading-5 text-slate-400">
-          {t("learningFocusDetail")}
-        </p>
+      <div className="mt-7 border-t border-white/6 pt-5">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("recentRuns")}</p>
+        <p className="mt-3 text-[10px] leading-5 text-slate-700">{t("noRecentRuns")}</p>
       </div>
     </aside>
   );

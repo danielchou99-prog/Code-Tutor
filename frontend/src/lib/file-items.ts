@@ -64,6 +64,16 @@ export async function listFileItems(userId: string, parentId: string | null) {
   return query.order("kind", { ascending: true }).order("name", { ascending: true });
 }
 
+export async function listRecentProjects(userId: string) {
+  return getSupabaseBrowserClient()
+    .from("file_items")
+    .select("id,user_id,parent_id,kind,name,tags,language,created_at,updated_at")
+    .eq("user_id", userId)
+    .eq("kind", "project")
+    .order("updated_at", { ascending: false })
+    .limit(5);
+}
+
 export async function createFileItem(input: {
   userId: string;
   parentId: string | null;

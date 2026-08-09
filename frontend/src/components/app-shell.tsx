@@ -12,11 +12,18 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import type { FileProject } from "@/lib/file-items";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 
+type OpenedProject = FileProject & { ownerId: string };
+
 function AppContent() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const [activeSection, setActiveSection] = useState<PrimarySection>("files");
-  const [openProject, setOpenProject] = useState<FileProject | null>(null);
+  const [openProject, setOpenProject] = useState<OpenedProject | null>(null);
+
+  const openUserProject = (project: FileProject) => {
+    if (!user) return;
+    setOpenProject({ ...project, ownerId: user.id });
+  };
 
   const selectSection = (section: PrimarySection) => {
     setActiveSection(section);
@@ -24,21 +31,16 @@ function AppContent() {
   };
 
   let content;
-  if (activeSection === "files" && openProject) {
+  if (activeSection === "files" && openProject && user && openProject.ownerId === user.id) {
     content = (
       <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(420px,1fr)_320px]">
-        <HistoryPanel />
+        <HistoryPanel project={openProject} onBack={() => setOpenProject(null)} />
         <WorkspaceCenter key={openProject.id} project={openProject} />
         <AiTutorPanel />
       </section>
     );
   } else if (activeSection === "files") {
-    content = (
-      <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <HistoryPanel />
-        <FileHome key={user?.id ?? "guest"} onOpenProject={setOpenProject} />
-      </section>
-    );
+    content = <FileHome key={user?.id ?? "guest"} onOpenProject={openUserProject} />;
   } else if (activeSection === "problems") {
     content = <ProblemsPage />;
   } else {

@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [account|account-clear|files-guest|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -76,14 +76,22 @@ async function evaluate(client, expression) {
   return response.result.value;
 }
 
-const targetResponse = await fetch(
-  `http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`,
-  { method: "PUT" },
-);
-if (!targetResponse.ok) {
-  throw new Error(`Unable to create browser target: HTTP ${targetResponse.status}`);
+let target;
+if (action === "current") {
+  const targetsResponse = await fetch(`http://127.0.0.1:${port}/json`);
+  const targets = await targetsResponse.json();
+  target = targets.find((candidate) => candidate.type === "page" && candidate.url.startsWith(url));
+  if (!target) throw new Error("An existing browser target was not found.");
+} else {
+  const targetResponse = await fetch(
+    `http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`,
+    { method: "PUT" },
+  );
+  if (!targetResponse.ok) {
+    throw new Error(`Unable to create browser target: HTTP ${targetResponse.status}`);
+  }
+  target = await targetResponse.json();
 }
-const target = await targetResponse.json();
 
 const socket = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((resolvePromise, reject) => {
@@ -145,7 +153,7 @@ if ((wantsEnglish && currentLanguage !== "en") || (!wantsEnglish && currentLangu
   await sleep(500);
 }
 
-let actionSucceeded = action === "none";
+let actionSucceeded = action === "none" || action === "current";
 if (action === "account") {
   actionSucceeded = await evaluate(
     client,
@@ -501,5 +509,5 @@ await mkdir(dirname(absoluteScreenshotPath), { recursive: true });
 await writeFile(absoluteScreenshotPath, Buffer.from(screenshot.data, "base64"));
 
 console.log(JSON.stringify(result));
-await client.send("Page.close");
+if (action !== "current") await client.send("Page.close");
 socket.close();

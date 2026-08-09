@@ -68,6 +68,18 @@
 
 目前驗證結果：ESLint 與 Next.js production build 通過；未登入瀏覽器測試確認不再顯示固定假專案，並改為提示使用者先登入。畫面證據：`plan/evidence/file-management-guest.png`。建立、搜尋、標籤修改、程式碼保存與跨帳號 RLS 測試，要在 migration 套用後執行。
 
+### 6. 左側內容與錯誤提示調整
+
+- [x] 移除 Binary Search、DFS Traversal、Array Sum 等固定假歷史紀錄。
+- [x] 檔案首頁左側改為目前資料夾的導覽與最近更新的真實專案。
+- [x] 未登入、資料為空及 migration 未套用時提供對應空狀態。
+- [x] Supabase `404`／`PGRST205` 顯示「檔案資料表尚未建立」，不再顯示籠統的稍後再試。
+- [x] 保持現有左欄寬度、深色配色與細框線。
+
+簡易說明：左側不應顯示不屬於使用者的示範紀錄。第一版會改成真正來自使用者檔案資料的快速入口，等提交紀錄資料表完成後，再把「最近執行」接回真實資料。
+
+診斷結果：Supabase REST endpoint 回傳 HTTP 404 與 `PGRST205`，訊息為找不到 `public.file_items`，確認 migration 尚未套用。介面已針對此錯誤提供正確說明。調整後 ESLint 與 production build 均通過。
+
 ## 四、驗收方式
 
 1. 登入後能建立資料夾，重新整理後仍存在。
