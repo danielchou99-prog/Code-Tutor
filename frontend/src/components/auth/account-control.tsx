@@ -7,7 +7,11 @@ import { useLanguage } from "@/lib/language-context";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
-export function AccountControl() {
+export function AccountControl({
+  onBeforeSignOut,
+}: {
+  onBeforeSignOut?: (signOut: () => Promise<void>) => void;
+}) {
   const { configured, loading, user, signIn, signOut, signUp, sendPasswordReset } = useAuth();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -175,7 +179,10 @@ export function AccountControl() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => void handleSignOut()}
+                  onClick={() => {
+                    if (onBeforeSignOut) onBeforeSignOut(handleSignOut);
+                    else void handleSignOut();
+                  }}
                   className="mt-3 w-full rounded-lg border border-white/8 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-rose-300/20 hover:text-rose-300"
                 >
                   {t("signOut")}

@@ -28,30 +28,42 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <EditorLoading />,
 });
 
-type SaveStatus = "saved" | "saving" | "failed";
+type SaveStatus = "saved" | "unsaved" | "saving" | "failed";
 
 type CodeEditorPanelProps = {
   isRunning: boolean;
+  onDirtyChange: (dirty: boolean) => void;
   onRun: (code: string) => void | Promise<void>;
   project: FileProject;
 };
 
-export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelProps) {
-  const { t } = useLanguage();
+export function CodeEditorPanel({ isRunning, onDirtyChange, onRun, project }: CodeEditorPanelProps) {
+  const { language, t } = useLanguage();
   const [code, setCode] = useState(defaultCppCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [savedCode, setSavedCode] = useState(defaultCppCode);
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
+  const [hasLoadedSavedCode, setHasLoadedSavedCode] = useState(false);
   const cursorListener = useRef<IDisposable | null>(null);
-  const hasLoadedSavedCode = useRef(false);
+  const hasLoadedSavedCodeRef = useRef(false);
+  const isSavingRef = useRef(false);
+  const latestCode = useRef(defaultCppCode);
+  const isDirty = hasLoadedSavedCode && code !== savedCode;
+  const displayedSaveStatus: SaveStatus = saveStatus === "saving" || saveStatus === "failed"
+    ? saveStatus
+    : isDirty ? "unsaved" : "saved";
 
   const persistCode = useCallback(async (nextCode: string) => {
     try {
       const { error } = await saveProjectContent(project.id, nextCode);
       if (error) throw error;
-      setSaveStatus("saved");
+      setSavedCode(nextCode);
+      setSaveStatus(latestCode.current === nextCode ? "saved" : "unsaved");
     } catch {
       setSaveStatus("failed");
+    } finally {
+      isSavingRef.current = false;
     }
   }, [project.id]);
 
@@ -60,29 +72,32 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
   }, []);
 
   useEffect(() => {
+    latestCode.current = code;
+    if (!hasLoadedSavedCode) return;
+    onDirtyChange(code !== savedCode);
+  }, [code, hasLoadedSavedCode, onDirtyChange, savedCode]);
+
+  useEffect(() => {
     let cancelled = false;
+    onDirtyChange(false);
     void loadProjectContent(project.id).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         setSaveStatus("failed");
       } else {
-        setCode(typeof data?.content === "string" ? data.content : defaultCppCode);
+        const nextCode = typeof data?.content === "string" ? data.content : defaultCppCode;
+        latestCode.current = nextCode;
+        setCode(nextCode);
+        setSavedCode(nextCode);
         setSaveStatus("saved");
       }
-      hasLoadedSavedCode.current = true;
+      hasLoadedSavedCodeRef.current = true;
+      setHasLoadedSavedCode(true);
     });
     return () => {
       cancelled = true;
     };
-  }, [project.id]);
-
-  useEffect(() => {
-    if (!hasLoadedSavedCode.current) return;
-
-    setSaveStatus("saving");
-    const timer = window.setTimeout(() => void persistCode(code), 600);
-    return () => window.clearTimeout(timer);
-  }, [code, persistCode]);
+  }, [onDirtyChange, project.id]);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     monaco.editor.defineTheme("code-tutor-dark", {
@@ -119,7 +134,7 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
     });
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      void persistCode(editor.getValue());
+      saveCode(editor.getValue());
     });
   };
 
@@ -129,15 +144,22 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
 
   const confirmClear = () => {
     setCode("");
-    void persistCode("");
     setClearStep(0);
+  };
+
+  const saveCode = (nextCode: string) => {
+    if (!hasLoadedSavedCodeRef.current || isSavingRef.current) return;
+    isSavingRef.current = true;
+    setSaveStatus("saving");
+    void persistCode(nextCode);
   };
 
   const statusLabel = {
     saved: t("saved"),
+    unsaved: language === "zh-Hant" ? "尚未儲存" : "Unsaved",
     saving: t("saving"),
     failed: t("saveFailed"),
-  }[saveStatus];
+  }[displayedSaveStatus];
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-[#0c111b]">
@@ -148,9 +170,11 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
           main.cpp
           <span
             className={`ml-3 size-1.5 rounded-full ${
-              saveStatus === "saved"
+              displayedSaveStatus === "saved"
                 ? "bg-emerald-400"
-                : saveStatus === "saving"
+                : displayedSaveStatus === "unsaved"
+                  ? "bg-amber-300"
+                : displayedSaveStatus === "saving"
                   ? "animate-pulse bg-amber-300"
                   : "bg-rose-400"
             }`}
@@ -158,7 +182,7 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
           />
           <span
             className={`ml-1.5 text-[9px] ${
-              saveStatus === "failed" ? "text-rose-400" : "text-slate-600"
+              displayedSaveStatus === "failed" ? "text-rose-400" : "text-slate-600"
             }`}
             role="status"
           >
@@ -167,6 +191,15 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden text-[10px] text-slate-600 sm:inline">C++ 20</span>
+          <button
+            type="button"
+            onClick={() => saveCode(code)}
+            disabled={!isDirty || saveStatus === "saving"}
+            className="h-7 rounded-lg border border-cyan-300/20 px-2.5 text-[10px] font-semibold text-cyan-200 transition-colors hover:border-cyan-300/40 disabled:cursor-default disabled:border-white/8 disabled:text-slate-600"
+            title={language === "zh-Hant" ? "將目前的 main.cpp 儲存至專案" : "Save the current main.cpp to this project"}
+          >
+            Save
+          </button>
           <button
             type="button"
             onClick={openClearDialog}
@@ -237,8 +270,8 @@ export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelPr
 
       <ConfirmDialog
         open={clearStep !== 0}
-        title={t(clearStep === 2 ? "clearCodeFinalTitle" : "clearCodeTitle")}
-        description={t(clearStep === 2 ? "clearCodeFinalConfirm" : "clearCodeFirstConfirm")}
+        title={clearStep === 2 ? "Are you sure?" : t("clearCodeTitle")}
+        description={clearStep === 2 ? "This will permanently clear the current main.cpp." : t("clearCodeFirstConfirm")}
         confirmLabel={t(clearStep === 2 ? "confirmClearAll" : "continueClear")}
         cancelLabel={t("cancel")}
         closeLabel={t("closeDialog")}

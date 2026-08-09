@@ -21,6 +21,7 @@ const primaryItems: Array<{
 
 type SiteHeaderProps = {
   activeSection: PrimarySection;
+  onBeforeSignOut: (signOut: () => Promise<void>) => void;
   onSelect: (section: PrimarySection) => void;
 };
 
@@ -33,7 +34,7 @@ function SettingsIcon() {
   );
 }
 
-export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
+export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement>(null);
@@ -167,7 +168,7 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
             </div>
           )}
         </div>
-        <AccountControl />
+        <AccountControl onBeforeSignOut={onBeforeSignOut} />
       </div>
     </header>
   );

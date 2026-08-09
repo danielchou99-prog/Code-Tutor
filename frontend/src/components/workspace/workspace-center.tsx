@@ -18,7 +18,13 @@ const initialInput = `5
 1 2 3 4 5
 `;
 
-export function WorkspaceCenter({ project }: { project: FileProject }) {
+export function WorkspaceCenter({
+  project,
+  onDirtyChange,
+}: {
+  project: FileProject;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
   const { t } = useLanguage();
   const [stdin, setStdin] = useState(initialInput);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -109,7 +115,12 @@ export function WorkspaceCenter({ project }: { project: FileProject }) {
 
   return (
     <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:border-x">
-      <CodeEditorPanel isRunning={isRunning} onRun={handleRun} project={project} />
+      <CodeEditorPanel
+        isRunning={isRunning}
+        onDirtyChange={onDirtyChange}
+        onRun={handleRun}
+        project={project}
+      />
       <OutputPanel
         activeTab={activeTab}
         isRunning={isRunning}
