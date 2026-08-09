@@ -300,3 +300,6 @@ Online Compiler 可以想成餐廳的點餐流程：
 - 已暫停 FastAPI 讓使用者在正常瀏覽器按 Run；前端正確顯示 `Cannot reach the compiler API. Start the FastAPI backend on port 8000.`，畫面沒有卡住。
 - 錯誤提示驗收後已重新啟動 FastAPI；`/health` 回傳 HTTP 200 與 `compiler_available: true`，真實 `/api/run` 再次成功輸出 `42`。
 - 本機 Online Compiler MVP 的隔離、資源限制、API、正常／錯誤畫面與響應式版面驗收全部完成。
+- [x] 修正本機前端依瀏覽器網址推算 API，造成使用不同 hostname 時無法連線的問題。
+- 簡易說明：本機開發階段固定使用 `127.0.0.1:8000`，不開放私人網路或變更防火牆；正式部署時再改成公開的 HTTPS API 網址。
+- 已重新啟動 Frontend 與 FastAPI；Frontend HTTP 200、`/health` 正常，真實 `/api/run` 回傳 `accepted` 並輸出 `42`。
