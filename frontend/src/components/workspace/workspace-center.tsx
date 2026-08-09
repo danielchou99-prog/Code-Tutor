@@ -127,7 +127,7 @@ export function WorkspaceCenter({
   };
 
   return (
-    <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:border-x">
+    <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:h-full lg:min-h-0 lg:overflow-hidden lg:border-x">
       <CodeEditorPanel
         isRunning={isRunning}
         onCodeChange={onCodeChange}

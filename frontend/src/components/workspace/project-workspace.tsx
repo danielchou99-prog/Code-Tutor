@@ -20,7 +20,7 @@ export function ProjectWorkspace({
   const [lastExecutionOutput, setLastExecutionOutput] = useState("");
 
   return (
-    <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(420px,1fr)_320px]">
+    <section className="grid min-h-0 flex-1 grid-cols-1 lg:h-[calc(100dvh-4rem)] lg:flex-none lg:grid-cols-[220px_minmax(420px,1fr)_320px] lg:overflow-hidden">
       <HistoryPanel project={project} onBack={onBack} />
       <WorkspaceCenter
         onCodeChange={setCode}

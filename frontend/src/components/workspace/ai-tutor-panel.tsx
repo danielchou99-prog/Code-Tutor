@@ -107,7 +107,7 @@ export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput:
   };
 
   return (
-    <aside className="flex min-h-[520px] min-w-0 flex-col bg-[#0b1018]">
+    <aside className="flex h-[70dvh] min-h-[520px] min-w-0 flex-col overflow-hidden bg-[#0b1018] lg:h-full lg:min-h-0">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/8 px-4">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-violet-300">AI</span>

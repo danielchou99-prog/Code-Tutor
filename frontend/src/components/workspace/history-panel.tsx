@@ -5,7 +5,7 @@ export function HistoryPanel({ project, onBack }: { project: FileProject; onBack
   const { t } = useLanguage();
 
   return (
-    <aside className="hidden border-r border-white/6 bg-[#0b1018] p-4 lg:block">
+    <aside className="hidden border-r border-white/6 bg-[#0b1018] p-4 lg:block lg:h-full lg:overflow-y-auto">
       <button type="button" onClick={onBack} className="flex items-center gap-2 text-[11px] text-slate-500 hover:text-cyan-200">
         <span aria-hidden="true">←</span>{t("backToFiles")}
       </button>
