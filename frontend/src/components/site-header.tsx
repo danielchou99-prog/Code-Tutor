@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AccountControl } from "@/components/auth/account-control";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
 
 export type PrimarySection = "home" | "files" | "problems" | "quiz" | "about";
@@ -37,6 +38,7 @@ function SettingsIcon() {
 export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const languageMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -107,10 +109,11 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
       <div className="flex items-center justify-self-end gap-1 sm:gap-2">
         <button
           type="button"
-          className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200 xl:flex"
+          onClick={() => setSettingsOpen(true)}
+          className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
         >
           <SettingsIcon />
-          {t("settings")}
+          <span className="hidden xl:inline">{t("settings")}</span>
         </button>
         <div className="relative flex items-center gap-2" ref={languageMenuRef}>
           <span className="text-[11px] text-slate-500">{t("languageLabel")}</span>
@@ -170,6 +173,7 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
         </div>
         <AccountControl onBeforeSignOut={onBeforeSignOut} />
       </div>
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </header>
   );
 }

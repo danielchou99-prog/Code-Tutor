@@ -1,6 +1,6 @@
 # Code Tutor 免費 AI 與帳號管理計畫
 
-- 文件狀態：Supabase 與 Groq 已建立，帳號系統開始實作
+- 文件狀態：帳號基礎完成；Groq 安全連線程式完成，等待環境設定與真實驗收
 - 最後更新：2026-08-09
 - 建議方案：Supabase Auth + 使用者自備 Groq API key（BYOK）
 
@@ -50,18 +50,18 @@
 ### 階段一：帳號基礎
 
 - [x] 建立 Supabase Free project。
-- [ ] 建立 email/password 註冊、登入、登出與忘記密碼頁面。
-- [ ] Backend 驗證 Supabase JWT，不信任前端自行提供的 user id。
-- [ ] 建立 `profiles`、`ai_connections`、`ai_usage` 資料表與 RLS。
-- [ ] 將目前右上帳號圖示接到登入狀態與帳號選單。
+- [x] 建立 email/password 註冊、登入、登出與忘記密碼頁面。
+- [x] Backend 驗證 Supabase JWT，不信任前端自行提供的 user id。
+- [x] 建立 `ai_connections`、`ai_usage` 資料表與 RLS migration；`profiles` 留到個人資料頁階段。
+- [x] 將目前右上帳號圖示接到登入狀態與帳號選單。
 
 ### 階段二：安全連接使用者 AI
 
-- [ ] 第一版建立 Groq provider adapter。
-- [ ] 使用者在帳號設定貼上自己的 Groq API key，經 HTTPS 送到 backend。
-- [ ] Backend 驗證 key 後以伺服器端主密鑰加密保存；前端永遠不能再次讀回完整 key。
-- [ ] 提供移除／更換 key、連線測試與最後四碼提示。
-- [ ] 不將 key 寫入 log、Git、localStorage 或錯誤訊息。
+- [x] 第一版建立 Groq provider adapter。
+- [x] 使用者在帳號設定貼上自己的 Groq API key，經 HTTP(S) 送到 backend；正式環境強制 HTTPS。
+- [x] Backend 驗證 key 後以伺服器端主密鑰加密保存；前端永遠不能再次讀回完整 key。
+- [x] 提供移除／更換 key、連線測試與最後四碼提示。
+- [x] 不將 key 寫入 log、Git、localStorage 或錯誤訊息。
 
 ### 階段三：AI Tutor API
 

@@ -48,3 +48,14 @@ class HealthResponse(BaseModel):
 class AuthMeResponse(BaseModel):
     user_id: str
     email: str | None = None
+
+
+class AiConnectionRequest(BaseModel):
+    api_key: str = Field(min_length=8, max_length=256)
+
+
+class AiConnectionStatusResponse(BaseModel):
+    connected: bool
+    provider: Literal["groq"] = "groq"
+    key_last_four: str | None = None
+    updated_at: str | None = None

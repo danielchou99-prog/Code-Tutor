@@ -1,10 +1,19 @@
 import asyncio
 from contextlib import suppress
 
-from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
+from .ai_connections import (
+    AiConnectionService,
+    AiProviderUnavailable,
+    AiStorageUnavailable,
+    FernetKeyCipher,
+    GroqKeyValidator,
+    InvalidProviderKey,
+    SupabaseAiConnectionStore,
+)
 from .auth import AuthenticatedUser, SupabaseTokenVerifier, get_current_user
 from .compiler import CompilerService, CompilerUnavailable, DockerCompiler
 from .config import settings
@@ -12,6 +21,8 @@ from .interactive import DockerInteractiveCompiler, InteractiveCompilerService, 
 from .models import (
     HealthResponse,
     AuthMeResponse,
+    AiConnectionRequest,
+    AiConnectionStatusResponse,
     InteractiveInputRequest,
     InteractiveStartRequest,
     RunRequest,
@@ -30,7 +41,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.allowed_origins),
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
     expose_headers=["Retry-After"],
 )
@@ -49,6 +60,31 @@ app.state.token_verifier = (
 )
 
 
+def create_ai_connection_service() -> AiConnectionService | None:
+    if not (
+        settings.supabase_url
+        and settings.supabase_publishable_key
+        and settings.ai_encryption_key
+    ):
+        return None
+    try:
+        cipher = FernetKeyCipher(settings.ai_encryption_key)
+    except ValueError:
+        return None
+    return AiConnectionService(
+        store=SupabaseAiConnectionStore(
+            settings.supabase_url,
+            settings.supabase_publishable_key,
+            settings.ai_request_timeout_seconds,
+        ),
+        cipher=cipher,
+        validator=GroqKeyValidator(settings.ai_request_timeout_seconds),
+    )
+
+
+app.state.ai_connection_service = create_ai_connection_service()
+
+
 def get_compiler() -> CompilerService:
     return DockerCompiler(settings)
 
@@ -65,6 +101,18 @@ def get_interactive_compiler() -> InteractiveCompilerService:
     return DockerInteractiveCompiler(settings)
 
 
+def get_ai_connection_service(request: Request) -> AiConnectionService:
+    service: AiConnectionService | None = getattr(
+        request.app.state, "ai_connection_service", None
+    )
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI connections are not configured on the server.",
+        )
+    return service
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health(compiler: CompilerService = Depends(get_compiler)) -> HealthResponse:
     compiler_available = await run_in_threadpool(compiler.is_available)
@@ -74,6 +122,71 @@ async def health(compiler: CompilerService = Depends(get_compiler)) -> HealthRes
 @app.get("/api/auth/me", response_model=AuthMeResponse)
 async def auth_me(user: AuthenticatedUser = Depends(get_current_user)) -> AuthMeResponse:
     return AuthMeResponse(user_id=user.user_id, email=user.email)
+
+
+def ai_connection_response(connection: object) -> AiConnectionStatusResponse:
+    return AiConnectionStatusResponse(
+        connected=bool(getattr(connection, "connected")),
+        provider="groq",
+        key_last_four=getattr(connection, "key_last_four"),
+        updated_at=getattr(connection, "updated_at"),
+    )
+
+
+@app.get("/api/ai/connection", response_model=AiConnectionStatusResponse)
+async def get_ai_connection(
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: AiConnectionService = Depends(get_ai_connection_service),
+) -> AiConnectionStatusResponse:
+    try:
+        connection = await run_in_threadpool(service.status, user)
+    except AiStorageUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI connection storage is temporarily unavailable.",
+        ) from error
+    return ai_connection_response(connection)
+
+
+@app.put("/api/ai/connection", response_model=AiConnectionStatusResponse)
+async def connect_ai(
+    payload: AiConnectionRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: AiConnectionService = Depends(get_ai_connection_service),
+) -> AiConnectionStatusResponse:
+    try:
+        connection = await run_in_threadpool(service.connect, user, payload.api_key)
+    except InvalidProviderKey as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Groq rejected this API key. Check the key and try again.",
+        ) from error
+    except AiProviderUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Groq is temporarily unavailable. Try again later.",
+        ) from error
+    except AiStorageUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI connection storage is temporarily unavailable.",
+        ) from error
+    return ai_connection_response(connection)
+
+
+@app.delete("/api/ai/connection", response_model=AiConnectionStatusResponse)
+async def remove_ai_connection(
+    user: AuthenticatedUser = Depends(get_current_user),
+    service: AiConnectionService = Depends(get_ai_connection_service),
+) -> AiConnectionStatusResponse:
+    try:
+        await run_in_threadpool(service.remove, user)
+    except AiStorageUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI connection storage is temporarily unavailable.",
+        ) from error
+    return AiConnectionStatusResponse(connected=False)
 
 
 @app.post("/api/run", response_model=RunResponse)

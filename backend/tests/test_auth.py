@@ -49,6 +49,8 @@ def test_supabase_verifier_accepts_valid_signed_token() -> None:
 
     assert user.user_id == "user-123"
     assert user.email == "student@example.com"
+    assert user.access_token == token
+    assert token not in repr(user)
 
 
 def test_supabase_verifier_rejects_wrong_audience() -> None:

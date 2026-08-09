@@ -60,6 +60,15 @@ class Settings:
     supabase_url: str | None = (
         os.getenv("CODE_TUTOR_SUPABASE_URL", "").strip().rstrip("/") or None
     )
+    supabase_publishable_key: str | None = (
+        os.getenv("CODE_TUTOR_SUPABASE_PUBLISHABLE_KEY", "").strip() or None
+    )
+    ai_encryption_key: str | None = (
+        os.getenv("CODE_TUTOR_AI_ENCRYPTION_KEY", "").strip() or None
+    )
+    ai_request_timeout_seconds: float = float(
+        os.getenv("CODE_TUTOR_AI_REQUEST_TIMEOUT_SECONDS", "10")
+    )
 
 
 settings = Settings()

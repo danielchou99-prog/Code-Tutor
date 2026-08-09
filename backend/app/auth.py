@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 import jwt
@@ -11,6 +11,7 @@ from jwt import PyJWKClient
 class AuthenticatedUser:
     user_id: str
     email: str | None = None
+    access_token: str = field(default="", repr=False, compare=False)
 
 
 class TokenVerifier(Protocol):
@@ -35,6 +36,7 @@ class SupabaseTokenVerifier:
         return AuthenticatedUser(
             user_id=str(claims["sub"]),
             email=claims.get("email") if isinstance(claims.get("email"), str) else None,
+            access_token=token,
         )
 
 
