@@ -39,3 +39,7 @@ Code-Tutor/
 ![Code Tutor workspace preview](docs/screenshots/code-tutor-workspace.png)
 
 詳細規劃請參閱 [docs/Roadmap.md](docs/Roadmap.md) 與 [docs/Design.md](docs/Design.md)。
+
+## 開發計畫
+
+各項網站功能在實作前會先建立計畫書，集中存放於 [`plan/`](plan/README.md)。目前可查看 [Online Compiler 建立計畫](plan/online-compiler.md)。

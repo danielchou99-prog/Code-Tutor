@@ -56,6 +56,7 @@ def test_docker_command_contains_sandbox_limits() -> None:
     combined = " ".join(command)
 
     assert "--network none" in combined
+    assert "-i" in command
     assert "--read-only" in command
     assert "--cap-drop ALL" in combined
     assert "no-new-privileges" in combined

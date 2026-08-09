@@ -123,6 +123,7 @@ exit "$run_status"
             self.settings.docker_binary,
             "run",
             "--rm",
+            "-i",
             "--network",
             "none",
             "--memory",
