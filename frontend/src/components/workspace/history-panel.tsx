@@ -1,7 +1,19 @@
-import type { FileProject } from "@/lib/file-items";
+import type { FileProject, ProjectFile } from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
 
-export function HistoryPanel({ project, onBack }: { project: FileProject; onBack: () => void }) {
+export function HistoryPanel({
+  activeFileId,
+  files,
+  project,
+  onBack,
+  onOpenFile,
+}: {
+  activeFileId: string | null;
+  files: ProjectFile[];
+  project: FileProject;
+  onBack: () => void;
+  onOpenFile: (fileId: string) => void;
+}) {
   const { language, t } = useLanguage();
 
   return (
@@ -20,11 +32,30 @@ export function HistoryPanel({ project, onBack }: { project: FileProject; onBack
 
       <div className="mt-7 border-t border-white/6 pt-5">
         <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("projectFiles")}</p>
-        <div className="mt-3 flex items-center gap-2 rounded-lg bg-white/[0.025] px-3 py-2.5 font-mono text-[11px] text-slate-400">
-          <span className="text-cyan-300/60">Files</span>
-          <span className="font-sans text-[10px] text-slate-600">
-            {language === "zh-Hant" ? "由編輯器分頁管理" : "Managed in editor tabs"}
-          </span>
+        <div className="mt-3 space-y-1">
+          {files.length ? files.map((file) => {
+            const active = file.id === activeFileId;
+            return (
+              <button
+                key={file.id}
+                type="button"
+                onClick={() => onOpenFile(file.id)}
+                aria-current={active ? "page" : undefined}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left font-mono text-[11px] transition-colors ${
+                  active
+                    ? "bg-cyan-300/[0.07] text-cyan-200"
+                    : "bg-white/[0.025] text-slate-500 hover:bg-white/[0.045] hover:text-slate-300"
+                }`}
+              >
+                <span className={active ? "text-cyan-300" : "text-slate-700"}>C++</span>
+                <span className="min-w-0 truncate">{file.name}</span>
+              </button>
+            );
+          }) : (
+            <p className="px-1 text-[10px] leading-5 text-slate-700">
+              {language === "zh-Hant" ? "這個 Project 尚無檔案" : "This project has no files"}
+            </p>
+          )}
         </div>
       </div>
 

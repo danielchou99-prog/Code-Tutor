@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runCpp, type RunResult } from "@/lib/compiler-api";
-import type { FileProject } from "@/lib/file-items";
+import type { FileProject, ProjectFile } from "@/lib/file-items";
 import {
   type InteractiveConnection,
   type InteractiveOutput,
@@ -23,11 +23,17 @@ export function WorkspaceCenter({
   onCodeChange,
   onDirtyChange,
   onExecutionOutputChange,
+  onFileRequestHandled,
+  onProjectFilesChange,
+  requestedFileId,
 }: {
   project: FileProject;
   onCodeChange: (code: string) => void;
   onDirtyChange: (dirty: boolean) => void;
   onExecutionOutputChange: (output: string) => void;
+  onFileRequestHandled: () => void;
+  onProjectFilesChange: (files: ProjectFile[], activeFileId: string | null) => void;
+  requestedFileId: string | null;
 }) {
   const { t } = useLanguage();
   const [stdin, setStdin] = useState(initialInput);
@@ -132,8 +138,11 @@ export function WorkspaceCenter({
         isRunning={isRunning}
         onCodeChange={onCodeChange}
         onDirtyChange={onDirtyChange}
+        onFileRequestHandled={onFileRequestHandled}
+        onProjectFilesChange={onProjectFilesChange}
         onRun={handleRun}
         project={project}
+        requestedFileId={requestedFileId}
       />
       <OutputPanel
         activeTab={activeTab}

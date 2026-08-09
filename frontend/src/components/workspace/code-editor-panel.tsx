@@ -44,8 +44,11 @@ type CodeEditorPanelProps = {
   isRunning: boolean;
   onCodeChange: (code: string) => void;
   onDirtyChange: (dirty: boolean) => void;
+  onFileRequestHandled: () => void;
+  onProjectFilesChange: (files: ProjectFile[], activeFileId: string | null) => void;
   onRun: (code: string) => void | Promise<void>;
   project: FileProject;
+  requestedFileId: string | null;
 };
 
 function TrashIcon() {
@@ -64,7 +67,16 @@ function FilesIcon() {
   );
 }
 
-export function CodeEditorPanel({ isRunning, onCodeChange, onDirtyChange, onRun, project }: CodeEditorPanelProps) {
+export function CodeEditorPanel({
+  isRunning,
+  onCodeChange,
+  onDirtyChange,
+  onFileRequestHandled,
+  onProjectFilesChange,
+  onRun,
+  project,
+  requestedFileId,
+}: CodeEditorPanelProps) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const zh = language === "zh-Hant";
@@ -93,6 +105,7 @@ export function CodeEditorPanel({ isRunning, onCodeChange, onDirtyChange, onRun,
   const isSavingRef = useRef(false);
   const latestCode = useRef("");
   const saveCurrentRef = useRef<(nextCode: string) => void>(() => undefined);
+  const openFileRequestRef = useRef<(file: ProjectFile) => void>(() => undefined);
   const isDirty = hasLoadedCode && code !== savedCode;
   const displayedSaveStatus: SaveStatus = saveStatus === "saving" || saveStatus === "failed"
     ? saveStatus
@@ -187,6 +200,10 @@ export function CodeEditorPanel({ isRunning, onCodeChange, onDirtyChange, onRun,
     else clearProjectDraft(project.id, activeFile.id);
   }, [activeFile, code, hasLoadedCode, onCodeChange, onDirtyChange, project.id, savedCode]);
 
+  useEffect(() => {
+    onProjectFilesChange(files, activeFile?.id ?? null);
+  }, [activeFile?.id, files, onProjectFilesChange]);
+
   const saveCode = useCallback((nextCode: string) => {
     const file = activeFileRef.current;
     if (!file || !hasLoadedCodeRef.current || isSavingRef.current) return;
@@ -226,6 +243,19 @@ export function CodeEditorPanel({ isRunning, onCodeChange, onDirtyChange, onRun,
       void loadFile(file);
     });
   };
+  useEffect(() => {
+    openFileRequestRef.current = openFile;
+  });
+
+  useEffect(() => {
+    if (!requestedFileId) return;
+    const requestTimer = window.setTimeout(() => {
+      const requestedFile = files.find((file) => file.id === requestedFileId);
+      if (requestedFile && requestedFile.id !== activeFile?.id) openFileRequestRef.current(requestedFile);
+      onFileRequestHandled();
+    }, 0);
+    return () => window.clearTimeout(requestTimer);
+  }, [activeFile?.id, files, onFileRequestHandled, requestedFileId]);
 
   const closeFile = (file: ProjectFile) => {
     const close = () => {
@@ -376,7 +406,6 @@ export function CodeEditorPanel({ isRunning, onCodeChange, onDirtyChange, onRun,
           <div className="flex h-full min-w-0 overflow-x-auto">
             <div className="flex h-full shrink-0 items-center border-r border-white/8 px-3 text-[10px] text-slate-600">
               <span className="max-w-24 truncate">{project.name}</span>
-              <span className="ml-2 text-slate-800">/</span>
             </div>
             {openFiles.map((file) => {
               const active = activeFile?.id === file.id;
