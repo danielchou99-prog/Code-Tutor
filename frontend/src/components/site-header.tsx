@@ -67,7 +67,7 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
   };
 
   return (
-    <header className="grid shrink-0 grid-cols-[1fr_auto] items-center border-b border-white/10 bg-[#0d121c] px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:px-6">
+    <header className="grid w-full min-w-0 max-w-full shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden border-b border-white/10 bg-[#0d121c] px-3 sm:px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:overflow-visible md:px-6">
       <div className="flex min-w-max items-center gap-2 py-4 md:py-0">
         <span className="size-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.65)]" />
         <p className="text-sm font-semibold tracking-wide text-white">Code Tutor</p>
@@ -106,17 +106,17 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
         })}
       </nav>
 
-      <div className="flex items-center justify-self-end gap-1 sm:gap-2">
+      <div className="flex min-w-0 items-center justify-self-end gap-1 sm:gap-2">
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
-          className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
+          className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200 sm:flex"
         >
           <SettingsIcon />
           <span className="hidden xl:inline">{t("settings")}</span>
         </button>
         <div className="relative flex items-center gap-2" ref={languageMenuRef}>
-          <span className="text-[11px] text-slate-500">{t("languageLabel")}</span>
+          <span className="hidden text-[11px] text-slate-500 sm:inline">{t("languageLabel")}</span>
           <button
             type="button"
             onClick={() => setLanguageMenuOpen((open) => !open)}

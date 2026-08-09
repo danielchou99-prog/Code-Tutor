@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { FileHome } from "@/components/files/file-home";
+import { HomePage } from "@/components/home/home-page";
 import { ProblemsPage } from "@/components/problems/problems-page";
 import { type PrimarySection, SiteHeader } from "@/components/site-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -20,7 +21,7 @@ function AppContent() {
   const { language, t } = useLanguage();
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const [activeSection, setActiveSection] = useState<PrimarySection>("files");
+  const [activeSection, setActiveSection] = useState<PrimarySection>("home");
   const [openProject, setOpenProject] = useState<OpenedProject | null>(null);
   const [hasUnsavedCode, setHasUnsavedCode] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -39,6 +40,7 @@ function AppContent() {
         const project = JSON.parse(storedProject) as FileProject;
         if (typeof project.id === "string" && typeof project.name === "string") {
           setOpenProject({ ...project, ownerId: userId });
+          setActiveSection("files");
         }
       } catch {
         window.localStorage.removeItem(`${openProjectStoragePrefix}${userId}`);
@@ -88,17 +90,18 @@ function AppContent() {
     content = <FileHome key={user?.id ?? "guest"} onOpenProject={openUserProject} />;
   } else if (activeSection === "problems") {
     content = <ProblemsPage />;
+  } else if (activeSection === "home") {
+    content = <HomePage onSelect={selectSection} />;
   } else {
-    const isAbout = activeSection === "about";
     content = (
       <section className="grid flex-1 place-items-center px-6 py-20 text-center">
         <div className="max-w-xl">
           <span className="mx-auto block size-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.6)]" />
           <h1 className="mt-5 text-2xl font-semibold text-white">
-            {t(isAbout ? "aboutTitle" : "homeTitle")}
+            {t("aboutTitle")}
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            {t(isAbout ? "aboutDetail" : "homeDetail")}
+            {t("aboutDetail")}
           </p>
         </div>
       </section>
@@ -106,7 +109,7 @@ function AppContent() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#090d14] text-slate-200">
+    <main className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[#090d14] text-slate-200">
       <SiteHeader
         activeSection={activeSection}
         onBeforeSignOut={(signOut) => protectUnsavedCode(signOut)}
