@@ -8,13 +8,15 @@ import { type PrimarySection, SiteHeader } from "@/components/site-header";
 import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { HistoryPanel } from "@/components/workspace/history-panel";
 import { WorkspaceCenter } from "@/components/workspace/workspace-center";
-import { AuthProvider } from "@/lib/auth-context";
+import { AuthProvider, useAuth } from "@/lib/auth-context";
+import type { FileProject } from "@/lib/file-items";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 
 function AppContent() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [activeSection, setActiveSection] = useState<PrimarySection>("files");
-  const [openProject, setOpenProject] = useState<string | null>(null);
+  const [openProject, setOpenProject] = useState<FileProject | null>(null);
 
   const selectSection = (section: PrimarySection) => {
     setActiveSection(section);
@@ -26,7 +28,7 @@ function AppContent() {
     content = (
       <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(420px,1fr)_320px]">
         <HistoryPanel />
-        <WorkspaceCenter />
+        <WorkspaceCenter key={openProject.id} project={openProject} />
         <AiTutorPanel />
       </section>
     );
@@ -34,7 +36,7 @@ function AppContent() {
     content = (
       <section className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)]">
         <HistoryPanel />
-        <FileHome onOpenProject={setOpenProject} />
+        <FileHome key={user?.id ?? "guest"} onOpenProject={setOpenProject} />
       </section>
     );
   } else if (activeSection === "problems") {

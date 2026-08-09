@@ -5,6 +5,12 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IDisposable } from "monaco-editor";
 
+import {
+  defaultCppCode,
+  type FileProject,
+  loadProjectContent,
+  saveProjectContent,
+} from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
 
 function EditorLoading() {
@@ -21,60 +27,58 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <EditorLoading />,
 });
 
-const initialCode = `#include <iostream>
-#include <vector>
-using namespace std;
-
-int main() {
-    int n;
-    cin >> n;
-
-    vector<int> numbers(n);
-    long long sum = 0;
-
-    for (int i = 0; i < n; ++i) {
-        cin >> numbers[i];
-        sum += numbers[i];
-    }
-
-    cout << sum << '\\n';
-    return 0;
-}`;
-
-const storageKey = "code-tutor:main.cpp";
 type SaveStatus = "saved" | "saving" | "failed";
 
 type CodeEditorPanelProps = {
   isRunning: boolean;
   onRun: (code: string) => void | Promise<void>;
+  project: FileProject;
 };
 
-export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
+export function CodeEditorPanel({ isRunning, onRun, project }: CodeEditorPanelProps) {
   const { t } = useLanguage();
-  const [code, setCode] = useState(initialCode);
+  const [code, setCode] = useState(defaultCppCode);
   const [cursor, setCursor] = useState({ lineNumber: 1, column: 1 });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const cursorListener = useRef<IDisposable | null>(null);
   const hasLoadedSavedCode = useRef(false);
 
-  const persistCode = useCallback((nextCode: string) => {
+  const persistCode = useCallback(async (nextCode: string) => {
     try {
-      window.localStorage.setItem(storageKey, nextCode);
+      const { error } = await saveProjectContent(project.id, nextCode);
+      if (error) throw error;
       setSaveStatus("saved");
     } catch {
       setSaveStatus("failed");
     }
-  }, []);
+  }, [project.id]);
 
   useEffect(() => {
     return () => cursorListener.current?.dispose();
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void loadProjectContent(project.id).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        setSaveStatus("failed");
+      } else {
+        setCode(typeof data?.content === "string" ? data.content : defaultCppCode);
+        setSaveStatus("saved");
+      }
+      hasLoadedSavedCode.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  useEffect(() => {
     if (!hasLoadedSavedCode.current) return;
 
     setSaveStatus("saving");
-    const timer = window.setTimeout(() => persistCode(code), 600);
+    const timer = window.setTimeout(() => void persistCode(code), 600);
     return () => window.clearTimeout(timer);
   }, [code, persistCode]);
 
@@ -104,15 +108,6 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
   };
 
   const handleMount: OnMount = (editor, monaco) => {
-    try {
-      const savedCode = window.localStorage.getItem(storageKey);
-      if (savedCode !== null) setCode(savedCode);
-    } catch {
-      setSaveStatus("failed");
-    } finally {
-      hasLoadedSavedCode.current = true;
-    }
-
     const currentPosition = editor.getPosition();
     if (currentPosition) setCursor(currentPosition);
 
@@ -122,7 +117,7 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
     });
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      persistCode(editor.getValue());
+      void persistCode(editor.getValue());
     });
   };
 
@@ -132,8 +127,8 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
     );
     if (!shouldReset) return;
 
-    setCode(initialCode);
-    persistCode(initialCode);
+    setCode(defaultCppCode);
+    void persistCode(defaultCppCode);
   };
 
   const statusLabel = {
@@ -146,6 +141,8 @@ export function CodeEditorPanel({ isRunning, onRun }: CodeEditorPanelProps) {
     <section className="flex min-h-0 flex-1 flex-col bg-[#0c111b]">
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-white/8 bg-[#0a0f17] pr-3">
         <div className="flex h-full items-center border-r border-white/8 bg-[#0c111b] px-4 text-xs text-slate-300">
+          <span className="max-w-28 truncate text-slate-500 sm:max-w-48">{project.name}</span>
+          <span className="mx-2 text-slate-700">/</span>
           main.cpp
           <span
             className={`ml-3 size-1.5 rounded-full ${

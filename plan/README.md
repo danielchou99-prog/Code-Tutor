@@ -31,3 +31,4 @@
 - [多標籤搜尋與 Interactive Console 計畫](problem-search-and-interactive-console.md)：`#` 多標籤解析、專案卡片簡化、Batch Input 與即時互動 Console。
 - [免費 AI 與帳號管理計畫](ai-account-foundation.md)：Supabase Auth、使用者自備 Groq key、AI Tutor API 與安全保存方式。
 - [帳號系統實作計畫](account-system.md)：Supabase Cookie-based Auth、註冊登入、確認信、密碼更新與後端 JWT 驗證。
+- [檔案管理與自訂標籤計畫](file-management-and-tags.md)：使用者專屬資料夾與專案、`#` 多標籤、階層導覽及專案程式碼保存。

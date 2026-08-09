@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runCpp, type RunResult } from "@/lib/compiler-api";
+import type { FileProject } from "@/lib/file-items";
 import {
   type InteractiveConnection,
   type InteractiveOutput,
@@ -17,7 +18,7 @@ const initialInput = `5
 1 2 3 4 5
 `;
 
-export function WorkspaceCenter() {
+export function WorkspaceCenter({ project }: { project: FileProject }) {
   const { t } = useLanguage();
   const [stdin, setStdin] = useState(initialInput);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -108,7 +109,7 @@ export function WorkspaceCenter() {
 
   return (
     <div className="flex min-h-[680px] min-w-0 flex-col border-white/10 lg:border-x">
-      <CodeEditorPanel isRunning={isRunning} onRun={handleRun} />
+      <CodeEditorPanel isRunning={isRunning} onRun={handleRun} project={project} />
       <OutputPanel
         activeTab={activeTab}
         isRunning={isRunning}

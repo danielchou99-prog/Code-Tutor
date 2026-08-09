@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [account|account-clear|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [account|account-clear|files-guest|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -219,6 +219,17 @@ if (action === "account-clear") {
         email.value === "" && password.value === "" &&
         email.autocomplete === "off" && password.autocomplete === "off"
       );
+    })()`,
+  );
+}
+if (action === "files-guest") {
+  actionSucceeded = await evaluate(
+    client,
+    `(() => {
+      const text = document.body.innerText;
+      return text.includes("請先登入，才能建立並保存自己的資料夾與專案。") &&
+        !text.includes("C++ 基礎練習") &&
+        !text.includes("APCS 題目整理");
     })()`,
   );
 }
