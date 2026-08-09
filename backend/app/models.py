@@ -43,3 +43,8 @@ class RunResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"] = "ok"
     compiler_available: bool
+
+
+class AuthMeResponse(BaseModel):
+    user_id: str
+    email: str | None = None

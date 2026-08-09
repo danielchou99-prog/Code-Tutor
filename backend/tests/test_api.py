@@ -4,6 +4,7 @@ import asyncio
 
 from fastapi.testclient import TestClient
 
+from app.auth import AuthenticatedUser
 from app.compiler import CompilerUnavailable
 from app.main import (
     app,
@@ -115,6 +116,36 @@ class FakeInteractiveCompiler:
 
 
 client = TestClient(app)
+
+
+class FakeTokenVerifier:
+    def verify(self, token: str) -> AuthenticatedUser:
+        if token != "valid-test-token":
+            raise ValueError("provider unavailable")
+        return AuthenticatedUser(user_id="user-123", email="student@example.com")
+
+
+def test_auth_me_requires_bearer_token() -> None:
+    response = client.get("/api/auth/me")
+
+    assert response.status_code == 401
+
+
+def test_auth_me_returns_verified_identity() -> None:
+    previous_verifier = app.state.token_verifier
+    app.state.token_verifier = FakeTokenVerifier()
+    try:
+        response = client.get(
+            "/api/auth/me", headers={"Authorization": "Bearer valid-test-token"}
+        )
+    finally:
+        app.state.token_verifier = previous_verifier
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": "user-123",
+        "email": "student@example.com",
+    }
 
 
 def test_health_reports_compiler_availability() -> None:

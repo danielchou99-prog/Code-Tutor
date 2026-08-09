@@ -8,6 +8,7 @@ import { type PrimarySection, SiteHeader } from "@/components/site-header";
 import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { HistoryPanel } from "@/components/workspace/history-panel";
 import { WorkspaceCenter } from "@/components/workspace/workspace-center";
+import { AuthProvider } from "@/lib/auth-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 
 function AppContent() {
@@ -66,7 +67,9 @@ function AppContent() {
 export function AppShell() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </LanguageProvider>
   );
 }

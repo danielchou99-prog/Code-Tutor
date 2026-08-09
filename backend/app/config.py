@@ -1,6 +1,11 @@
 from dataclasses import dataclass, field
 import os
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 DEFAULT_ALLOWED_ORIGINS = (
     "http://localhost:3000",
@@ -52,6 +57,9 @@ class Settings:
         os.getenv("CODE_TUTOR_QUEUE_WAIT_SECONDS", "10")
     )
     allowed_origins: tuple[str, ...] = field(default_factory=read_allowed_origins)
+    supabase_url: str | None = (
+        os.getenv("CODE_TUTOR_SUPABASE_URL", "").strip().rstrip("/") or None
+    )
 
 
 settings = Settings()

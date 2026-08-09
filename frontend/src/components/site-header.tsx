@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { AccountControl } from "@/components/auth/account-control";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
 
 export type PrimarySection = "home" | "files" | "problems" | "quiz" | "about";
@@ -28,15 +29,6 @@ function SettingsIcon() {
     <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 fill-none stroke-current" strokeWidth="1.7">
       <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56v.09h-2.7V20a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.76 15a1.7 1.7 0 0 0-1.56-1.03h-.09v-2.7h.09a1.7 1.7 0 0 0 1.56-1.03 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.03-1.56v-.09h2.7v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.56 1.03h.09v2.7h-.09A1.7 1.7 0 0 0 19.4 15Z" />
-    </svg>
-  );
-}
-
-function UserIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="1.7">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5.7 19c.7-3.2 3-5 6.3-5s5.6 1.8 6.3 5" />
     </svg>
   );
 }
@@ -175,13 +167,7 @@ export function SiteHeader({ activeSection, onSelect }: SiteHeaderProps) {
             </div>
           )}
         </div>
-        <button
-          className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:border-cyan-300/30 hover:text-cyan-200"
-          type="button"
-          aria-label={t("accountMenu")}
-        >
-          <UserIcon />
-        </button>
+        <AccountControl />
       </div>
     </header>
   );

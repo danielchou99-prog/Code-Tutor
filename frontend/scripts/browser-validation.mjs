@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [account|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -146,6 +146,22 @@ if ((wantsEnglish && currentLanguage !== "en") || (!wantsEnglish && currentLangu
 }
 
 let actionSucceeded = action === "none";
+if (action === "account") {
+  actionSucceeded = await evaluate(
+    client,
+    `(() => {
+      const accountButton = document.querySelector('button[aria-label="開啟帳號選單"]');
+      if (!accountButton) return false;
+      accountButton.click();
+      return true;
+    })()`,
+  );
+  await sleep(300);
+  actionSucceeded = await evaluate(
+    client,
+    `Boolean(document.querySelector('[role="dialog"]'))`,
+  );
+}
 if (action === "language-menu") {
   const opened = await evaluate(
     client,

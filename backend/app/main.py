@@ -5,11 +5,13 @@ from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDis
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
+from .auth import AuthenticatedUser, SupabaseTokenVerifier, get_current_user
 from .compiler import CompilerService, CompilerUnavailable, DockerCompiler
 from .config import settings
 from .interactive import DockerInteractiveCompiler, InteractiveCompilerService, READY_MARKER
 from .models import (
     HealthResponse,
+    AuthMeResponse,
     InteractiveInputRequest,
     InteractiveStartRequest,
     RunRequest,
@@ -29,7 +31,7 @@ app.add_middleware(
     allow_origins=list(settings.allowed_origins),
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
     expose_headers=["Retry-After"],
 )
 
@@ -41,6 +43,9 @@ execution_gate = ExecutionGate(
     max_concurrent=settings.max_concurrent_runs,
     max_queued=settings.max_queued_runs,
     wait_timeout_seconds=settings.queue_wait_seconds,
+)
+app.state.token_verifier = (
+    SupabaseTokenVerifier(settings.supabase_url) if settings.supabase_url else None
 )
 
 
@@ -64,6 +69,11 @@ def get_interactive_compiler() -> InteractiveCompilerService:
 async def health(compiler: CompilerService = Depends(get_compiler)) -> HealthResponse:
     compiler_available = await run_in_threadpool(compiler.is_available)
     return HealthResponse(compiler_available=compiler_available)
+
+
+@app.get("/api/auth/me", response_model=AuthMeResponse)
+async def auth_me(user: AuthenticatedUser = Depends(get_current_user)) -> AuthMeResponse:
+    return AuthMeResponse(user_id=user.user_id, email=user.email)
 
 
 @app.post("/api/run", response_model=RunResponse)

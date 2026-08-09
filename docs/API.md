@@ -19,6 +19,24 @@
 
 `compiler_available` 為 `false` 時，代表 Docker 尚未安裝、未啟動，或 Compiler image 尚未建立。
 
+## Account identity
+
+### `GET /api/auth/me`
+
+使用 `Authorization: Bearer <Supabase JWT>` 傳送登入 token。後端會透過 Supabase JWKS 驗證 JWT 簽章、issuer、audience 與到期時間，不接受前端自行提供 user id。
+
+成功回應：
+
+```json
+{
+  "user_id": "supabase-user-id",
+  "email": "student@example.com"
+}
+```
+
+- 沒有 Bearer token 或 token 無效：HTTP 401
+- 尚未設定 `CODE_TUTOR_SUPABASE_URL` 或驗證服務暫時無法使用：HTTP 503
+
 ## Compiler
 
 ### `POST /api/run`

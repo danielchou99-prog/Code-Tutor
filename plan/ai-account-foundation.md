@@ -1,6 +1,6 @@
 # Code Tutor 免費 AI 與帳號管理計畫
 
-- 文件狀態：Supabase 專案已建立，等待連線資料與 Groq API key
+- 文件狀態：Supabase 與 Groq 已建立，帳號系統開始實作
 - 最後更新：2026-08-09
 - 建議方案：Supabase Auth + 使用者自備 Groq API key（BYOK）
 
