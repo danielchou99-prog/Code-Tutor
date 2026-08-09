@@ -7,15 +7,6 @@ import { useLanguage } from "@/lib/language-context";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
-function UserIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5 fill-none stroke-current" strokeWidth="1.7">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5.7 19c.7-3.2 3-5 6.3-5s5.6 1.8 6.3 5" />
-    </svg>
-  );
-}
-
 export function AccountControl() {
   const { configured, loading, user, signIn, signOut, signUp, sendPasswordReset } = useAuth();
   const { t } = useLanguage();
@@ -88,7 +79,11 @@ export function AccountControl() {
   return (
     <div className="relative" ref={panelRef}>
       <button
-        className="grid size-9 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:border-cyan-300/30 hover:text-cyan-200"
+        className={
+          user
+            ? "grid size-9 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:border-cyan-300/30 hover:text-cyan-200"
+            : "flex h-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.025] px-3 text-[11px] font-medium text-slate-300 transition-colors hover:border-cyan-300/30 hover:text-cyan-200"
+        }
         type="button"
         aria-label={t("accountMenu")}
         aria-haspopup="dialog"
@@ -96,11 +91,11 @@ export function AccountControl() {
         onClick={() => setOpen((value) => !value)}
       >
         {loading ? (
-          <span className="size-3 animate-pulse rounded-full bg-slate-500" />
+          <span className="h-2.5 w-10 animate-pulse rounded bg-slate-600" />
         ) : user ? (
           <span className="text-xs font-semibold text-cyan-200">{initial}</span>
         ) : (
-          <UserIcon />
+          <span>Sign in</span>
         )}
       </button>
 
