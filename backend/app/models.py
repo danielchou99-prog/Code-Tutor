@@ -9,6 +9,8 @@ RunStatus = Literal[
     "runtime_error",
     "timeout",
     "service_unavailable",
+    "rate_limited",
+    "server_busy",
 ]
 
 

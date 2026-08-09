@@ -26,4 +26,4 @@
 ## 現有計畫
 
 - [Online Compiler 建立計畫](online-compiler.md)：C++ 線上編譯器、Docker 隔離環境、安全限制與上線準備。
-
+- [公開測試版保護計畫](public-beta-protection.md)：Rate limit、最大並行數、工作佇列、Frontend 狀態與安全 LAN 存取。

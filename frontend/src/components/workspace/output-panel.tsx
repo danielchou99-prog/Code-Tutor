@@ -39,6 +39,16 @@ const statusPresentation: Record<
     color: "text-slate-400",
     icon: "i",
   },
+  rate_limited: {
+    label: "Too many runs — please wait",
+    color: "text-amber-300",
+    icon: "⌛",
+  },
+  server_busy: {
+    label: "Compiler queue is busy",
+    color: "text-amber-300",
+    icon: "…",
+  },
 };
 
 export function OutputPanel({
@@ -120,6 +130,11 @@ export function OutputPanel({
                 )}
                 {result.truncated && (
                   <p className="text-amber-300">Output was truncated by the safety limit.</p>
+                )}
+                {result.retry_after_seconds && (
+                  <p className="text-amber-300">
+                    Try again in about {result.retry_after_seconds} seconds.
+                  </p>
                 )}
               </div>
             ) : (
