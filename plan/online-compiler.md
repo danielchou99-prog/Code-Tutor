@@ -1,8 +1,8 @@
 # Code Tutor Online Compiler 建立計畫
 
-- 文件狀態：進行中（本機 Online Compiler 已可用，等待瀏覽器畫面驗收）
+- 文件狀態：本機 MVP 驗收完成
 - 最後更新：2026-08-09
-- 目前階段：本機錯誤提示與響應式畫面驗收
+- 目前階段：準備公開測試版保護計畫
 - 第一版語言：C++20
 
 ## 一、計畫目標
@@ -115,7 +115,7 @@ Image 可以想成編譯環境的固定範本。它會保存 Linux、GCC 和必�
 - 每個限制都有自動測試或可重複的測試紀錄。
 - 測試結束後沒有殘留的執行容器或程式碼。
 
-### 階段 4：完成前後端端對端測試
+### 階段 4：完成前後端端對端測試（已完成）
 
 #### 計畫
 
@@ -125,8 +125,8 @@ Image 可以想成編譯環境的固定範本。它會保存 Linux、GCC 和必�
 - [x] 測試語法錯誤並顯示編譯訊息。
 - [x] 測試執行錯誤。
 - [x] 測試無限迴圈與逾時顯示。
-- [ ] 測試後端未啟動和 Docker 未啟動時的提示。
-- [ ] 檢查手機和桌面版輸出區域是否仍可操作。
+- [x] 測試後端或 Compiler 無法連線時的提示。
+- [x] 檢查手機和桌面版輸出區域是否仍可操作。
 
 #### 簡易說明
 
@@ -261,7 +261,7 @@ Online Compiler 可以想成餐廳的點餐流程：
 
 ## 十、下一步
 
-下一個實際動作是測試後端停止、Docker 停止時的前端提示，並檢查手機與桌面版輸出區域。完成本機錯誤提示與響應式驗收後，再建立公開測試版 rate limit 與工作佇列的獨立計畫書。
+本機 Online Compiler MVP 已完成驗收。下一個實際動作是在 `plan/` 建立公開測試版保護的獨立計畫書，設計 API rate limit、最大同時執行數、工作佇列、執行狀態與監控，再依計畫逐項實作。
 
 ## 十一、執行紀錄
 
@@ -294,3 +294,9 @@ Online Compiler 可以想成餐廳的點餐流程：
 - 已新增 cgroup 資源限制測試，從執行容器內確認 CPU quota 為 `50000/100000`（0.5 CPU）、記憶體上限為 `536870912` bytes（512 MB）、程序上限為 64。
 - 已實際建立短生命週期子程序，確認 Docker 會在程序數達上限前拒絕額外 fork。
 - 完整後端測試增加至 16 項且全部通過，測試完成後沒有殘留 Compiler 容器。
+- 已使用 Microsoft Edge Headless 驗證 1440×1000、900×1000 與 390×844 三種 viewport；Run、Input、Output 均可見，整頁沒有水平溢位，AI Tutor 在窄畫面移至編輯器下方。
+- 響應式驗收截圖保存於 `plan/evidence/online-compiler/`，並新增可重複執行的 `frontend/scripts/browser-validation.mjs`。
+- Headless Edge 中 Monaco 持續停在 Loading 狀態，React Run 點擊事件未掛載，因此 Backend 斷線提示改由正常瀏覽器人工完成最後一步。
+- 已暫停 FastAPI 讓使用者在正常瀏覽器按 Run；前端正確顯示 `Cannot reach the compiler API. Start the FastAPI backend on port 8000.`，畫面沒有卡住。
+- 錯誤提示驗收後已重新啟動 FastAPI；`/health` 回傳 HTTP 200 與 `compiler_available: true`，真實 `/api/run` 再次成功輸出 `42`。
+- 本機 Online Compiler MVP 的隔離、資源限制、API、正常／錯誤畫面與響應式版面驗收全部完成。
