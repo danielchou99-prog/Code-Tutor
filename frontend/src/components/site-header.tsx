@@ -60,10 +60,15 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
 
   return (
     <header className="grid w-full min-w-0 max-w-full shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden border-b border-white/10 bg-[#0d121c] px-3 sm:px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:overflow-visible md:px-6">
-      <div className="flex min-w-max items-center gap-2 py-4 md:py-0">
+      <button
+        type="button"
+        onClick={() => onSelect("home")}
+        aria-label={t("navHome")}
+        className="flex min-w-max items-center gap-2 py-4 text-left transition-opacity hover:opacity-80 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 md:py-0"
+      >
         <span className="size-2 rounded-full shadow-[0_0_10px_rgba(103,232,249,0.65)]" style={{ backgroundColor: accentColor }} />
-        <p className="text-sm font-semibold tracking-wide text-white">Code Tutor</p>
-      </div>
+        <span className="text-sm font-semibold tracking-wide text-white">Code Tutor</span>
+      </button>
 
       <nav
         aria-label={t("mainNavigation")}
