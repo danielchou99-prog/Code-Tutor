@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [account|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [account|account-clear|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -160,6 +160,66 @@ if (action === "account") {
   actionSucceeded = await evaluate(
     client,
     `Boolean(document.querySelector('[role="dialog"]'))`,
+  );
+}
+if (action === "account-clear") {
+  const opened = await evaluate(
+    client,
+    `(() => {
+      const button = document.querySelector('button[aria-haspopup="dialog"]');
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!opened) throw new Error("Account menu button was not found.");
+  await sleep(300);
+
+  const valuesEntered = await evaluate(
+    client,
+    `(() => {
+      const email = document.querySelector('[role="dialog"] input[type="email"]');
+      const password = document.querySelector('[role="dialog"] input[type="password"]');
+      if (!email || !password) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(email, "privacy-test@example.com");
+      email.dispatchEvent(new Event("input", { bubbles: true }));
+      setter?.call(password, "temporary-password");
+      password.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    })()`,
+  );
+  if (!valuesEntered) throw new Error("Account fields were not found.");
+  await sleep(200);
+
+  const closed = await evaluate(
+    client,
+    `(() => {
+      const button = document.querySelector('[role="dialog"] button[aria-label]');
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!closed) throw new Error("Account close button was not found.");
+  await sleep(200);
+
+  await evaluate(
+    client,
+    `document.querySelector('button[aria-haspopup="dialog"]')?.click()`,
+  );
+  await sleep(300);
+  actionSucceeded = await evaluate(
+    client,
+    `(() => {
+      const email = document.querySelector('[role="dialog"] input[type="email"]');
+      const password = document.querySelector('[role="dialog"] input[type="password"]');
+      return Boolean(
+        email && password &&
+        email.value === "" && password.value === "" &&
+        email.autocomplete === "off" && password.autocomplete === "off"
+      );
+    })()`,
   );
 }
 if (action === "language-menu") {

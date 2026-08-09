@@ -111,6 +111,21 @@ Supabase 負責安全保存密碼與寄送驗證信；Code Tutor 只呼叫官方
 
 畫面證據：`plan/evidence/account-system-signed-out.png`。
 
+## 九之二、登出與登入表單隱私
+
+- [x] 登入成功後立即清除元件記憶體中的 Email、密碼與確認密碼。
+- [x] 登出後清除 Supabase session 與所有登入表單欄位。
+- [x] 關閉登入視窗時也清除已輸入內容，重新開啟保持空白。
+- [x] 關閉登入表單 autocomplete，降低瀏覽器在共用裝置自動填入的機會。
+- [x] 驗證 Code Tutor 不把密碼寫入 localStorage、sessionStorage 或其他應用程式儲存位置。
+- [x] 完成 ESLint、production build 與瀏覽器欄位清除測試。
+
+### 簡易說明
+
+Code Tutor 只把密碼直接交給 Supabase Auth 驗證，不會自行保存原始密碼。網站可以清除自己畫面與 session，但無法刪除使用者曾主動存在 Edge／Chrome 密碼管理員裡的資料；那部分必須由使用者在瀏覽器設定中管理。
+
+驗證結果：在登入欄位輸入測試資料，關閉視窗後重新開啟，Email 與密碼皆為空白，且欄位的 autocomplete 已關閉。ESLint 與 production build 均通過。畫面證據：`plan/evidence/account-system-credentials-cleared.png`。
+
 ## 十、官方依據
 
 - Supabase Next.js Auth 使用 Cookie-based session：<https://supabase.com/docs/guides/auth/quickstarts/nextjs>

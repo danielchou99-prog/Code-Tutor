@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -21,14 +21,29 @@ export function AccountControl() {
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  const resetForm = useCallback(() => {
+    setMode("signin");
+    setEmail("");
+    setPassword("");
+    setConfirmPassword("");
+    setDisplayName("");
+    setMessage(null);
+    setError(null);
+  }, []);
+
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    resetForm();
+  }, [resetForm]);
+
   useEffect(() => {
     if (!open) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") closePanel();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [open]);
+  }, [closePanel, open]);
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
@@ -67,10 +82,22 @@ export function AccountControl() {
     }
 
     if (mode === "signin") {
-      setOpen(false);
+      closePanel();
     } else {
+      setPassword("");
+      setConfirmPassword("");
       setMessage(mode === "signup" ? t("confirmationEmailSent") : t("resetEmailSent"));
     }
+  };
+
+  const handleSignOut = async () => {
+    const result = await signOut();
+    resetForm();
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setOpen(false);
   };
 
   const label = user?.user_metadata.display_name || user?.email || t("guest");
@@ -88,7 +115,10 @@ export function AccountControl() {
         aria-label={t("accountMenu")}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) closePanel();
+          else setOpen(true);
+        }}
       >
         {loading ? (
           <span className="h-2.5 w-10 animate-pulse rounded bg-slate-600" />
@@ -105,7 +135,7 @@ export function AccountControl() {
             className="fixed inset-0 z-40 cursor-default bg-black/35"
             type="button"
             aria-label={t("closeDialog")}
-            onClick={() => setOpen(false)}
+            onClick={closePanel}
           />
           <div
             role="dialog"
@@ -122,7 +152,7 @@ export function AccountControl() {
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={closePanel}
                 className="text-sm text-slate-600 hover:text-slate-300"
                 aria-label={t("closeDialog")}
               >
@@ -145,20 +175,24 @@ export function AccountControl() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => void signOut().then(() => setOpen(false))}
+                  onClick={() => void handleSignOut()}
                   className="mt-3 w-full rounded-lg border border-white/8 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-rose-300/20 hover:text-rose-300"
                 >
                   {t("signOut")}
                 </button>
+                {error && <p role="alert" className="mt-3 text-[11px] leading-5 text-rose-300">{error}</p>}
               </div>
             ) : (
-              <form className="space-y-3" onSubmit={submit}>
+              <form className="space-y-3" autoComplete="off" onSubmit={submit}>
                 {mode === "signup" && (
                   <label className="block text-[11px] text-slate-400">
                     {t("displayName")}
                     <input
                       required
                       minLength={2}
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
                       className="mt-1.5 h-10 w-full rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/30"
@@ -170,7 +204,9 @@ export function AccountControl() {
                   <input
                     required
                     type="email"
-                    autoComplete="email"
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     className="mt-1.5 h-10 w-full rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/30"
@@ -183,7 +219,9 @@ export function AccountControl() {
                       required
                       minLength={8}
                       type="password"
-                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                      autoComplete={mode === "signin" ? "off" : "new-password"}
+                      data-1p-ignore
+                      data-lpignore="true"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       className="mt-1.5 h-10 w-full rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/30"
@@ -198,6 +236,8 @@ export function AccountControl() {
                       minLength={8}
                       type="password"
                       autoComplete="new-password"
+                      data-1p-ignore
+                      data-lpignore="true"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
                       className="mt-1.5 h-10 w-full rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/30"
