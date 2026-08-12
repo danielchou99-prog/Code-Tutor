@@ -261,6 +261,7 @@ async def start_ai_tutor(
         error_output=payload.error_output,
         question=payload.question.strip(),
         language=payload.language,
+        programming_language=payload.programming_language,
     )
     try:
         stream = await run_in_threadpool(service.start, user, prompt)
@@ -354,6 +355,7 @@ async def run_code(
             request.code,
             request.stdin,
             request.files or None,
+            request.language,
         )
     except CompilerUnavailable as error:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -459,6 +461,7 @@ async def run_interactive(
         session = await compiler.start(
             start_request.code,
             start_request.files or None,
+            start_request.language,
         )
 
         stdout_task = asyncio.create_task(stream_stdout())

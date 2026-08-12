@@ -27,6 +27,7 @@ class FakeCompiler:
         code: str,
         stdin: str,
         files: list[ProjectSourceFile] | None = None,
+        language: str = "cpp",
     ) -> RunResponse:
         return RunResponse(
             status="accepted",
@@ -45,6 +46,7 @@ class UnavailableCompiler:
         code: str,
         stdin: str,
         files: list[ProjectSourceFile] | None = None,
+        language: str = "cpp",
     ) -> RunResponse:
         raise CompilerUnavailable("Docker Desktop is not running.")
 
@@ -65,6 +67,7 @@ class BlockingCompiler:
         code: str,
         stdin: str,
         files: list[ProjectSourceFile] | None = None,
+        language: str = "cpp",
     ) -> RunResponse:
         with self._lock:
             self._active += 1
@@ -129,8 +132,10 @@ class FakeInteractiveCompiler:
         self,
         code: str,
         files: list[ProjectSourceFile] | None = None,
+        language: str = "cpp",
     ) -> FakeInteractiveSession:
         assert code == "int main() {}"
+        assert language == "cpp"
         self.session = FakeInteractiveSession()
         return self.session
 
@@ -217,6 +222,35 @@ def test_run_rejects_project_without_cpp_file() -> None:
         json={
             "code": "header only",
             "files": [{"name": "helper.hpp", "content": "int helper();"}],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_run_accepts_python_project() -> None:
+    app.dependency_overrides[get_compiler] = FakeCompiler
+    response = client.post(
+        "/api/run",
+        json={
+            "code": "print('ok')",
+            "language": "python",
+            "files": [{"name": "main.py", "content": "print('ok')"}],
+        },
+    )
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accepted"
+
+
+def test_run_rejects_cpp_file_in_python_project() -> None:
+    response = client.post(
+        "/api/run",
+        json={
+            "code": "print('ok')",
+            "language": "python",
+            "files": [{"name": "main.cpp", "content": "int main() {}"}],
         },
     )
 

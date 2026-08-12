@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -155,6 +155,7 @@ if ((wantsEnglish && currentLanguage !== "en") || (!wantsEnglish && currentLangu
 
 let actionSucceeded = action === "none" || action === "current";
 if (action === "account") {
+  await sleep(2_000);
   actionSucceeded = await evaluate(
     client,
     `(() => {
@@ -171,6 +172,7 @@ if (action === "account") {
   );
 }
 if (action === "account-clear") {
+  await sleep(2_000);
   const opened = await evaluate(
     client,
     `(() => {
@@ -231,6 +233,19 @@ if (action === "account-clear") {
   );
 }
 if (action === "files-guest") {
+  const clicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.trim() === "檔案",
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!clicked) throw new Error("File navigation button was not found.");
+  await sleep(500);
   actionSucceeded = await evaluate(
     client,
     `(() => {
@@ -281,17 +296,97 @@ if (action === "english") {
       const trigger = document.querySelector('button[aria-haspopup="menu"]');
       return document.documentElement.lang === "en" &&
       document.body.innerText.includes("File") &&
+      document.body.innerText.includes("Problems") &&
+      document.body.innerText.includes("Settings") &&
+      document.body.innerText.includes("Sign in") &&
       trigger?.textContent.includes("English") &&
       !trigger?.textContent.includes("Language") &&
       trigger?.previousElementSibling?.textContent.trim() === "Language" &&
-      document.body.innerText.includes("New Folder") &&
-      document.body.innerText.includes("New Project") &&
-      document.body.innerText.includes("C++ 基礎練習") &&
-      !document.body.innerText.includes("C++ Fundamentals") &&
-      !document.body.innerText.includes("Your current main.cpp and Online Compiler") &&
       !document.body.innerText.includes("檔案");
     })()`,
   );
+}
+if (action === "settings" || action === "settings-light" || action === "home-logo") {
+  const clicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.trim() === "設定",
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  if (!clicked) throw new Error("Settings navigation button was not found.");
+  await sleep(500);
+
+  if (action === "settings") {
+    actionSucceeded = await evaluate(
+      client,
+      `(() => {
+        const text = document.body.innerText;
+        return text.includes("個人資料") && text.includes("外觀") &&
+          text.includes("Compiler / Editor") && text.includes("版面配置") &&
+          text.includes("執行設定") && text.includes("快捷鍵") &&
+          text.includes("通知") && text.includes("語言") &&
+          text.includes("AI / Groq") && text.includes("帳號安全") &&
+          text.includes("危險區域") && !text.includes("關於我們");
+      })()`,
+    );
+  }
+
+  if (action === "settings-light") {
+    const appearanceClicked = await evaluate(
+      client,
+      `(() => {
+        const button = [...document.querySelectorAll("button")].find(
+          (candidate) => candidate.textContent.trim() === "外觀",
+        );
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`,
+    );
+    if (!appearanceClicked) throw new Error("Appearance settings button was not found.");
+    await sleep(300);
+    const lightClicked = await evaluate(
+      client,
+      `(() => {
+        const button = [...document.querySelectorAll("button")].find(
+          (candidate) => candidate.textContent.trim() === "淺色",
+        );
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`,
+    );
+    if (!lightClicked) throw new Error("Light theme button was not found.");
+    await sleep(300);
+    actionSucceeded = await evaluate(
+      client,
+      `document.querySelector('main')?.dataset.codeTutorTheme === "light" &&
+        JSON.parse(localStorage.getItem("code-tutor:settings") ?? "{}").theme === "light"`,
+    );
+  }
+
+  if (action === "home-logo") {
+    const logoClicked = await evaluate(
+      client,
+      `(() => {
+        const button = document.querySelector('header button[aria-label="首頁"]');
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`,
+    );
+    if (!logoClicked) throw new Error("Code Tutor home button was not found.");
+    await sleep(300);
+    actionSucceeded = await evaluate(
+      client,
+      `document.body.innerText.includes("從寫下第一行，到真正理解每一行")`,
+    );
+  }
 }
 if (action === "project" || action === "interactive" || action === "run" || action === "run-blocked") {
   const opened = await evaluate(

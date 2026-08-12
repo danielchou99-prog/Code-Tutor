@@ -30,6 +30,7 @@ class CompilerService(Protocol):
         code: str,
         stdin: str,
         files: Sequence[ProjectSourceFile] | None = None,
+        language: str = "cpp",
     ) -> RunResponse: ...
 
 
@@ -58,6 +59,7 @@ class DockerCompiler:
         code: str,
         stdin: str,
         files: Sequence[ProjectSourceFile] | None = None,
+        language: str = "cpp",
     ) -> RunResponse:
         if not self.is_available():
             raise CompilerUnavailable(
@@ -70,11 +72,11 @@ class DockerCompiler:
             source_files = (
                 list(files)
                 if files
-                else [ProjectSourceFile(name="main.cpp", content=code)]
+                else [ProjectSourceFile(name="main.py" if language == "python" else "main.cpp", content=code)]
             )
             self._write_source_files(source_directory, source_files)
 
-            command = self._docker_command(source_directory)
+            command = self._docker_command(source_directory, language)
             try:
                 completed = subprocess.run(
                     command,
@@ -100,20 +102,37 @@ class DockerCompiler:
         duration_ms = round((time.perf_counter() - started_at) * 1000)
         return self._to_response(completed, duration_ms)
 
-    def _docker_command(self, source_directory: Path) -> list[str]:
+    def _docker_command(self, source_directory: Path, language: str = "cpp") -> list[str]:
         output_limit = self.settings.max_output_bytes
         run_timeout = self.settings.run_timeout_seconds
-        script = f"""
-set -u
-g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
+        prepare_and_run = (
+            """PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile /source/*.py 2>/tmp/compile.err
 compile_status=$?
 if [ "$compile_status" -ne 0 ]; then
-  echo {COMPILE_ERROR_MARKER} >&2
+  echo {compile_error_marker} >&2
   head -c {output_limit} /tmp/compile.err >&2
   exit 1
 fi
 
-timeout --signal=KILL {run_timeout}s /tmp/program > /tmp/stdout 2>/tmp/stderr
+timeout --signal=TERM --kill-after=1s {run_timeout}s python3 -B /source/main.py > /tmp/stdout 2>/tmp/stderr"""
+            if language == "python"
+            else """g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
+compile_status=$?
+if [ "$compile_status" -ne 0 ]; then
+  echo {compile_error_marker} >&2
+  head -c {output_limit} /tmp/compile.err >&2
+  exit 1
+fi
+
+timeout --signal=TERM --kill-after=1s {run_timeout}s /tmp/program > /tmp/stdout 2>/tmp/stderr"""
+        ).format(
+            compile_error_marker=COMPILE_ERROR_MARKER,
+            output_limit=output_limit,
+            run_timeout=run_timeout,
+        )
+        script = f"""
+set -u
+{prepare_and_run}
 run_status=$?
 
 stdout_size=$(wc -c < /tmp/stdout)

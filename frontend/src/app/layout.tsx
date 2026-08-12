@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Code Tutor | AI Coding Workspace",
-  description: "Learn C++ with compiler feedback and an AI tutor.",
+  description: "Learn C++ and Python with runtime feedback and an AI tutor.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

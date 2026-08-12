@@ -1,3 +1,5 @@
+import type { ProgrammingLanguage } from "@/lib/file-items";
+
 export type RunStatus =
   | "accepted"
   | "compile_error"
@@ -17,7 +19,7 @@ export type RunResult = {
   retry_after_seconds?: number;
 };
 
-export type CppSourceFile = {
+export type SourceFile = {
   name: string;
   content: string;
 };
@@ -29,7 +31,11 @@ function getApiUrl(): string {
   return `${window.location.protocol}//${window.location.hostname}:8000`;
 }
 
-export async function runCpp(files: CppSourceFile[], stdin: string): Promise<RunResult> {
+export async function runCode(
+  files: SourceFile[],
+  stdin: string,
+  language: ProgrammingLanguage,
+): Promise<RunResult> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 30_000);
 
@@ -38,10 +44,10 @@ export async function runCpp(files: CppSourceFile[], stdin: string): Promise<Run
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        code: files.find((file) => file.name.toLocaleLowerCase().endsWith(".cpp"))?.content ?? "",
+        code: files.find((file) => file.name.toLocaleLowerCase() === (language === "python" ? "main.py" : "main.cpp"))?.content ?? "",
         files,
         stdin,
-        language: "cpp",
+        language,
       }),
       signal: controller.signal,
     });

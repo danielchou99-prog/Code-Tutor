@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { streamAiTutor, type AiTutorAction } from "@/lib/ai-tutor-api";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import type { ProgrammingLanguage } from "@/lib/file-items";
 
 type TutorMessage = {
   id: string;
@@ -24,7 +25,7 @@ function messageId(): string {
     : `${Date.now()}-${Math.random()}`;
 }
 
-export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput: string }) {
+export function AiTutorPanel({ code, errorOutput, programmingLanguage }: { code: string; errorOutput: string; programmingLanguage: ProgrammingLanguage }) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const zh = language === "zh-Hant";
@@ -83,6 +84,7 @@ export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput:
           errorOutput,
           question: customQuestion.trim(),
           language,
+          programmingLanguage,
         },
         (chunk) => {
           setMessages((current) => current.map((message) =>
@@ -178,7 +180,9 @@ export function AiTutorPanel({ code, errorOutput }: { code: string; errorOutput:
             <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">{t("context")}</p>
             <span className="size-1.5 rounded-full bg-cyan-300" />
           </div>
-          <p className="mt-2 text-[11px] leading-5 text-slate-500">{t("contextDetail")}</p>
+          <p className="mt-2 text-[11px] leading-5 text-slate-500">{zh
+            ? `${programmingLanguage === "python" ? "main.py" : "main.cpp"} 與最新的執行結果會自動包含在對話中。`
+            : `${programmingLanguage === "python" ? "main.py" : "main.cpp"} and the latest execution output will be included automatically.`}</p>
         </div>
         {error ? <p className="mt-3 text-[11px] leading-5 text-rose-400" role="alert">{error}</p> : null}
       </div>

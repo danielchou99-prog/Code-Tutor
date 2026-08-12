@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export type FileItemKind = "folder" | "project";
+export type ProgrammingLanguage = "cpp" | "python";
 
 export type FileItem = {
   id: string;
@@ -9,12 +10,12 @@ export type FileItem = {
   kind: FileItemKind;
   name: string;
   tags: string[];
-  language: "cpp" | null;
+  language: ProgrammingLanguage | null;
   created_at: string;
   updated_at: string;
 };
 
-export type FileProject = Pick<FileItem, "id" | "name">;
+export type FileProject = Pick<FileItem, "id" | "name"> & { language: ProgrammingLanguage };
 
 export type ProjectFile = {
   id: string;
@@ -113,6 +114,13 @@ int main() {
     return 0;
 }`;
 
+export const defaultPythonCode = `numbers = list(map(int, input().split()))
+print(sum(numbers))`;
+
+export function languageLabel(language: ProgrammingLanguage): string {
+  return language === "python" ? "Python" : "C++";
+}
+
 export function parseHashtags(value: string): string[] {
   const matches = value.match(/#[^\s#]+/gu) ?? [];
   const uniqueTags = new Map<string, string>();
@@ -157,7 +165,9 @@ export async function createFileItem(input: {
   kind: FileItemKind;
   name: string;
   tags: string[];
+  language?: ProgrammingLanguage;
 }) {
+  const projectLanguage = input.language ?? "cpp";
   return getSupabaseBrowserClient()
     .from("file_items")
     .insert({
@@ -166,8 +176,10 @@ export async function createFileItem(input: {
       kind: input.kind,
       name: input.name.trim(),
       tags: input.tags,
-      language: input.kind === "project" ? "cpp" : null,
-      content: input.kind === "project" ? defaultCppCode : null,
+      language: input.kind === "project" ? projectLanguage : null,
+      content: input.kind === "project"
+        ? projectLanguage === "python" ? defaultPythonCode : defaultCppCode
+        : null,
     })
     .select("id,user_id,parent_id,kind,name,tags,language,created_at,updated_at")
     .single();
@@ -212,7 +224,7 @@ export async function saveProjectContent(id: string, content: string) {
     .eq("kind", "project");
 }
 
-export function isValidProjectFileName(value: string): boolean {
+export function isValidProjectFileName(value: string, language: ProgrammingLanguage): boolean {
   const name = value.trim();
   const baseName = name.slice(0, name.lastIndexOf(".")).replace(/[ .]+$/u, "").toLocaleLowerCase();
   const reservedNames = new Set([
@@ -225,7 +237,7 @@ export function isValidProjectFileName(value: string): boolean {
     && baseName.length > 0
     && !/[<>:"/\\|?*\u0000-\u001f]/u.test(name)
     && !reservedNames.has(baseName)
-    && /\.(?:cpp|h|hpp)$/iu.test(name);
+    && (language === "python" ? /\.py$/iu.test(name) : /\.(?:cpp|h|hpp)$/iu.test(name));
 }
 
 export async function listProjectFiles(projectId: string) {

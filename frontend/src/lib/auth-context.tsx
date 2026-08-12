@@ -38,12 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = getSupabaseBrowserClient();
     let mounted = true;
+    const loadingTimeout = window.setTimeout(() => {
+      if (mounted) setLoading(false);
+    }, 5_000);
 
-    void supabase.auth.getUser().then(({ data }) => {
-      if (!mounted) return;
-      setUser(data.user);
-      setLoading(false);
-    });
+    void supabase.auth.getUser()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setUser(data.user);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
@@ -53,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      window.clearTimeout(loadingTimeout);
       data.subscription.unsubscribe();
     };
   }, [configured]);

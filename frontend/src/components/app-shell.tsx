@@ -42,7 +42,7 @@ function AppContent() {
       try {
         const project = JSON.parse(storedProject) as FileProject;
         if (typeof project.id === "string" && typeof project.name === "string") {
-          setOpenProject({ ...project, ownerId: userId });
+          setOpenProject({ ...project, language: project.language === "python" ? "python" : "cpp", ownerId: userId });
           setActiveSection("files");
         }
       } catch {
@@ -51,6 +51,16 @@ function AppContent() {
     }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, [userId]);
+
+  useEffect(() => {
+    if (!hasUnsavedCode) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedCode]);
 
   const closeProject = useCallback(() => {
     if (user) window.localStorage.removeItem(`${openProjectStoragePrefix}${user.id}`);
@@ -124,7 +134,7 @@ function AppContent() {
       <ConfirmDialog
         open={pendingAction !== null}
         title={language === "zh-Hant" ? "尚有未儲存的修改" : "Unsaved changes"}
-        description={language === "zh-Hant" ? "若現在離開，目前尚未儲存的 main.cpp 修改將會遺失。" : "Your unsaved changes to main.cpp will be lost if you leave now."}
+        description={language === "zh-Hant" ? "若現在離開，目前尚未儲存的程式碼修改將會遺失。" : "Your unsaved code changes will be lost if you leave now."}
         confirmLabel={language === "zh-Hant" ? "不儲存並離開" : "Leave without saving"}
         cancelLabel={t("cancel")}
         closeLabel={t("closeDialog")}

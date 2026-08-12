@@ -24,7 +24,7 @@ import {
   saveProjectDraft,
   saveProjectFileContent,
 } from "@/lib/file-items";
-import type { CppSourceFile } from "@/lib/compiler-api";
+import type { SourceFile } from "@/lib/compiler-api";
 import { useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
 
@@ -50,7 +50,7 @@ type CodeEditorPanelProps = {
   onDirtyChange: (dirty: boolean) => void;
   onFileRequestHandled: () => void;
   onProjectFilesChange: (files: ProjectFile[], activeFileId: string | null) => void;
-  onRun: (files: CppSourceFile[]) => void | Promise<void>;
+  onRun: (files: SourceFile[]) => void | Promise<void>;
   project: FileProject;
   requestedFileId: string | null;
 };
@@ -178,7 +178,7 @@ export function CodeEditorPanel({
         setFiles(nextFiles);
         const storedId = loadActiveProjectFileId(project.id);
         const initialFile = nextFiles.find((file) => file.id === storedId)
-          ?? nextFiles.find((file) => file.name.toLocaleLowerCase() === "main.cpp")
+          ?? nextFiles.find((file) => file.name.toLocaleLowerCase() === (project.language === "python" ? "main.py" : "main.cpp"))
           ?? nextFiles[0]
           ?? null;
         if (initialFile) {
@@ -199,7 +199,7 @@ export function CodeEditorPanel({
       cancelled = true;
       window.clearTimeout(restoreTimer);
     };
-  }, [loadFile, onDirtyChange, project.id, zh]);
+  }, [loadFile, onDirtyChange, project.id, project.language, zh]);
 
   useEffect(() => () => cursorListener.current?.dispose(), []);
 
@@ -299,8 +299,10 @@ export function CodeEditorPanel({
   const submitNewFile = async () => {
     if (!user || creating) return;
     const normalizedName = newFileName.trim();
-    if (!isValidProjectFileName(normalizedName)) {
-      setCreateError(zh ? "檔名必須以 .cpp、.h 或 .hpp 結尾，且不可包含 / 或 \\." : "Use a .cpp, .h, or .hpp name without / or \\.");
+    if (!isValidProjectFileName(normalizedName, project.language)) {
+      setCreateError(project.language === "python"
+        ? (zh ? "檔名必須以 .py 結尾，且不可包含 / 或 \\." : "Use a .py name without / or \\.")
+        : (zh ? "檔名必須以 .cpp、.h 或 .hpp 結尾，且不可包含 / 或 \\." : "Use a .cpp, .h, or .hpp name without / or \\."));
       return;
     }
     if (files.some((file) => file.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
@@ -471,7 +473,8 @@ export function CodeEditorPanel({
     saving: t("saving"),
     failed: t("saveFailed"),
   }[displayedSaveStatus];
-  const canRun = Boolean(activeFile && files.some((file) => file.name.toLocaleLowerCase().endsWith(".cpp")));
+  const entryFileName = project.language === "python" ? "main.py" : "main.cpp";
+  const canRun = Boolean(activeFile && files.some((file) => file.name.toLocaleLowerCase() === entryFileName));
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-[#0c111b]">
@@ -593,7 +596,7 @@ export function CodeEditorPanel({
             type="button"
             onClick={() => void runProject()}
             disabled={isRunning || preparingRun || !canRun}
-            title={!canRun && activeFile ? (zh ? "Project 至少需要一個 .cpp 檔案" : "The project needs at least one .cpp file") : undefined}
+            title={!canRun && activeFile ? (zh ? `Project 必須保留 ${entryFileName}` : `The project needs ${entryFileName}`) : undefined}
             className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)] transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             <span aria-hidden="true">▶</span>
@@ -620,12 +623,12 @@ export function CodeEditorPanel({
             onMount={handleMount}
             onChange={(value) => setCode(value ?? "")}
             path={`file:///${activeFile.id}/${activeFile.name}`}
-            language="cpp"
+            language={project.language === "python" ? "python" : "cpp"}
             value={code}
             theme={settings.theme === "light" ? "code-tutor-light" : "code-tutor-dark"}
             options={{
               accessibilitySupport: "auto",
-              ariaLabel: `${activeFile.name} C++ ${zh ? "程式碼編輯器" : "code editor"}`,
+              ariaLabel: `${activeFile.name} ${project.language === "python" ? "Python" : "C++"} ${zh ? "程式碼編輯器" : "code editor"}`,
               automaticLayout: true,
               bracketPairColorization: { enabled: true },
               cursorBlinking: "smooth",
@@ -671,14 +674,14 @@ export function CodeEditorPanel({
               className="pointer-events-auto w-full max-w-sm rounded-2xl border border-white/10 bg-[#111824] p-5 shadow-2xl shadow-black/60"
             >
               <h2 className="text-sm font-semibold text-white">{zh ? "新增 Project 檔案" : "New project file"}</h2>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500">{zh ? "支援 .cpp、.h 與 .hpp，每個 Project 最多 50 個檔案。" : "Supports .cpp, .h, and .hpp, up to 50 files per project."}</p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">{project.language === "python" ? (zh ? "支援 .py，每個 Project 最多 50 個檔案。" : "Supports .py, up to 50 files per project.") : (zh ? "支援 .cpp、.h 與 .hpp，每個 Project 最多 50 個檔案。" : "Supports .cpp, .h, and .hpp, up to 50 files per project.")}</p>
               <label className="mt-4 block text-[11px] text-slate-400" htmlFor="new-project-file-name">{zh ? "檔名" : "File name"}</label>
               <input
                 id="new-project-file-name"
                 autoFocus
                 value={newFileName}
                 onChange={(event) => { setNewFileName(event.target.value); setCreateError(null); }}
-                placeholder="example.cpp"
+                placeholder={project.language === "python" ? "example.py" : "example.cpp"}
                 maxLength={120}
                 disabled={creating}
                 className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0a1019] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-300/40"

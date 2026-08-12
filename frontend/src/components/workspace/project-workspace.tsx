@@ -54,7 +54,7 @@ export function ProjectWorkspace({
         requestedFileId={requestedFileId}
       />
       <div className={settings.panelPlacement === "bottom" ? "lg:col-start-2 lg:row-start-2 lg:min-h-0" : "lg:min-h-0"}>
-        <AiTutorPanel code={code} errorOutput={lastExecutionOutput} />
+        <AiTutorPanel code={code} errorOutput={lastExecutionOutput} programmingLanguage={project.language} />
       </div>
     </section>
   );

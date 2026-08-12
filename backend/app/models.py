@@ -38,16 +38,16 @@ class ProjectSourceFile(BaseModel):
             or "\\" in name
             or any(character in '<>:"|?*' or ord(character) < 32 for character in name)
             or base_name in windows_reserved_names
-            or not name.lower().endswith((".cpp", ".h", ".hpp"))
+            or not name.lower().endswith((".cpp", ".h", ".hpp", ".py"))
         ):
-            raise ValueError("Use a safe .cpp, .h, or .hpp file name.")
+            raise ValueError("Use a safe .cpp, .h, .hpp, or .py file name.")
         return name
 
 
 class ProjectSourcesMixin(BaseModel):
     code: str = Field(default="", max_length=65_536)
     files: list[ProjectSourceFile] = Field(default_factory=list, max_length=50)
-    language: Literal["cpp"] = "cpp"
+    language: Literal["cpp", "python"] = "cpp"
 
     @model_validator(mode="after")
     def validate_project_sources(self) -> "ProjectSourcesMixin":
@@ -59,8 +59,12 @@ class ProjectSourcesMixin(BaseModel):
         normalized_names = [source.name.casefold() for source in self.files]
         if len(normalized_names) != len(set(normalized_names)):
             raise ValueError("Project file names must be unique.")
-        if not any(source.name.lower().endswith(".cpp") for source in self.files):
-            raise ValueError("A C++ project must contain at least one .cpp file.")
+        allowed_extensions = (".cpp", ".h", ".hpp") if self.language == "cpp" else (".py",)
+        if any(not source.name.lower().endswith(allowed_extensions) for source in self.files):
+            raise ValueError(f"Project files do not match the {self.language} language.")
+        entry_file = "main.cpp" if self.language == "cpp" else "main.py"
+        if not any(source.name.casefold() == entry_file for source in self.files):
+            raise ValueError(f"A {self.language} project must contain {entry_file}.")
         if sum(len(source.content.encode("utf-8")) for source in self.files) > 262_144:
             raise ValueError("Project source files exceed the 256 KiB limit.")
         return self
@@ -115,3 +119,4 @@ class AiTutorRequest(BaseModel):
     error_output: str = Field(default="", max_length=8_000)
     question: str = Field(default="", max_length=2_000)
     language: Literal["zh-Hant", "en"] = "zh-Hant"
+    programming_language: Literal["cpp", "python"] = "cpp"

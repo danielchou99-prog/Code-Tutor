@@ -23,6 +23,17 @@ def test_interactive_command_keeps_compiler_security_limits() -> None:
     assert "g++ /source/*.cpp" in command[-1]
 
 
+def test_python_interactive_command_uses_python_with_same_limits() -> None:
+    command = compiler._docker_command(
+        Path("C:/code-tutor-test"), "code-tutor-interactive-test", "python"
+    )
+
+    assert "python3 -m py_compile /source/*.py" in command[-1]
+    assert "python3 -B /source/main.py" in command[-1]
+    assert "--network" in command
+    assert "none" in command
+
+
 @pytest.mark.skipif(
     not compiler.is_available(),
     reason="Docker compiler is not available.",
@@ -94,6 +105,33 @@ def test_interactive_compiler_builds_multiple_project_files() -> None:
                     break
             assert (await asyncio.wait_for(session.process.stdout.read(), timeout=5)).decode() == "42\n"
             assert await session.process.wait() == 0
+        finally:
+            await session.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.skipif(
+    not compiler.is_available(),
+    reason="Docker compiler is not available.",
+)
+def test_python_interactive_compiler_supports_input() -> None:
+    async def exercise() -> None:
+        session = await compiler.start(
+            "name = input()\nprint(f'Hello {name}', flush=True)",
+            language="python",
+        )
+        try:
+            assert session.process.stderr is not None
+            assert session.process.stdout is not None
+            while True:
+                line = await asyncio.wait_for(session.process.stderr.readline(), timeout=10)
+                assert line
+                if line.decode().strip() == READY_MARKER:
+                    break
+            await session.write("Daniel\n")
+            output = await asyncio.wait_for(session.process.stdout.readline(), timeout=5)
+            assert output.decode() == "Hello Daniel\n"
         finally:
             await session.close()
 

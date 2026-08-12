@@ -20,8 +20,8 @@ Open `http://localhost:8000/docs` for the generated API documentation.
 - `GET /api/ai/connection`: returns the signed-in user's Groq connection status.
 - `PUT /api/ai/connection`: validates and encrypts a Groq API key before saving it.
 - `DELETE /api/ai/connection`: removes the signed-in user's encrypted Groq key.
-- `POST /api/run`: validates, compiles, and runs one C++ source file.
-- `WS /api/run/interactive`: keeps an isolated C++ process alive for streamed output and multi-round stdin.
+- `POST /api/run`: validates and runs an isolated C++ or Python project.
+- `WS /api/run/interactive`: keeps an isolated C++ or Python process alive for streamed output and multi-round stdin.
 
 ## Security boundary
 

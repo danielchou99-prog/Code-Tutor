@@ -1,4 +1,4 @@
-import type { FileProject, ProjectFile } from "@/lib/file-items";
+import { languageLabel, type FileProject, type ProjectFile } from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
 
 export function HistoryPanel({
@@ -25,7 +25,7 @@ export function HistoryPanel({
       <div className="mt-6">
         <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">{t("currentProject")}</p>
         <div className="mt-3 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.035] p-3">
-          <span className="grid size-8 place-items-center rounded-lg bg-cyan-300/[0.07] font-mono text-[9px] font-bold text-cyan-200">C++</span>
+          <span className="grid min-w-8 place-items-center rounded-lg bg-cyan-300/[0.07] px-1 py-2 font-mono text-[9px] font-bold text-cyan-200">{languageLabel(project.language)}</span>
           <p className="mt-3 break-words text-xs font-medium leading-5 text-slate-300">{project.name}</p>
         </div>
       </div>
@@ -47,7 +47,7 @@ export function HistoryPanel({
                     : "bg-white/[0.025] text-slate-500 hover:bg-white/[0.045] hover:text-slate-300"
                 }`}
               >
-                <span className={active ? "text-cyan-300" : "text-slate-700"}>C++</span>
+                <span className={active ? "text-cyan-300" : "text-slate-700"}>{file.name.toLocaleLowerCase().endsWith(".py") ? "PY" : "C++"}</span>
                 <span className="min-w-0 truncate">{file.name}</span>
               </button>
             );

@@ -68,6 +68,17 @@ def test_docker_command_contains_sandbox_limits() -> None:
     assert "g++ /source/*.cpp" in combined
 
 
+def test_python_docker_command_uses_python_with_same_sandbox() -> None:
+    command = compiler()._docker_command(Path("C:/temporary/source"), "python")
+    combined = " ".join(command)
+
+    assert "python3 -m py_compile /source/*.py" in combined
+    assert "python3 -B /source/main.py" in combined
+    assert "--network none" in combined
+    assert "--read-only" in command
+    assert "--memory 512m" in combined
+
+
 def test_writes_all_project_sources() -> None:
     sources = [
         ProjectSourceFile(name="main.cpp", content='#include "helper.hpp"\nint main() {}'),

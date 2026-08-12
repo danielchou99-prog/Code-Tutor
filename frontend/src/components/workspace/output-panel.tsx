@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { RunResult, RunStatus } from "@/lib/compiler-api";
 import type { InteractiveOutput, InteractiveStatus } from "@/lib/interactive-api";
+import type { ProgrammingLanguage } from "@/lib/file-items";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
 
@@ -19,6 +20,7 @@ type OutputPanelProps = {
   onStopInteractive: () => void;
   result: RunResult | null;
   stdin: string;
+  programmingLanguage: ProgrammingLanguage;
 };
 
 const statusPresentation: Record<
@@ -76,6 +78,7 @@ export function OutputPanel({
   onStopInteractive,
   result,
   stdin,
+  programmingLanguage,
 }: OutputPanelProps) {
   const { t } = useLanguage();
   const { settings } = useSettings();
@@ -254,7 +257,7 @@ export function OutputPanel({
       ) : (
         <div className="flex h-[calc(100%-2.5rem)] flex-col justify-between p-4 font-mono text-xs">
           <div className="min-h-0 flex-1 overflow-auto">
-            <p className="mb-2 text-slate-600">$ Build project with C++20</p>
+            <p className="mb-2 text-slate-600">$ {programmingLanguage === "python" ? "Run project with Python 3" : "Build project with C++20"}</p>
             {isRunning ? (
               <p className="animate-pulse text-cyan-300">{t("compiling")}</p>
             ) : result ? (

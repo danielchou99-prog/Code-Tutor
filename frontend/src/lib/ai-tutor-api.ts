@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Language } from "@/lib/language-context";
+import type { ProgrammingLanguage } from "@/lib/file-items";
 
 export type AiTutorAction = "analyze" | "explain_error" | "hint" | "ask";
 
@@ -9,6 +10,7 @@ export type AiTutorRequest = {
   errorOutput: string;
   question: string;
   language: Language;
+  programmingLanguage: ProgrammingLanguage;
 };
 
 function getApiUrl(): string {
@@ -38,6 +40,7 @@ export async function streamAiTutor(
       error_output: request.errorOutput,
       question: request.question,
       language: request.language,
+      programming_language: request.programmingLanguage,
     }),
     cache: "no-store",
     signal,
@@ -60,4 +63,3 @@ export async function streamAiTutor(
   const finalChunk = decoder.decode();
   if (finalChunk) onChunk(finalChunk);
 }
-

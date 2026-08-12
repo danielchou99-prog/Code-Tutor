@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { runCpp, type CppSourceFile, type RunResult } from "@/lib/compiler-api";
+import { runCode, type SourceFile, type RunResult } from "@/lib/compiler-api";
 import type { FileProject, ProjectFile } from "@/lib/file-items";
 import {
   type InteractiveConnection,
   type InteractiveOutput,
   type InteractiveStatus,
-  startInteractiveCpp,
+  startInteractiveCode,
 } from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
 import { useSettings } from "@/lib/settings-context";
@@ -60,7 +60,7 @@ export function WorkspaceCenter({
   }, [notification]);
 
   const handleRun = useCallback(
-    async (files: CppSourceFile[]) => {
+    async (files: SourceFile[]) => {
       if (settings.clearConsoleOnRun) {
         setResult(null);
         setInteractiveOutput([]);
@@ -75,7 +75,7 @@ export function WorkspaceCenter({
         onExecutionOutputChange("");
         setInteractiveStatus("connecting");
         setIsRunning(true);
-        interactiveConnection.current = startInteractiveCpp(files, {
+        interactiveConnection.current = startInteractiveCode(files, project.language, {
           onEvent: (event) => {
             if (event.type === "output") {
               setInteractiveOutput((current) => [...current, event]);
@@ -110,7 +110,7 @@ export function WorkspaceCenter({
       setIsRunning(true);
 
       try {
-        const nextResult = await runCpp(files, stdin);
+        const nextResult = await runCode(files, stdin, project.language);
         setResult(nextResult);
         onExecutionOutputChange([nextResult.stderr, nextResult.stdout].filter(Boolean).join("\n"));
         if (nextResult.status === "accepted" && settings.notifySuccess) {
@@ -151,7 +151,7 @@ export function WorkspaceCenter({
         setIsRunning(false);
       }
     },
-    [inputMode, onExecutionOutputChange, settings, stdin, t],
+    [inputMode, onExecutionOutputChange, project.language, settings, stdin, t],
   );
 
   const sendInteractiveInput = (data: string) => {
@@ -204,6 +204,7 @@ export function WorkspaceCenter({
         onStopInteractive={stopInteractive}
         result={result}
         stdin={stdin}
+        programmingLanguage={project.language}
       />
     </div>
   );

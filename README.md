@@ -1,11 +1,11 @@
 # Code Tutor
 
-Code Tutor 是一個以程式設計學習為核心的 AI Agent。使用者可以在線上撰寫與執行 C++，並取得錯誤解釋、除錯建議與漸進式提示。
+Code Tutor 是一個以程式設計學習為核心的 AI Agent。使用者可以在線上撰寫與執行 C++ 或 Python，並取得錯誤解釋、除錯建議與漸進式提示。
 
 ## MVP 功能
 
 - 使用者帳號
-- C++ 編輯器
+- C++ / Python 編輯器
 - 編譯與執行
 - Output / Error 顯示
 - AI Analyze Code
@@ -26,7 +26,7 @@ Code Tutor 是一個以程式設計學習為核心的 AI Agent。使用者可以
 Code-Tutor/
 |-- frontend/    # Next.js 前端
 |-- backend/     # FastAPI 後端
-|-- compiler/    # C++ 編譯沙箱
+|-- compiler/    # C++ / Python 隔離執行沙箱
 |-- docs/        # 專案文件
 |-- README.md
 `-- .gitignore

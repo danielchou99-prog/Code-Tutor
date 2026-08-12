@@ -29,7 +29,7 @@ class InteractiveCompilerService(Protocol):
     def is_available(self) -> bool: ...
 
     async def start(
-        self, code: str, files: Sequence[ProjectSourceFile] | None = None
+        self, code: str, files: Sequence[ProjectSourceFile] | None = None, language: str = "cpp"
     ) -> InteractiveSessionProtocol: ...
 
 
@@ -95,7 +95,7 @@ class DockerInteractiveCompiler:
         )
 
     async def start(
-        self, code: str, files: Sequence[ProjectSourceFile] | None = None
+        self, code: str, files: Sequence[ProjectSourceFile] | None = None, language: str = "cpp"
     ) -> DockerInteractiveSession:
         if not self.is_available():
             raise CompilerUnavailable("Docker is not installed or unavailable.")
@@ -105,12 +105,12 @@ class DockerInteractiveCompiler:
         source_files = (
             list(files)
             if files
-            else [ProjectSourceFile(name="main.cpp", content=code)]
+            else [ProjectSourceFile(name="main.py" if language == "python" else "main.cpp", content=code)]
         )
         DockerCompiler._write_source_files(source_directory, source_files)
 
         container_name = f"code-tutor-interactive-{uuid4().hex}"
-        command = self._docker_command(source_directory, container_name)
+        command = self._docker_command(source_directory, container_name, language)
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -130,17 +130,31 @@ class DockerInteractiveCompiler:
         )
 
     def _docker_command(
-        self, source_directory: Path, container_name: str
+        self, source_directory: Path, container_name: str, language: str = "cpp"
     ) -> list[str]:
-        script = f"""
-set -u
-g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program
+        prepare_and_run = (
+            """PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile /source/*.py
 compile_status=$?
 if [ "$compile_status" -ne 0 ]; then
   exit "$compile_status"
 fi
-echo {READY_MARKER} >&2
-exec timeout --signal=KILL {self.settings.interactive_timeout_seconds}s /tmp/program
+echo {ready_marker} >&2
+exec timeout --signal=KILL {timeout}s python3 -B /source/main.py"""
+            if language == "python"
+            else """g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program
+compile_status=$?
+if [ "$compile_status" -ne 0 ]; then
+  exit "$compile_status"
+fi
+echo {ready_marker} >&2
+exec timeout --signal=KILL {timeout}s /tmp/program"""
+        ).format(
+            ready_marker=READY_MARKER,
+            timeout=self.settings.interactive_timeout_seconds,
+        )
+        script = f"""
+set -u
+{prepare_and_run}
 """.strip()
 
         return [

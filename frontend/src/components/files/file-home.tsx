@@ -10,6 +10,8 @@ import {
   type FileItem,
   type FileItemKind,
   type FileProject,
+  type ProgrammingLanguage,
+  languageLabel,
   listFileItems,
   listRecentProjects,
   moveFileItem,
@@ -18,6 +20,7 @@ import {
   updateFileItem,
 } from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
+import { useSettings } from "@/lib/settings-context";
 
 type FileHomeProps = {
   onOpenProject: (project: FileProject) => void;
@@ -55,19 +58,22 @@ function ItemDialog({
   busy: boolean;
   error: string | null;
   onClose: () => void;
-  onSubmit: (name: string, tags: string[]) => Promise<void>;
+  onSubmit: (name: string, tags: string[], language: ProgrammingLanguage) => Promise<void>;
 }) {
   const { t } = useLanguage();
+  const { settings } = useSettings();
   const item = state.mode === "edit" ? state.item : null;
   const kind = state.mode === "create" ? state.kind : item?.kind ?? "project";
   const [name, setName] = useState(item?.name ?? "");
   const [tagInput, setTagInput] = useState(item?.tags.map((tag) => `#${tag}`).join(" ") ?? "");
+  const [programmingLanguage, setProgrammingLanguage] = useState<ProgrammingLanguage>(item?.language ?? settings.defaultProgrammingLanguage);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const tags = parseHashtags(tagInput);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim()) return;
-    await onSubmit(name.trim(), tags);
+    await onSubmit(name.trim(), tags, programmingLanguage);
   };
 
   const title = state.mode === "edit"
@@ -99,6 +105,41 @@ function ItemDialog({
             className="mt-1.5 h-10 w-full rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/30"
           />
         </label>
+
+        {state.mode === "create" && kind === "project" ? (
+          <div className="mt-4">
+            <span className="block text-[11px] text-slate-400">{t("languageLabel")}</span>
+            <div className="relative mt-1.5">
+              <button
+                type="button"
+                onClick={() => setLanguageMenuOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={languageMenuOpen}
+                className="flex h-10 w-full items-center justify-between rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none hover:border-cyan-300/20 focus:border-cyan-300/30"
+              >
+                <span>{programmingLanguage === "python" ? "Python 3" : "C++20"}</span>
+                <span aria-hidden="true" className={`text-[9px] text-slate-600 transition-transform ${languageMenuOpen ? "rotate-180" : ""}`}>⌄</span>
+              </button>
+              {languageMenuOpen ? (
+                <div role="listbox" aria-label={t("languageLabel")} className="absolute left-0 right-0 top-full z-10 mt-1 rounded-xl border border-white/10 bg-[#111824] p-1.5 shadow-2xl shadow-black/60">
+                  {(["cpp", "python"] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="option"
+                      aria-selected={programmingLanguage === value}
+                      onClick={() => { setProgrammingLanguage(value); setLanguageMenuOpen(false); }}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs ${programmingLanguage === value ? "bg-cyan-300/[0.08] text-cyan-200" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
+                    >
+                      <span>{value === "python" ? "Python 3" : "C++20"}</span>
+                      {programmingLanguage === value ? <span aria-hidden="true">✓</span> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <label className="mt-4 block text-[11px] text-slate-400">
           {t("itemTags")}
@@ -235,12 +276,12 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
       : [...current, tag]);
   };
 
-  const submitDialog = async (name: string, tags: string[]) => {
+  const submitDialog = async (name: string, tags: string[], programmingLanguage: ProgrammingLanguage) => {
     if (!dialog || !user) return;
     setSaving(true);
     setDialogError(null);
     const result = dialog.mode === "create"
-      ? await createFileItem({ userId: user.id, parentId: currentFolderId, kind: dialog.kind, name, tags })
+      ? await createFileItem({ userId: user.id, parentId: currentFolderId, kind: dialog.kind, name, tags, language: programmingLanguage })
       : await updateFileItem(dialog.item.id, name, tags);
     setSaving(false);
 
@@ -444,8 +485,8 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
                       title={t("dragToMove")}
                       className={`group cursor-grab rounded-2xl border border-white/8 bg-[#0d131d] p-5 transition-all active:cursor-grabbing hover:-translate-y-0.5 hover:border-cyan-300/25 hover:bg-[#101925] ${draggedItemId === project.id ? "opacity-45" : ""}`}
                     >
-                      <button type="button" onClick={() => onOpenProject({ id: project.id, name: project.name })} className="w-full text-left">
-                        <div className="flex items-start justify-between gap-4"><span className="grid size-11 place-items-center rounded-xl border border-cyan-300/10 bg-cyan-300/[0.055] font-mono text-xs font-bold text-cyan-200">C++</span><span className="text-slate-600 group-hover:text-cyan-300" aria-hidden="true">↗</span></div>
+                      <button type="button" onClick={() => onOpenProject({ id: project.id, name: project.name, language: project.language ?? "cpp" })} className="w-full text-left">
+                        <div className="flex items-start justify-between gap-4"><span className="grid min-w-11 place-items-center rounded-xl border border-cyan-300/10 bg-cyan-300/[0.055] px-2 py-3 font-mono text-xs font-bold text-cyan-200">{languageLabel(project.language ?? "cpp")}</span><span className="text-slate-600 group-hover:text-cyan-300" aria-hidden="true">↗</span></div>
                         <h2 className="mt-5 text-sm font-semibold text-slate-200">{project.name}</h2>
                       </button>
                       <ItemMeta item={project} onTag={toggleTag} />
@@ -527,8 +568,8 @@ function FileNavigationSidebar({
         <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white">{t("recentProjects")}</p>
         <div className="mt-2 space-y-1">
           {recentProjects.length === 0 ? <p className="px-2 py-2 text-[10px] leading-4 text-slate-700">{t("noRecentProjects")}</p> : recentProjects.map((project) => (
-            <button key={project.id} type="button" onClick={() => onOpenProject({ id: project.id, name: project.name })} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
-              <span className="grid size-6 shrink-0 place-items-center rounded-md bg-cyan-300/[0.055] font-mono text-[8px] text-cyan-200/70">C++</span><span className="truncate">{project.name}</span>
+            <button key={project.id} type="button" onClick={() => onOpenProject({ id: project.id, name: project.name, language: project.language ?? "cpp" })} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] text-slate-500 hover:bg-white/[0.035] hover:text-cyan-200">
+              <span className="grid min-w-6 shrink-0 place-items-center rounded-md bg-cyan-300/[0.055] px-1 py-1.5 font-mono text-[8px] text-cyan-200/70">{languageLabel(project.language ?? "cpp")}</span><span className="truncate">{project.name}</span>
             </button>
           ))}
         </div>
@@ -554,7 +595,7 @@ function ItemActions({ item, onEdit, onDelete }: { item: FileItem; onEdit: () =>
     <div className="mt-4 flex items-center gap-3 border-t border-white/5 pt-3 text-[10px]">
       <button type="button" onClick={onEdit} className="text-slate-600 hover:text-cyan-200">{t("editItem")}</button>
       <button type="button" onClick={onDelete} className="text-slate-700 hover:text-rose-300">{t("deleteItem")}</button>
-      <span className="ml-auto text-slate-700">{t(item.kind === "folder" ? "folderType" : "projectType")}</span>
+      <span className="ml-auto text-slate-700">{item.kind === "folder" ? t("folderType") : `${languageLabel(item.language ?? "cpp")} Project`}</span>
     </div>
   );
 }

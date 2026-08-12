@@ -33,6 +33,38 @@ int main() {
     assert result.exit_code == 0
 
 
+def test_docker_compiler_accepts_python_with_stdin() -> None:
+    result = compiler.run(
+        "value = int(input())\nprint(value * 2)",
+        "21\n",
+        language="python",
+    )
+
+    assert result.status == "accepted"
+    assert result.stdout == "42\n"
+
+
+def test_docker_compiler_reports_python_syntax_error() -> None:
+    result = compiler.run("print(", "", language="python")
+
+    assert result.status == "compile_error"
+    assert "SyntaxError" in result.stderr
+
+
+def test_docker_compiler_reports_python_runtime_error() -> None:
+    result = compiler.run("raise RuntimeError('boom')", "", language="python")
+
+    assert result.status == "runtime_error"
+    assert "RuntimeError: boom" in result.stderr
+
+
+def test_docker_compiler_stops_python_infinite_loop() -> None:
+    result = compiler.run("while True:\n    pass", "", language="python")
+
+    assert result.status == "timeout"
+    assert result.exit_code is None
+
+
 def test_docker_compiler_builds_multiple_project_files() -> None:
     files = [
         ProjectSourceFile(

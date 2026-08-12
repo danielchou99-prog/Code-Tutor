@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import type { ProgrammingLanguage } from "@/lib/file-items";
 
 export type AppSettings = {
   theme: "dark" | "light";
@@ -22,6 +23,7 @@ export type AppSettings = {
   notifySuccess: boolean;
   notifyError: boolean;
   notifySystem: boolean;
+  defaultProgrammingLanguage: ProgrammingLanguage;
 };
 
 const storageKey = "code-tutor:settings";
@@ -46,6 +48,7 @@ export const defaultAppSettings: AppSettings = {
   notifySuccess: true,
   notifyError: true,
   notifySystem: true,
+  defaultProgrammingLanguage: "cpp",
 };
 
 type SettingsContextValue = {
@@ -73,6 +76,7 @@ function normalizeSettings(value: unknown): AppSettings {
     sidebarWidth: Math.min(280, Math.max(180, Number(input.sidebarWidth) || defaultAppSettings.sidebarWidth)),
     aiPanelWidth: Math.min(420, Math.max(280, Number(input.aiPanelWidth) || defaultAppSettings.aiPanelWidth)),
     panelPlacement: input.panelPlacement === "bottom" ? "bottom" : "right",
+    defaultProgrammingLanguage: input.defaultProgrammingLanguage === "python" ? "python" : "cpp",
   };
 }
 
