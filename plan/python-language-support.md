@@ -33,6 +33,8 @@
   - 簡易說明：檢查前端型別與建置，並測試 Python 正常輸出、stdin、語法錯誤、執行錯誤、逾時及 Interactive Console。
 - [x] 8. 修復 Supabase Python Project 建立流程與錯誤提示
   - 簡易說明：重新建立 `project_files` 限制與自動產生 `main.py` 的 Trigger，並讓前端分辨重複名稱、migration 不完整及其他資料庫錯誤。
+- [x] 9. 新增 Project 檔案時自動補上副檔名
+  - 簡易說明：Python 輸入 `22` 會建立 `22.py`；C++ 輸入 `22` 會建立 `22.cpp`。已輸入合法副檔名時維持原值，並在建立前顯示實際檔名。
 
 ## 驗收方式
 
@@ -44,6 +46,7 @@
 - [x] Python Interactive Console 可以接收輸入並回傳結果。
 - [x] 原有 C++ 功能與測試仍正常。
 - [x] `npm run lint`、TypeScript 檢查、正式 build 與後端測試全部通過。
+- [x] 不含副檔名的新檔名會依 Project 語言自動補上 `.py` 或 `.cpp`。
 
 ## 需要使用者手動操作
 
@@ -65,3 +68,5 @@
 - 2026-08-22 第二次驗收：使用者確認最新修復 migration 已成功執行，但 Python Project 仍被拒絕。下一步改用乾淨 PostgreSQL 重播全部 migration 並實際插入 Python Project，不再只檢查 constraint 文字。
 - 根因已重現：原始 `file_items` 仍有名為 `file_items_check` 的舊 C++-only constraint；先前新增的 `file_items_language_check` 雖然正確，兩條規則會同時生效，因此 Python 仍被舊規則拒絕。
 - 最終修復：新增 `202608220002_remove_legacy_cpp_constraint.sql`，只移除舊 `file_items_check`，並檢查是否仍有任何未包含 Python 的 language constraint。
+- 新檔名處理：輸入不含副檔名的名稱會自動補上 `.py` 或 `.cpp`，建立視窗會預覽實際檔名；合法的 C++ header／source 與 Python 副檔名不會重複附加。
+- 自動補副檔名檢查：ESLint、TypeScript `--noEmit`、Next.js production build 全部通過。

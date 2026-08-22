@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAuth } from "@/lib/auth-context";
 import {
   clearProjectDraft,
+  completeProjectFileName,
   createProjectFile,
   deleteProjectFile,
   isValidProjectFileName,
@@ -298,11 +299,11 @@ export function CodeEditorPanel({
 
   const submitNewFile = async () => {
     if (!user || creating) return;
-    const normalizedName = newFileName.trim();
+    const normalizedName = completeProjectFileName(newFileName, project.language);
     if (!isValidProjectFileName(normalizedName, project.language)) {
       setCreateError(project.language === "python"
-        ? (zh ? "檔名必須以 .py 結尾，且不可包含 / 或 \\." : "Use a .py name without / or \\.")
-        : (zh ? "檔名必須以 .cpp、.h 或 .hpp 結尾，且不可包含 / 或 \\." : "Use a .cpp, .h, or .hpp name without / or \\."));
+        ? (zh ? "請使用安全檔名；未輸入副檔名時會自動補上 .py。" : "Use a safe file name. .py is added when no extension is entered.")
+        : (zh ? "請使用安全檔名；未輸入副檔名時會自動補上 .cpp，也可自行使用 .h 或 .hpp。" : "Use a safe file name. .cpp is added when no extension is entered; .h and .hpp are also supported."));
       return;
     }
     if (files.some((file) => file.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
@@ -681,11 +682,21 @@ export function CodeEditorPanel({
                 autoFocus
                 value={newFileName}
                 onChange={(event) => { setNewFileName(event.target.value); setCreateError(null); }}
+                onBlur={() => {
+                  const completedName = completeProjectFileName(newFileName, project.language);
+                  if (isValidProjectFileName(completedName, project.language)) setNewFileName(completedName);
+                }}
                 placeholder={project.language === "python" ? "example.py" : "example.cpp"}
                 maxLength={120}
                 disabled={creating}
                 className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0a1019] px-3 text-sm text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
               />
+              {newFileName.trim() && !createError ? (
+                <p className="mt-2 text-[10px] text-slate-500">
+                  {zh ? "將建立：" : "Will create: "}
+                  <span className="font-mono text-cyan-200/75">{completeProjectFileName(newFileName, project.language)}</span>
+                </p>
+              ) : null}
               {createError ? <p className="mt-2 text-[11px] leading-5 text-rose-400" role="alert">{createError}</p> : null}
               <div className="mt-5 flex justify-end gap-2">
                 <button type="button" onClick={() => setCreateDialogOpen(false)} disabled={creating} className="h-10 rounded-xl border border-white/10 px-4 text-xs text-slate-400">{t("cancel")}</button>

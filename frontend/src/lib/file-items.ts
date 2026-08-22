@@ -224,6 +224,23 @@ export async function saveProjectContent(id: string, content: string) {
     .eq("kind", "project");
 }
 
+export function completeProjectFileName(
+  value: string,
+  language: ProgrammingLanguage,
+): string {
+  const name = value.trim();
+  if (!name) return "";
+
+  const validExtension = language === "python"
+    ? /\.py$/iu
+    : /\.(?:cpp|h|hpp)$/iu;
+  if (validExtension.test(name)) return name;
+
+  const lastDot = name.lastIndexOf(".");
+  if (lastDot > 0) return name;
+  return `${name}${language === "python" ? ".py" : ".cpp"}`;
+}
+
 export function isValidProjectFileName(value: string, language: ProgrammingLanguage): boolean {
   const name = value.trim();
   const baseName = name.slice(0, name.lastIndexOf(".")).replace(/[ .]+$/u, "").toLocaleLowerCase();
