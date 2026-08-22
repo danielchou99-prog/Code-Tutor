@@ -62,3 +62,6 @@
 - 2026-08-22 修復：新增 `202608220001_repair_python_project_creation.sql`，會重建並自我驗證 Python Project constraint、Trigger 與 `main.py` 建立函式。
 - 2026-08-22 前端修復：資料庫 `23505` 會明確顯示名稱重複；Python 的 `23514`／`P0001` 會提示執行修復 migration；其他錯誤會顯示資料庫錯誤代碼，不再全部誤判成名稱重複。
 - 修復後自動檢查：ESLint、TypeScript `--noEmit`、Next.js production build 全部通過。
+- 2026-08-22 第二次驗收：使用者確認最新修復 migration 已成功執行，但 Python Project 仍被拒絕。下一步改用乾淨 PostgreSQL 重播全部 migration 並實際插入 Python Project，不再只檢查 constraint 文字。
+- 根因已重現：原始 `file_items` 仍有名為 `file_items_check` 的舊 C++-only constraint；先前新增的 `file_items_language_check` 雖然正確，兩條規則會同時生效，因此 Python 仍被舊規則拒絕。
+- 最終修復：新增 `202608220002_remove_legacy_cpp_constraint.sql`，只移除舊 `file_items_check`，並檢查是否仍有任何未包含 Python 的 language constraint。
