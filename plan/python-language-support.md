@@ -13,7 +13,7 @@
 - [x] 已確認前端建立 Project、檔案驗證、Monaco 與執行 API 都寫死 C++。
 - [x] 已確認 FastAPI 的請求模型、一般執行及 Interactive Console 都只支援 C++。
 - [x] 已確認編譯器 Docker image 目前只包含 GCC。
-- [x] Python 支援程式與本機執行環境已完成；Supabase migration 尚待使用者套用。
+- [ ] Python Project 建立驗收失敗：`file_items` 已允許 Python，但建立時仍被 Supabase 後續流程拒絕。
 
 ## 執行步驟與簡易說明
 
@@ -31,10 +31,12 @@
   - 簡易說明：AI Tutor 要知道目前是 Python 或 C++，畫面上的語言徽章和執行提示也要一致。
 - [x] 7. 建立與執行測試
   - 簡易說明：檢查前端型別與建置，並測試 Python 正常輸出、stdin、語法錯誤、執行錯誤、逾時及 Interactive Console。
+- [x] 8. 修復 Supabase Python Project 建立流程與錯誤提示
+  - 簡易說明：重新建立 `project_files` 限制與自動產生 `main.py` 的 Trigger，並讓前端分辨重複名稱、migration 不完整及其他資料庫錯誤。
 
 ## 驗收方式
 
-- [x] 建立 Project 時可從下拉選單選擇 C++20 或 Python 3（程式碼、型別與正式 build 已驗證；待使用者套用 migration 後進行帳號實測）。
+- [ ] 建立 Project 時可從下拉選單選擇 C++20 或 Python 3（C++ 已通過；Python 線上資料庫建立待修復後重驗）。
 - [x] Python Project 會產生 `main.py`，並使用 Python 徽章與 Monaco Python 語法模式。
 - [x] Python 可執行 `print()`，可讀取 `input()`。
 - [x] Python 語法錯誤會顯示為 `compile_error`，執行例外顯示為 `runtime_error`。
@@ -45,15 +47,18 @@
 
 ## 需要使用者手動操作
 
-- [ ] 將新增的 Supabase migration 貼到 Supabase SQL Editor 執行；未執行前，線上資料庫仍會拒絕 Python Project。
+- [ ] 將 Python 修復 migration 貼到 Supabase SQL Editor 執行。
 - [ ] 功能完成後，在瀏覽器各建立一個 C++ 與 Python Project，確認下拉選單與實際操作符合期望。
 
 ## 執行結果
 
-- 狀態：程式開發與本機自動驗證完成，等待 Supabase migration 與瀏覽器帳號驗收。
+- 狀態：本機執行功能正常；2026-08-22 收到線上 Supabase 無法建立 Python Project 的驗收回報，修復進行中。
 - 新增 migration：`supabase/migrations/202608120001_python_projects.sql`。
 - Docker image 已重建；包含 GCC 13.4 與 Python 3.11，兩種語言共用原有網路、CPU、記憶體、程序、唯讀檔案系統、逾時與輸出限制。
 - 後端完整測試：66 passed。
 - 前端：ESLint passed、TypeScript passed、Next.js production build passed。
 - 實際本機 HTTP API smoke test：Python stdin 輸出 `42`、C++ 輸出 `42`，兩者皆為 `accepted`。
 - FastAPI `http://127.0.0.1:8000` 與 Next.js `http://127.0.0.1:3000` 已重新啟動。
+- 2026-08-22 修復：新增 `202608220001_repair_python_project_creation.sql`，會重建並自我驗證 Python Project constraint、Trigger 與 `main.py` 建立函式。
+- 2026-08-22 前端修復：資料庫 `23505` 會明確顯示名稱重複；Python 的 `23514`／`P0001` 會提示執行修復 migration；其他錯誤會顯示資料庫錯誤代碼，不再全部誤判成名稱重複。
+- 修復後自動檢查：ESLint、TypeScript `--noEmit`、Next.js production build 全部通過。

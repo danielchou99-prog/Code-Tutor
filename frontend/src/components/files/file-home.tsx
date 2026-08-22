@@ -47,6 +47,14 @@ function errorCode(error: unknown): string | null {
   return String(error.code);
 }
 
+function errorMessage(error: unknown): string {
+  if (!error || typeof error !== "object") return "";
+  return ["message", "details", "hint"]
+    .map((key) => key in error ? String((error as Record<string, unknown>)[key] ?? "") : "")
+    .filter(Boolean)
+    .join(" ");
+}
+
 function ItemDialog({
   state,
   busy,
@@ -197,9 +205,16 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   const [deleting, setDeleting] = useState(false);
   const currentFolderId = path.at(-1)?.id ?? null;
 
-  const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete" | "move") => {
-    if (["42P01", "PGRST205"].includes(errorCode(error) ?? "")) return t("fileStorageNotReady");
-    if (fallback === "save") return t("fileSaveFailed");
+  const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete" | "move", pythonProject = false) => {
+    const code = errorCode(error) ?? "";
+    const message = errorMessage(error);
+    if (["42P01", "PGRST205"].includes(code)) return t("fileStorageNotReady");
+    if (fallback === "save" && code === "23505") return t("fileDuplicateName");
+    if (fallback === "save" && pythonProject && (
+      ["23514", "P0001"].includes(code)
+      || /main\.py|python projects|project_files_name_check|language_check/iu.test(message)
+    )) return t("pythonProjectStorageNotReady");
+    if (fallback === "save") return code ? `${t("fileSaveFailed")} (${code})` : t("fileSaveFailed");
     if (fallback === "delete") return t("fileDeleteFailed");
     if (fallback === "move") return t("fileMoveFailed");
     return t("fileLoadFailed");
@@ -286,7 +301,10 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
     setSaving(false);
 
     if (result.error) {
-      setDialogError(friendlyError(result.error, "save"));
+      const isNewPythonProject = dialog.mode === "create"
+        && dialog.kind === "project"
+        && programmingLanguage === "python";
+      setDialogError(friendlyError(result.error, "save", isNewPythonProject));
       return;
     }
 
