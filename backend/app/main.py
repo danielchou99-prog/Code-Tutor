@@ -28,6 +28,13 @@ from .ai_tutor import (
 from .compiler import CompilerService, CompilerUnavailable, DockerCompiler
 from .config import settings
 from .interactive import DockerInteractiveCompiler, InteractiveCompilerService, READY_MARKER
+from .judge import (
+    JudgeService,
+    JudgeStorageUnavailable,
+    JudgeStore,
+    ProblemNotFound,
+    SupabaseJudgeStore,
+)
 from .models import (
     HealthResponse,
     AuthMeResponse,
@@ -38,6 +45,8 @@ from .models import (
     InteractiveStartRequest,
     RunRequest,
     RunResponse,
+    SubmitRequest,
+    SubmitResponse,
 )
 from .protection import ExecutionGate, InMemoryRateLimiter, RateLimitExceeded
 
@@ -61,6 +70,10 @@ rate_limiter = InMemoryRateLimiter(
     max_requests=settings.rate_limit_requests,
     window_seconds=settings.rate_limit_window_seconds,
 )
+judge_rate_limiter = InMemoryRateLimiter(
+    max_requests=settings.judge_rate_limit_requests,
+    window_seconds=settings.judge_rate_limit_window_seconds,
+)
 execution_gate = ExecutionGate(
     max_concurrent=settings.max_concurrent_runs,
     max_queued=settings.max_queued_runs,
@@ -68,6 +81,15 @@ execution_gate = ExecutionGate(
 )
 app.state.token_verifier = (
     SupabaseTokenVerifier(settings.supabase_url) if settings.supabase_url else None
+)
+app.state.judge_store = (
+    SupabaseJudgeStore(
+        settings.supabase_url,
+        settings.supabase_server_key,
+        settings.ai_request_timeout_seconds,
+    )
+    if settings.supabase_url and settings.supabase_server_key
+    else None
 )
 
 
@@ -135,6 +157,20 @@ def get_rate_limiter() -> InMemoryRateLimiter:
 
 def get_execution_gate() -> ExecutionGate:
     return execution_gate
+
+
+def get_judge_rate_limiter() -> InMemoryRateLimiter:
+    return judge_rate_limiter
+
+
+def get_judge_store(request: Request) -> JudgeStore:
+    store: JudgeStore | None = getattr(request.app.state, "judge_store", None)
+    if store is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Judge storage is not configured on the server.",
+        )
+    return store
 
 
 def get_interactive_compiler() -> InteractiveCompilerService:
@@ -360,6 +396,60 @@ async def run_code(
     except CompilerUnavailable as error:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return RunResponse(status="service_unavailable", stderr=str(error))
+    finally:
+        if has_execution_slot:
+            gate.leave_execution()
+        gate.leave()
+
+
+@app.post("/api/problems/{problem_id}/submit", response_model=SubmitResponse)
+async def submit_problem(
+    problem_id: str,
+    payload: SubmitRequest,
+    response: Response,
+    user: AuthenticatedUser = Depends(get_current_user),
+    compiler: CompilerService = Depends(get_compiler),
+    store: JudgeStore = Depends(get_judge_store),
+    limiter: InMemoryRateLimiter = Depends(get_judge_rate_limiter),
+    gate: ExecutionGate = Depends(get_execution_gate),
+) -> SubmitResponse:
+    try:
+        limiter.check(f"judge:{user.user_id}")
+    except RateLimitExceeded as error:
+        response.headers["Retry-After"] = str(error.retry_after_seconds)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many submissions. Please wait before submitting again.",
+        ) from error
+
+    if not gate.try_enter():
+        response.headers["Retry-After"] = "1"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The Judge queue is full. Please try again shortly.",
+        )
+
+    has_execution_slot = False
+    try:
+        has_execution_slot = await run_in_threadpool(gate.wait_for_execution)
+        if not has_execution_slot:
+            response.headers["Retry-After"] = "1"
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The Judge queue wait timed out. Please try again.",
+            )
+        service = JudgeService(store, compiler)
+        return await run_in_threadpool(service.submit, user, problem_id, payload)
+    except ProblemNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The requested problem does not exist.",
+        ) from error
+    except JudgeStorageUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Judge storage is temporarily unavailable.",
+        ) from error
     finally:
         if has_execution_slot:
             gate.leave_execution()

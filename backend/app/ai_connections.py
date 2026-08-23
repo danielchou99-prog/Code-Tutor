@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import ssl
-from typing import Protocol
+from typing import Any, Protocol
 from urllib.parse import quote
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -36,7 +36,7 @@ def secure_http_request(
     *,
     headers: dict[str, str],
     timeout: float,
-    json: dict[str, str] | None = None,
+    json: dict[str, Any] | None = None,
 ) -> httpx.Response:
     with secure_http_client(timeout) as client:
         return client.request(method, url, headers=headers, json=json)
@@ -205,7 +205,7 @@ class SupabaseAiConnectionStore:
         method: str,
         url: str,
         headers: dict[str, str],
-        json: dict[str, str] | None = None,
+        json: dict[str, Any] | None = None,
     ) -> httpx.Response:
         try:
             response = secure_http_request(

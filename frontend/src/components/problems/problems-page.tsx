@@ -2,25 +2,39 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { loadProblems } from "@/lib/problem-repository";
 
-import { type Problem, type ProblemDifficulty, type ProblemStatus, type ProblemTag, problems, tagLabels } from "./problem-data";
+import { getProblemTagLabel, type Problem, type ProblemDifficulty, type ProblemStatus, type ProblemTag, problems } from "./problem-data";
 import { ProblemSolverPage } from "./problem-solver-page";
 
-const allTags = Object.keys(tagLabels) as ProblemTag[];
 const hashtagPattern = /#[^\s#]+/gu;
 const selectedProblemStorageKey = "code-tutor:selected-problem";
 
 export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: number }) {
   const { language } = useLanguage();
+  const { user } = useAuth();
   const zh = language === "zh-Hant";
   const textKey = zh ? "zh" : "en";
   const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
+  const [availableProblems, setAvailableProblems] = useState<Problem[]>(problems);
   const [query, setQuery] = useState("");
   const [difficulty, setDifficulty] = useState<ProblemDifficulty | "all">("all");
   const [status, setStatus] = useState<ProblemStatus | "all">("all");
   const [selectedTags, setSelectedTags] = useState<ProblemTag[]>([]);
   const previousResetRevision = useRef(resetListRevision);
+  const allTags = useMemo(() => [...new Set(availableProblems.flatMap((problem) => problem.tags))], [availableProblems]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadProblems().then((result) => {
+      if (cancelled) return;
+      setAvailableProblems(result.problems);
+      setSelectedProblem((current) => current ? result.problems.find((problem) => problem.id === current.id) ?? current : current);
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -42,34 +56,42 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
     return (query.match(hashtagPattern) ?? []).map((token) => {
       const normalized = token.slice(1).toLocaleLowerCase(language).replaceAll("-", "");
       return allTags.find((tag) => {
-        const candidates = [tag, tagLabels[tag].zh, tagLabels[tag].en]
+        const label = getProblemTagLabel(tag);
+        const candidates = [tag, label.zh, label.en]
           .map((label) => label.toLocaleLowerCase(language).replaceAll(" ", "").replaceAll("-", ""));
         return candidates.includes(normalized);
       }) ?? null;
     });
-  }, [language, query]);
+  }, [allTags, language, query]);
 
   const filteredProblems = useMemo(() => {
     const searchText = query.replace(hashtagPattern, " ").trim().toLocaleLowerCase(language);
     const effectiveTags = [...new Set([...selectedTags, ...queryTags.filter((tag): tag is ProblemTag => tag !== null)])];
     const hasUnknownTag = queryTags.some((tag) => tag === null);
 
-    return problems.filter((problem) => {
+    return availableProblems.filter((problem) => {
       if (difficulty !== "all" && problem.difficulty !== difficulty) return false;
       if (status !== "all" && problem.status !== status) return false;
       if (hasUnknownTag || !effectiveTags.every((tag) => problem.tags.includes(tag))) return false;
       if (!searchText) return true;
-      const searchable = [problem.id, problem.title[textKey], problem.summary[textKey], ...problem.tags.flatMap((tag) => [tagLabels[tag].zh, tagLabels[tag].en])]
+      const searchable = [problem.id, problem.title[textKey], problem.summary[textKey], ...problem.tags.flatMap((tag) => {
+        const label = getProblemTagLabel(tag);
+        return [label.zh, label.en];
+      })]
         .join(" ")
         .toLocaleLowerCase(language);
       return searchable.includes(searchText);
     });
-  }, [difficulty, language, query, queryTags, selectedTags, status, textKey]);
+  }, [availableProblems, difficulty, language, query, queryTags, selectedTags, status, textKey]);
 
   if (selectedProblem) {
     return <ProblemSolverPage problem={selectedProblem} onBack={() => {
       window.localStorage.removeItem(selectedProblemStorageKey);
       setSelectedProblem(null);
+    }} onSubmitted={(result) => {
+      const nextStatus: ProblemStatus = result.status === "accepted" || result.score === 100 ? "solved" : "attempted";
+      setAvailableProblems((current) => current.map((problem) => problem.id === result.problem_id ? { ...problem, status: nextStatus } : problem));
+      setSelectedProblem((current) => current?.id === result.problem_id ? { ...current, status: nextStatus } : current);
     }} />;
   }
 
@@ -90,8 +112,8 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
             <p className="mt-3 text-sm leading-6 text-slate-500">{zh ? "搜尋題目並依難度、標籤與作答狀態篩選，點擊題目後可以直接閱讀與寫程式。" : "Search and filter by difficulty, tag, or progress, then open a problem to read and code in one workspace."}</p>
           </div>
           <div className="flex gap-6 text-center">
-            <Metric value={String(problems.length)} label={zh ? "目前題目" : "Problems"} />
-            <Metric value={String(problems.filter((problem) => problem.status === "solved").length)} label={zh ? "已通過" : "Solved"} />
+            <Metric value={String(availableProblems.length)} label={zh ? "目前題目" : "Problems"} />
+            <Metric value={String(availableProblems.filter((problem) => problem.status === "solved").length)} label={zh ? "已通過" : "Solved"} />
           </div>
         </div>
 
@@ -113,7 +135,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
             <span className="mr-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">Tags</span>
             {allTags.map((tag) => {
               const active = selectedTags.includes(tag);
-              return <button key={tag} type="button" aria-pressed={active} onClick={() => setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])} className={`rounded-full border px-3 py-1.5 text-[10px] transition-colors ${active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-white/8 bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300"}`}>#{tagLabels[tag][textKey]}</button>;
+              return <button key={tag} type="button" aria-pressed={active} onClick={() => setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])} className={`rounded-full border px-3 py-1.5 text-[10px] transition-colors ${active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-white/8 bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300"}`}>#{getProblemTagLabel(tag)[textKey]}</button>;
             })}
             {(query || difficulty !== "all" || status !== "all" || selectedTags.length > 0) ? <button type="button" onClick={clearFilters} className="ml-auto px-2 py-1 text-[10px] text-slate-600 hover:text-cyan-300">{zh ? "清除篩選" : "Clear filters"}</button> : null}
           </div>
@@ -169,7 +191,7 @@ function ProblemCard({ problem, textKey, zh, onOpen }: { problem: Problem; textK
         </span>
       </button>
       <div className="mt-2 flex min-h-5 flex-wrap justify-center gap-x-2 gap-y-1 px-1 text-center">
-        {problem.tags.map((tag) => <span key={tag} className="text-[9px] font-medium text-cyan-300/75">#{tagLabels[tag][textKey]}</span>)}
+        {problem.tags.map((tag) => <span key={tag} className="text-[9px] font-medium text-cyan-300/75">#{getProblemTagLabel(tag)[textKey]}</span>)}
       </div>
     </article>
   );

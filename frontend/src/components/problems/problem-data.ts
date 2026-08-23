@@ -1,6 +1,6 @@
 export type ProblemDifficulty = "easy" | "medium" | "hard";
 export type ProblemStatus = "solved" | "attempted" | "unsolved";
-export type ProblemTag = "math" | "implementation" | "binary-search" | "array" | "bfs" | "graph" | "dynamic-programming";
+export type ProblemTag = string;
 
 export type LocalizedText = {
   zh: string;
@@ -60,6 +60,14 @@ export const tagLabels: Record<ProblemTag, LocalizedText> = {
   graph: { zh: "圖論", en: "Graph" },
   "dynamic-programming": { zh: "動態規劃", en: "Dynamic Programming" },
 };
+
+export function registerProblemTagLabels(labels: Record<string, LocalizedText>) {
+  Object.assign(tagLabels, labels);
+}
+
+export function getProblemTagLabel(tag: ProblemTag): LocalizedText {
+  return tagLabels[tag] ?? { zh: tag, en: tag };
+}
 
 export const problems: Problem[] = [
   {

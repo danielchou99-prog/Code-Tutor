@@ -7,6 +7,7 @@ import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { OutputPanel } from "@/components/workspace/output-panel";
 import { runCode, type RunResult, type SourceFile } from "@/lib/compiler-api";
 import type { ProgrammingLanguage } from "@/lib/file-items";
+import { JudgeApiError, type JudgeResult, submitProblem } from "@/lib/judge-api";
 import {
   type InteractiveConnection,
   type InteractiveOutput,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
 
-import { type Problem, tagLabels } from "./problem-data";
+import { getProblemTagLabel, type Problem } from "./problem-data";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -26,14 +27,13 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ),
 });
 
-type JudgeView = "ready" | "unavailable";
 type ResizeTarget = "problem" | "result" | null;
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBack: () => void }) {
+export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: Problem; onBack: () => void; onSubmitted?: (result: JudgeResult) => void }) {
   const { language } = useLanguage();
   const zh = language === "zh-Hant";
   const textKey = zh ? "zh" : "en";
@@ -50,7 +50,9 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
   const [inputMode, setInputMode] = useState<"batch" | "interactive">("batch");
   const [interactiveOutput, setInteractiveOutput] = useState<InteractiveOutput[]>([]);
   const [interactiveStatus, setInteractiveStatus] = useState<InteractiveStatus>("idle");
-  const [judgeView, setJudgeView] = useState<JudgeView>("ready");
+  const [judgeResult, setJudgeResult] = useState<JudgeResult | null>(null);
+  const [judgeError, setJudgeError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [problemWidth, setProblemWidth] = useState(35);
   const [resultWidth, setResultWidth] = useState(22);
   const [resizing, setResizing] = useState<ResizeTarget>(null);
@@ -173,6 +175,28 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
     setIsRunning(false);
   };
 
+  const submit = async () => {
+    if (isSubmitting || isRunning) return;
+    setJudgeError("");
+    setJudgeResult(null);
+    setIsSubmitting(true);
+    try {
+      const result = await submitProblem(problem.id, sourceFiles(), programmingLanguage);
+      setJudgeResult(result);
+      onSubmitted?.(result);
+    } catch (error) {
+      if (error instanceof JudgeApiError && error.statusCode === 401) {
+        setJudgeError(zh ? "請先登入 Code Tutor，再送出正式評分。" : "Sign in to Code Tutor before submitting for judging.");
+      } else if (error instanceof JudgeApiError && error.statusCode === 503) {
+        setJudgeError(zh ? "Judge 尚未完成伺服器設定，或目前暫時無法使用。" : "The Judge is not configured or is temporarily unavailable.");
+      } else {
+        setJudgeError(error instanceof Error ? error.message : (zh ? "無法送出程式碼。" : "The submission could not be sent."));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const editorWidth = 100 - problemWidth - resultWidth;
   const aiErrorOutput = [
     runResult?.stderr,
@@ -212,7 +236,7 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setCodeByLanguage((current) => ({ ...current, [programmingLanguage]: problem.starterCode[programmingLanguage] }))} className="h-8 rounded-lg border border-white/8 px-3 text-[10px] text-slate-400 hover:border-white/15 hover:text-white">{zh ? "還原程式碼" : "Reset code"}</button>
               <button type="button" onClick={() => void run()} disabled={isRunning} className="h-8 rounded-lg bg-cyan-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60">▶ Run</button>
-              <button type="button" onClick={() => setJudgeView("unavailable")} className="h-8 rounded-lg bg-violet-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-violet-300">Submit</button>
+              <button type="button" onClick={() => void submit()} disabled={isSubmitting || isRunning} className="h-8 rounded-lg bg-violet-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-violet-300 disabled:cursor-wait disabled:opacity-60">{isSubmitting ? (zh ? "評分中…" : "Judging…") : "Submit"}</button>
             </div>
           </div>
           <div className="min-h-[390px] flex-1 overflow-hidden xl:min-h-0">
@@ -242,7 +266,7 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
         </section>
 
         <ResizeHandle label={zh ? "調整編輯器與結果寬度" : "Resize editor and result"} active={resizing === "result"} onPointerDown={() => setResizing("result")} />
-        <JudgePanel view={judgeView} problem={problem} textKey={textKey} zh={zh} />
+        <JudgePanel error={judgeError} isSubmitting={isSubmitting} result={judgeResult} problem={problem} textKey={textKey} zh={zh} />
       </div>
 
       {aiOpen ? (
@@ -266,7 +290,7 @@ function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey:
   return (
     <article className="min-h-[520px] min-w-0 overflow-y-auto bg-[#0a0f17] p-5 sm:p-6 xl:min-h-0" aria-label={zh ? "題目內容" : "Problem statement"}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/65">Problem #{problem.id}</p><h1 className="mt-2 text-xl font-semibold text-white">{problem.title[textKey]}</h1></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/10 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/10 text-amber-200" : "bg-rose-400/10 text-rose-300"}`}>{difficulty}</span></div>
-      <div className="mt-4 flex flex-wrap gap-2">{problem.tags.map((tag) => <span key={tag} className="rounded-full border border-cyan-300/10 bg-cyan-300/[0.04] px-2.5 py-1 text-[10px] text-cyan-200/75">#{tagLabels[tag][textKey]}</span>)}</div>
+      <div className="mt-4 flex flex-wrap gap-2">{problem.tags.map((tag) => <span key={tag} className="rounded-full border border-cyan-300/10 bg-cyan-300/[0.04] px-2.5 py-1 text-[10px] text-cyan-200/75">#{getProblemTagLabel(tag)[textKey]}</span>)}</div>
       <StatementSection title={zh ? "題目描述" : "Description"}>{problem.description.map((paragraph) => <p key={paragraph[textKey]}>{paragraph[textKey]}</p>)}</StatementSection>
       <StatementSection title={zh ? "輸入格式" : "Input"}><p>{problem.inputFormat[textKey]}</p></StatementSection>
       <StatementSection title={zh ? "輸出格式" : "Output"}><p>{problem.outputFormat[textKey]}</p></StatementSection>
@@ -286,16 +310,25 @@ function StatementSection({ title, children }: { title: string; children: React.
 function SampleBlock({ label, value, bordered = false }: { label: string; value: string; bordered?: boolean }) { return <div className={bordered ? "border-t border-white/8" : ""}><div className="px-4 py-2 text-[9px] font-semibold uppercase tracking-wider text-slate-600">{label}</div><pre className="overflow-x-auto px-4 pb-3 font-mono text-xs text-slate-300">{value}</pre></div>; }
 function LimitCard({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-600">{label}</span><strong className="mt-1 block font-mono text-[11px] text-slate-300">{value}</strong></div>; }
 
-function JudgePanel({ view, problem, textKey, zh }: { view: JudgeView; problem: Problem; textKey: "zh" | "en"; zh: boolean }) {
+function JudgePanel({ error, isSubmitting, result, problem, textKey, zh }: { error: string; isSubmitting: boolean; result: JudgeResult | null; problem: Problem; textKey: "zh" | "en"; zh: boolean }) {
   const totalCases = problem.testGroups.reduce((sum, group) => sum + group.testCaseCount, 0);
+  const statusLabel = result ? ({
+    accepted: zh ? "已通過" : "Accepted",
+    wrong_answer: zh ? "答案錯誤" : "Wrong Answer",
+    compile_error: zh ? "編譯錯誤" : "Compilation Error",
+    runtime_error: zh ? "執行錯誤" : "Runtime Error",
+    timeout: zh ? "超出時間限制" : "Time Limit Exceeded",
+    service_unavailable: zh ? "Judge 暫時無法使用" : "Judge Unavailable",
+    server_busy: zh ? "Judge 忙碌中" : "Judge Busy",
+  }[result.status]) : "";
   return (
     <aside className="min-h-[420px] min-w-0 overflow-y-auto bg-[#0a0f17] p-5 xl:min-h-0" aria-label={zh ? "正式評分結果" : "Judge result"}>
       <div className="flex items-center justify-between"><h2 className="text-xs font-semibold text-white">Judge Result</h2></div>
       <div className="mt-5 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
-        <div className={`flex items-center gap-2 text-xs font-semibold ${view === "ready" ? "text-slate-300" : "text-violet-300"}`}><span>{view === "ready" ? "○" : "◇"}</span><span>{view === "ready" ? (zh ? "等待送出" : "Ready to submit") : (zh ? "Submit 版面已準備" : "Submit UI is ready")}</span></div>
-        <p className="mt-3 text-[11px] leading-5 text-slate-500">{view === "ready" ? (zh ? "按下 Submit 後，正式 Judge 狀態才會顯示在這裡。Run 不會改變此區域。" : "This panel changes only after Submit. Run results stay below the editor.") : (zh ? "正式 Judge、隱藏測資與 Submission 紀錄將在下一階段串接，目前不會產生假分數。" : "The Judge, hidden tests, and submission records will be connected next. No placeholder score is generated.")}</p>
+        <div className={`flex items-center gap-2 text-xs font-semibold ${error ? "text-rose-300" : result?.status === "accepted" ? "text-emerald-300" : result ? "text-amber-200" : isSubmitting ? "text-violet-300" : "text-slate-300"}`}><span>{error ? "!" : result?.status === "accepted" ? "✓" : result ? "◇" : isSubmitting ? "…" : "○"}</span><span>{error || statusLabel || (isSubmitting ? (zh ? "正在執行隱藏測資…" : "Running hidden tests…") : (zh ? "等待送出" : "Ready to submit"))}</span></div>
+        <p className="mt-3 text-[11px] leading-5 text-slate-500">{result ? (zh ? `通過 ${result.passed_cases} / ${result.total_cases} 筆測資，總分 ${result.score} 分，執行 ${result.duration_ms} ms。` : `Passed ${result.passed_cases} / ${result.total_cases} cases. Score: ${result.score}. Execution: ${result.duration_ms} ms.`) : isSubmitting ? (zh ? "請稍候，Judge 會逐筆執行測資並計算群組分數。" : "Please wait while the Judge runs each case and calculates group scores.") : (zh ? "按下 Submit 後，正式 Judge 狀態才會顯示在這裡。Run 不會改變此區域。" : "This panel changes only after Submit. Run results stay below the editor.")}</p>
       </div>
-      <div className="mt-5 rounded-xl border border-white/8 p-4"><div className="flex items-center justify-between"><span className="text-[10px] text-slate-500">{zh ? "正式測資" : "Judge cases"}</span><strong className="font-mono text-xs text-white">{totalCases}</strong></div><div className="mt-3 space-y-3">{problem.testGroups.map((group) => <div key={group.name[textKey]} className="border-t border-white/6 pt-3 first:border-0 first:pt-0"><div className="flex items-center justify-between gap-2 text-[10px]"><span className="font-medium text-slate-300">{group.scorePercent}%</span><span className="font-mono text-slate-600">{group.testCaseCount} {zh ? "筆" : "cases"}</span></div><p className="mt-1 text-[10px] leading-4 text-slate-500">{group.condition[textKey]}</p></div>)}</div><div className="mt-3 flex items-center justify-between border-t border-white/8 pt-3 text-[10px]"><span className="font-semibold text-slate-300">{zh ? "總分" : "Total"}</span><strong className="font-mono text-white">100%</strong></div></div>
+      <div className="mt-5 rounded-xl border border-white/8 p-4"><div className="flex items-center justify-between"><span className="text-[10px] text-slate-500">{zh ? "正式測資" : "Judge cases"}</span><strong className="font-mono text-xs text-white">{result?.total_cases ?? totalCases}</strong></div><div className="mt-3 space-y-3">{problem.testGroups.map((group, index) => { const judgedGroup = result?.groups.find((item) => item.group_order === index + 1); return <div key={group.name[textKey]} className="border-t border-white/6 pt-3 first:border-0 first:pt-0"><div className="flex items-center justify-between gap-2 text-[10px]"><span className="font-medium text-slate-300">{judgedGroup ? `${judgedGroup.earned_score} / ${judgedGroup.score_percent}` : `${group.scorePercent}%`}</span><span className={`font-mono ${judgedGroup?.status === "passed" ? "text-emerald-300" : judgedGroup?.status === "failed" ? "text-rose-300" : "text-slate-600"}`}>{judgedGroup ? `${judgedGroup.passed_cases} / ${judgedGroup.total_cases}` : `${group.testCaseCount} ${zh ? "筆" : "cases"}`}</span></div><p className="mt-1 text-[10px] leading-4 text-slate-500">{group.condition[textKey]}</p></div>; })}</div><div className="mt-3 flex items-center justify-between border-t border-white/8 pt-3 text-[10px]"><span className="font-semibold text-slate-300">{zh ? "總分" : "Total"}</span><strong className="font-mono text-white">{result ? `${result.score} / 100` : "100%"}</strong></div></div>
       <div className="mt-7 border-t border-white/8 pt-5"><p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">Judge status</p><div className="mt-3 grid gap-2 text-[10px] text-slate-600"><span>✓ Accepted</span><span>✕ Wrong Answer</span><span>⚠ Compilation Error</span><span>⏱ Time Limit Exceeded</span></div></div>
     </aside>
   );

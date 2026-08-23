@@ -63,6 +63,17 @@ class Settings:
     supabase_publishable_key: str | None = (
         os.getenv("CODE_TUTOR_SUPABASE_PUBLISHABLE_KEY", "").strip() or None
     )
+    supabase_server_key: str | None = (
+        os.getenv("CODE_TUTOR_SUPABASE_SECRET_KEY", "").strip()
+        or os.getenv("CODE_TUTOR_SUPABASE_SERVICE_ROLE_KEY", "").strip()
+        or None
+    )
+    judge_rate_limit_requests: int = int(
+        os.getenv("CODE_TUTOR_JUDGE_RATE_LIMIT_REQUESTS", "5")
+    )
+    judge_rate_limit_window_seconds: int = int(
+        os.getenv("CODE_TUTOR_JUDGE_RATE_LIMIT_WINDOW_SECONDS", "60")
+    )
     ai_encryption_key: str | None = (
         os.getenv("CODE_TUTOR_AI_ENCRYPTION_KEY", "").strip() or None
     )

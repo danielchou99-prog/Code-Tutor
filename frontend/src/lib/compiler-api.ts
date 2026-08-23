@@ -24,7 +24,7 @@ export type SourceFile = {
   content: string;
 };
 
-function getApiUrl(): string {
+export function getApiUrl(): string {
   const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
   if (configuredUrl) return configuredUrl.replace(/\/$/, "");
 

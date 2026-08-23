@@ -13,6 +13,16 @@ RunStatus = Literal[
     "server_busy",
 ]
 
+JudgeStatus = Literal[
+    "accepted",
+    "wrong_answer",
+    "compile_error",
+    "runtime_error",
+    "timeout",
+    "service_unavailable",
+    "server_busy",
+]
+
 
 class ProjectSourceFile(BaseModel):
     name: str = Field(min_length=1, max_length=120)
@@ -90,6 +100,31 @@ class RunResponse(BaseModel):
     exit_code: int | None = None
     duration_ms: int = 0
     truncated: bool = False
+
+
+class SubmitRequest(ProjectSourcesMixin):
+    pass
+
+
+class JudgeGroupResult(BaseModel):
+    group_order: int
+    score_percent: int
+    earned_score: int
+    passed_cases: int
+    total_cases: int
+    status: Literal["passed", "failed", "not_run"]
+
+
+class SubmitResponse(BaseModel):
+    submission_id: str | None = None
+    problem_id: str
+    status: JudgeStatus
+    score: int = 0
+    passed_cases: int = 0
+    total_cases: int = 0
+    duration_ms: int = 0
+    groups: list[JudgeGroupResult] = Field(default_factory=list)
+    message: str = ""
 
 
 class HealthResponse(BaseModel):

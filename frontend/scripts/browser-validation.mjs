@@ -679,7 +679,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
           text.includes("Text") && text.includes("Interactive Console") &&
           text.includes("範例輸入 1") && text.includes("範例輸出 1") &&
           text.includes("範例輸入 2") && text.includes("範例輸出 2") &&
-          text.includes("Submit 版面已準備") && !text.includes("SUBMIT ONLY") &&
+          text.includes("請先登入 Code Tutor") && !text.includes("SUBMIT ONLY") &&
           Boolean(document.querySelector('button[aria-label="開啟 AI Tutor"]'));
       })()`,
     );
