@@ -13,6 +13,12 @@ export type ProblemSample = {
   explanation?: LocalizedText;
 };
 
+export type ProblemTestGroup = {
+  name: LocalizedText;
+  testCaseCount: number;
+  scorePercent: number;
+};
+
 export type Problem = {
   id: string;
   title: LocalizedText;
@@ -25,9 +31,23 @@ export type Problem = {
   outputFormat: LocalizedText;
   samples: ProblemSample[];
   constraints: LocalizedText[];
+  testGroups: ProblemTestGroup[];
   timeLimitMs: number;
   memoryLimitMb: number;
-  starterCode: string;
+  starterCode: Record<"cpp" | "python", string>;
+};
+
+const helloWorldStarterCode: Problem["starterCode"] = {
+  cpp: `#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Hello, World!" << '\\n';
+    return 0;
+}
+`,
+  python: `print("Hello, World!")
+`,
 };
 
 export const tagLabels: Record<ProblemTag, LocalizedText> = {
@@ -50,26 +70,21 @@ export const problems: Problem[] = [
     tags: ["math", "implementation"],
     description: [
       { zh: "給定兩個整數 A 與 B，請計算並輸出 A + B。", en: "Given two integers A and B, calculate and print A + B." },
-      { zh: "這是一道用來熟悉輸入、輸出與提交流程的基礎題。", en: "This problem helps you become familiar with input, output, and the submission flow." },
     ],
     inputFormat: { zh: "一行包含兩個以空白分隔的整數 A 與 B。", en: "One line contains two space-separated integers A and B." },
     outputFormat: { zh: "輸出一個整數，代表 A + B。", en: "Print one integer: A + B." },
-    samples: [{ input: "1 2", output: "3" }],
+    samples: [
+      { input: "1 2", output: "3" },
+      { input: "-5 12", output: "7" },
+    ],
     constraints: [{ zh: "−10⁹ ≤ A, B ≤ 10⁹", en: "−10⁹ ≤ A, B ≤ 10⁹" }],
+    testGroups: [
+      { name: { zh: "基礎測資", en: "Basic cases" }, testCaseCount: 4, scorePercent: 40 },
+      { name: { zh: "邊界測資", en: "Boundary cases" }, testCaseCount: 6, scorePercent: 60 },
+    ],
     timeLimitMs: 1000,
     memoryLimitMb: 256,
-    starterCode: `#include <iostream>
-using namespace std;
-
-int main() {
-    long long a, b;
-    cin >> a >> b;
-
-    // Write your answer here.
-
-    return 0;
-}
-`,
+    starterCode: helloWorldStarterCode,
   },
   {
     id: "1002",
@@ -84,29 +99,21 @@ int main() {
     ],
     inputFormat: { zh: "第一行為 N 與 X。第二行包含 N 個由小到大排序的整數。", en: "The first line contains N and X. The second line contains N sorted integers." },
     outputFormat: { zh: "輸出 X 第一次出現的位置；若不存在則輸出 −1。", en: "Print the first position of X, or −1 if it does not exist." },
-    samples: [{ input: "7 4\n1 2 4 4 4 8 10", output: "2", explanation: { zh: "數值 4 第一次出現在索引 2。", en: "The first 4 appears at index 2." } }],
+    samples: [
+      { input: "7 4\n1 2 4 4 4 8 10", output: "2", explanation: { zh: "數值 4 第一次出現在索引 2。", en: "The first 4 appears at index 2." } },
+      { input: "5 6\n1 2 3 4 5", output: "-1" },
+    ],
     constraints: [
       { zh: "1 ≤ N ≤ 200,000", en: "1 ≤ N ≤ 200,000" },
       { zh: "−10⁹ ≤ 陣列元素, X ≤ 10⁹", en: "−10⁹ ≤ array values, X ≤ 10⁹" },
     ],
+    testGroups: [
+      { name: { zh: "無重複元素", en: "Unique values" }, testCaseCount: 8, scorePercent: 40 },
+      { name: { zh: "完整測資", en: "Full cases" }, testCaseCount: 12, scorePercent: 60 },
+    ],
     timeLimitMs: 1000,
     memoryLimitMb: 256,
-    starterCode: `#include <iostream>
-#include <vector>
-using namespace std;
-
-int main() {
-    int n;
-    long long target;
-    cin >> n >> target;
-    vector<long long> values(n);
-    for (long long &value : values) cin >> value;
-
-    // Find the first position of target.
-
-    return 0;
-}
-`,
+    starterCode: helloWorldStarterCode,
   },
   {
     id: "1003",
@@ -121,27 +128,18 @@ int main() {
     ],
     inputFormat: { zh: "第一行為 H 與 W，接下來 H 行為迷宮內容。", en: "The first line contains H and W, followed by H rows of the maze." },
     outputFormat: { zh: "輸出最少步數；如果無法到達，輸出 −1。", en: "Print the minimum steps, or −1 if the exit is unreachable." },
-    samples: [{ input: "3 4\nS...\n.##.\n...E", output: "5" }],
+    samples: [
+      { input: "3 4\nS...\n.##.\n...E", output: "5" },
+      { input: "2 2\nS#\n.E", output: "2" },
+    ],
     constraints: [{ zh: "1 ≤ H, W ≤ 1,000", en: "1 ≤ H, W ≤ 1,000" }],
+    testGroups: [
+      { name: { zh: "小型迷宮", en: "Small mazes" }, testCaseCount: 10, scorePercent: 30 },
+      { name: { zh: "大型迷宮", en: "Large mazes" }, testCaseCount: 20, scorePercent: 70 },
+    ],
     timeLimitMs: 2000,
     memoryLimitMb: 256,
-    starterCode: `#include <iostream>
-#include <queue>
-#include <string>
-#include <vector>
-using namespace std;
-
-int main() {
-    int h, w;
-    cin >> h >> w;
-    vector<string> maze(h);
-    for (string &row : maze) cin >> row;
-
-    // Use BFS to find the shortest path.
-
-    return 0;
-}
-`,
+    starterCode: helloWorldStarterCode,
   },
   {
     id: "1004",
@@ -155,27 +153,20 @@ int main() {
     ],
     inputFormat: { zh: "第一行為 N。第二行包含 N 個整數。", en: "The first line contains N. The second line contains N integers." },
     outputFormat: { zh: "輸出最大連續區間和。", en: "Print the maximum contiguous sum." },
-    samples: [{ input: "8\n-2 -3 4 -1 -2 1 5 -3", output: "7" }],
+    samples: [
+      { input: "8\n-2 -3 4 -1 -2 1 5 -3", output: "7" },
+      { input: "3\n-5 -1 -8", output: "-1" },
+    ],
     constraints: [
       { zh: "1 ≤ N ≤ 1,000,000", en: "1 ≤ N ≤ 1,000,000" },
       { zh: "−10⁹ ≤ Ai ≤ 10⁹", en: "−10⁹ ≤ Ai ≤ 10⁹" },
     ],
+    testGroups: [
+      { name: { zh: "小範圍", en: "Small range" }, testCaseCount: 10, scorePercent: 30 },
+      { name: { zh: "完整範圍", en: "Full range" }, testCaseCount: 20, scorePercent: 70 },
+    ],
     timeLimitMs: 1000,
     memoryLimitMb: 256,
-    starterCode: `#include <iostream>
-#include <vector>
-using namespace std;
-
-int main() {
-    int n;
-    cin >> n;
-    vector<long long> values(n);
-    for (long long &value : values) cin >> value;
-
-    // Find the maximum contiguous sum.
-
-    return 0;
-}
-`,
+    starterCode: helloWorldStarterCode,
   },
 ];

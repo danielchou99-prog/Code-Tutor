@@ -130,7 +130,6 @@ function ProblemRow({ problem, textKey, zh, onOpen }: { problem: Problem; textKe
       <span className="font-mono text-[10px] text-slate-500">#{problem.id}</span>
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-slate-200 group-hover:text-white">{problem.title[textKey]}</span>
-        <span className="mt-1.5 block text-[11px] leading-5 text-slate-500">{problem.summary[textKey]}</span>
         <span className="mt-2 flex flex-wrap gap-1.5 md:hidden">{problem.tags.map((tag) => <span key={tag} className="text-[9px] text-cyan-300/60">#{tagLabels[tag][textKey]}</span>)}</span>
       </span>
       <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>

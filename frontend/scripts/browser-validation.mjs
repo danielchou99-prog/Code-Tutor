@@ -515,6 +515,51 @@ if (action === "problems" || action === "english-problems" || action === "proble
     );
     if (!problemOpened) throw new Error("Problem detail button was not found.");
     await sleep(2_000);
+    const languageMenuOpened = await evaluate(
+      client,
+      `(() => {
+        const trigger = document.querySelector('button[aria-label="選擇程式語言"]');
+        if (!trigger) return false;
+        trigger.click();
+        return true;
+      })()`,
+    );
+    if (!languageMenuOpened) throw new Error("Programming language menu was not available.");
+    await sleep(200);
+    const languageChanged = await evaluate(
+      client,
+      `(() => {
+        const python = [...document.querySelectorAll('[role="menuitemradio"]')].find(
+          (item) => item.textContent.includes("Python 3"),
+        );
+        if (!python) return false;
+        python.click();
+        return true;
+      })()`,
+    );
+    if (!languageChanged) {
+      const visibleText = await evaluate(client, `document.body.innerText.slice(-1400)`);
+      throw new Error(`Python language option was not available. Visible text: ${visibleText}`);
+    }
+    const inputOpened = await evaluate(
+      client,
+      `(() => {
+        const button = [...document.querySelectorAll("button")].find(
+          (candidate) => candidate.textContent.trim() === "輸入",
+        );
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`,
+    );
+    if (!inputOpened) throw new Error("Problem console input tab was not found.");
+    await evaluate(
+      client,
+      `([...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.trim() === "Submit",
+      ))?.click()`,
+    );
+    await sleep(500);
     actionSucceeded = await evaluate(
       client,
       `(() => {
@@ -522,8 +567,12 @@ if (action === "problems" || action === "english-problems" || action === "proble
         const upperText = text.toUpperCase();
         return text.includes("題目描述") && text.includes("輸入格式") &&
           text.includes("輸出格式") && upperText.includes("TIME LIMIT") &&
-          upperText.includes("MEMORY LIMIT") && text.includes("main.cpp") &&
-          text.includes("Result") && text.includes("Submit") &&
+          upperText.includes("MEMORY LIMIT") && text.includes("測資與計分") &&
+          text.includes("Python 3") && !text.includes("main.cpp") &&
+          text.includes("Text") && text.includes("Interactive Console") &&
+          text.includes("範例輸入 1") && text.includes("範例輸出 1") &&
+          text.includes("範例輸入 2") && text.includes("範例輸出 2") &&
+          text.includes("Submit 版面已準備") &&
           Boolean(document.querySelector('button[aria-label="開啟 AI Tutor"]'));
       })()`,
     );
@@ -554,6 +603,7 @@ if (action === "problems" || action === "english-problems" || action === "proble
       : `document.documentElement.lang === "zh-Hant" &&
           document.body.innerText.includes("找到 1 題") &&
           document.body.innerText.includes("A + B") &&
+          !document.body.innerText.includes("讀入兩個整數並輸出它們的總和") &&
           !document.body.innerText.includes("迷宮最短路徑")`,
   );
   }
@@ -607,6 +657,15 @@ const result = await evaluate(
         outputText.includes("尋找適合你的練習題") &&
         outputText.includes("#APCS中高級") &&
         outputText.includes("#二分搜"),
+      problemEditorLayout: (() => {
+        const trigger = document.querySelector('button[aria-label="選擇程式語言"]');
+        const section = trigger?.closest("section");
+        if (!section) return null;
+        return [...section.children].map((element) => {
+          const bounds = element.getBoundingClientRect();
+          return { tag: element.tagName, top: bounds.top, height: bounds.height, bottom: bounds.bottom };
+        });
+      })(),
       visibleTextTail: outputText.slice(-800),
     };
   })()`,
