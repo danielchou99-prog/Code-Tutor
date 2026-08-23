@@ -25,7 +25,7 @@ function messageId(): string {
     : `${Date.now()}-${Math.random()}`;
 }
 
-export function AiTutorPanel({ code, errorOutput, programmingLanguage }: { code: string; errorOutput: string; programmingLanguage: ProgrammingLanguage }) {
+export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }: { code: string; errorOutput: string; onClose?: () => void; programmingLanguage: ProgrammingLanguage }) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const zh = language === "zh-Hant";
@@ -125,9 +125,22 @@ export function AiTutorPanel({ code, errorOutput, programmingLanguage }: { code:
           <span className="text-xs font-bold text-violet-300">AI</span>
           <h2 className="text-xs font-semibold text-slate-200">{t("aiTutor")}</h2>
         </div>
-        <span className="rounded-full border border-violet-400/15 bg-violet-400/5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-violet-300">
-          {t("coachMode")}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-violet-400/15 bg-violet-400/5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-violet-300">
+            {t("coachMode")}
+          </span>
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={zh ? "關閉 AI Tutor" : "Close AI Tutor"}
+              title={zh ? "關閉 AI Tutor" : "Close AI Tutor"}
+              className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/20 bg-slate-800/80 text-xl font-medium leading-none text-white shadow-sm transition-colors hover:border-rose-300/40 hover:bg-rose-300/15 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4" aria-live="polite">

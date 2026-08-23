@@ -247,8 +247,7 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
 
       {aiOpen ? (
         <div className="fixed bottom-5 right-5 z-50 h-[min(600px,calc(100dvh-7rem))] w-[min(380px,calc(100vw-2.5rem))] overflow-hidden rounded-2xl border border-violet-300/20 bg-[#0b1018] shadow-2xl shadow-black/60">
-          <button type="button" onClick={() => setAiOpen(false)} aria-label={zh ? "關閉 AI Tutor" : "Close AI Tutor"} className="absolute right-3 top-2.5 z-10 grid size-7 place-items-center rounded-lg text-slate-500 hover:bg-white/5 hover:text-white">×</button>
-          <AiTutorPanel code={code} errorOutput={aiErrorOutput} programmingLanguage={programmingLanguage} />
+          <AiTutorPanel code={code} errorOutput={aiErrorOutput} onClose={() => setAiOpen(false)} programmingLanguage={programmingLanguage} />
         </div>
       ) : (
         <button type="button" onClick={() => setAiOpen(true)} aria-label={zh ? "開啟 AI Tutor" : "Open AI Tutor"} className="fixed bottom-6 right-6 z-40 grid size-14 place-items-center rounded-full border border-violet-300/25 bg-violet-400 text-sm font-black text-slate-950 shadow-lg shadow-violet-950/40 transition-transform hover:scale-105">AI</button>

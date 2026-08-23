@@ -49,6 +49,8 @@
   - 簡易說明：C++ 與 Python 預設程式都只輸出 Hello, World!；每組範例都分別顯示相同編號的輸入與輸出。
 - [x] 16. 重新執行自動與瀏覽器驗收。
   - 簡易說明：確認兩種程式語言、兩種輸入模式、Run／Submit 分離及響應式版面正常。
+- [x] 17. 修正 AI Tutor 關閉按鈕。
+  - 簡易說明：將關閉按鈕從「引導模式」上方移到標題列獨立位置，增加尺寸、邊框與 hover／focus 狀態，避免誤觸並提升辨識度。
 
 ## 驗收方式
 
@@ -87,3 +89,4 @@
 - Run 的 Output／Input、Text／Interactive Console 均移至 Editor 下方；右側只會在按下 Submit 後改變。
 - 每題的 C++ 與 Python 預設程式均輸出 `Hello, World!`；Compiler API 實測兩種語言皆回傳 `accepted`。
 - 每題至少有兩組示範，輸入與輸出會以相同編號配對顯示。
+- AI Tutor 關閉按鈕已移入標題列獨立區域，尺寸提升為 36 × 36，並加入明顯邊框、底色、hover、鍵盤 focus、輔助文字與 tooltip；瀏覽器會自動檢查它不再和「引導模式」重疊。
