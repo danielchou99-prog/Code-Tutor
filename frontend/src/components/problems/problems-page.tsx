@@ -152,18 +152,20 @@ function ProblemCard({ problem, textKey, zh, onOpen }: { problem: Problem; textK
         type="button"
         onClick={onOpen}
         aria-label={`${zh ? "開啟題目" : "Open problem"} #${problem.id} ${problem.title[textKey]}`}
-        className="group flex min-h-44 w-full flex-col rounded-2xl border border-white/9 bg-[#0d131d] p-4 text-left transition-[border-color,background-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-[#101925] hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
+        className="group aspect-square w-full rounded-2xl border border-white/9 bg-[#0d131d] p-4 text-left shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition-[border-color,background-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-[#101925] hover:shadow-[0_16px_34px_rgba(0,0,0,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
       >
-        <span className="flex w-full items-start justify-between gap-2">
-          <span className="font-mono text-[10px] text-slate-500">#{problem.id}</span>
-          <span className={`flex shrink-0 items-center gap-1.5 text-[9px] font-semibold ${problem.status === "solved" ? "text-emerald-300" : problem.status === "attempted" ? "text-amber-200" : "text-slate-600"}`}>
-            <span aria-hidden="true">{problem.status === "solved" ? "✓" : problem.status === "attempted" ? "◐" : "○"}</span>{statusLabel}
+        <span className="flex h-full min-h-0 w-full flex-col">
+          <span className="flex w-full items-start justify-between gap-2">
+            <span className="font-mono text-[10px] text-slate-500">#{problem.id}</span>
+            <span className={`flex shrink-0 items-center gap-1.5 text-[9px] font-semibold ${problem.status === "solved" ? "text-emerald-300" : problem.status === "attempted" ? "text-amber-200" : "text-slate-600"}`}>
+              <span aria-hidden="true">{problem.status === "solved" ? "✓" : problem.status === "attempted" ? "◐" : "○"}</span>{statusLabel}
+            </span>
           </span>
-        </span>
-        <strong className="mt-5 line-clamp-3 text-sm leading-5 text-slate-100 group-hover:text-white">{problem.title[textKey]}</strong>
-        <span className="mt-auto flex w-full items-end justify-between gap-2 pt-5">
-          <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
-          <span aria-hidden="true" className="text-xs text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-300">→</span>
+          <strong className="mt-5 line-clamp-3 text-sm leading-5 text-slate-100 group-hover:text-white">{problem.title[textKey]}</strong>
+          <span className="mt-auto flex w-full items-end justify-between gap-2 pt-5">
+            <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
+            <span aria-hidden="true" className="text-xs text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-300">→</span>
+          </span>
         </span>
       </button>
       <div className="mt-2 flex min-h-5 flex-wrap justify-center gap-x-2 gap-y-1 px-1 text-center">
