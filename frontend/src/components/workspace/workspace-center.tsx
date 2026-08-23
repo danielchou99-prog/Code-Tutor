@@ -41,7 +41,7 @@ export function WorkspaceCenter({
   const [stdin, setStdin] = useState(initialInput);
   const [result, setResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [activeTab, setActiveTab] = useState<"output" | "input">("output");
+  const [activeTab, setActiveTab] = useState<"output" | "input">("input");
   const [inputMode, setInputMode] = useState<"batch" | "interactive">("batch");
   const [interactiveOutput, setInteractiveOutput] = useState<InteractiveOutput[]>([]);
   const [interactiveStatus, setInteractiveStatus] = useState<InteractiveStatus>("idle");

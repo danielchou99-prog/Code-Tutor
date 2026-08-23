@@ -45,6 +45,7 @@ export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }
     : t("tutorGreeting");
 
   useEffect(() => {
+    if (messages.length === 0) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Code Tutor Problem Grid Mockup</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #090d14; color: #d9e4f2; font-family: Inter, "Noto Sans TC", sans-serif; }
+    header { height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 28px; border-bottom: 1px solid rgba(255,255,255,.09); background: #0d121c; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #fff; }
+    .brand-dot { width: 8px; height: 8px; border-radius: 50%; background: #67e8f9; box-shadow: 0 0 12px rgba(103,232,249,.7); }
+    nav { display: flex; height: 64px; gap: 10px; align-items: center; }
+    nav span { height: 64px; display: grid; place-items: center; padding: 0 14px; font-size: 12px; color: #72829a; }
+    nav .active { color: #67e8f9; border-bottom: 1px solid #67e8f9; }
+    .language { justify-self: end; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 10px 14px; font-size: 11px; color: #9cadc4; }
+    main { max-width: 1320px; margin: 0 auto; padding: 42px 38px 70px; }
+    .proposal { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(196,181,253,.2); border-radius: 999px; background: rgba(196,181,253,.06); padding: 6px 10px; color: #c4b5fd; font-size: 10px; letter-spacing: .08em; }
+    h1 { margin: 16px 0 8px; color: white; font-size: 30px; }
+    .intro { margin: 0; color: #64748b; font-size: 13px; }
+    .explanation { margin-top: 22px; border-left: 2px solid #22d3ee; padding: 8px 14px; color: #8da1ba; font-size: 11px; line-height: 1.8; background: linear-gradient(90deg, rgba(34,211,238,.045), transparent); }
+    .toolbar { margin-top: 28px; display: grid; grid-template-columns: 1fr 180px 180px; gap: 12px; padding: 18px; border: 1px solid rgba(255,255,255,.09); border-radius: 18px; background: #0d131d; }
+    .control { height: 44px; display: flex; align-items: center; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: #090e16; padding: 0 15px; color: #53657e; font-size: 11px; }
+    .section-title { margin: 34px 0 8px; display: flex; justify-content: space-between; align-items: end; }
+    .section-title h2 { margin: 0; color: #fff; font-size: 15px; }
+    .section-title span { color: #40516a; font-size: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+    .problem { min-width: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #0c121b; padding: 18px 16px 15px; transition: .2s; }
+    .problem.selected { border-color: rgba(103,232,249,.34); background: #0d1721; box-shadow: 0 0 0 1px rgba(103,232,249,.05), 0 14px 30px rgba(0,0,0,.18); }
+    .folder { position: relative; height: 112px; margin-top: 9px; border: 1px solid rgba(103,232,249,.18); border-radius: 10px 12px 12px 12px; background: linear-gradient(145deg, #132332, #0d1823); overflow: visible; }
+    .folder::before { content: ""; position: absolute; left: -1px; top: -15px; width: 72px; height: 24px; border: 1px solid rgba(103,232,249,.18); border-bottom: 0; border-radius: 9px 13px 0 0; background: #132332; }
+    .folder-top { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 17px 15px 14px; }
+    .meta { display: flex; align-items: center; justify-content: space-between; }
+    .id { font: 10px Consolas, monospace; color: #52647b; }
+    .status { font-size: 9px; color: #6ee7b7; }
+    .title { color: #f5f8fc; font-size: 14px; font-weight: 700; line-height: 1.35; }
+    .difficulty { width: max-content; border-radius: 999px; padding: 3px 7px; font-size: 8px; font-weight: 700; background: rgba(52,211,153,.08); color: #6ee7b7; }
+    .difficulty.medium { background: rgba(251,191,36,.08); color: #fde68a; }
+    .difficulty.hard { background: rgba(251,113,133,.08); color: #fda4af; }
+    .file-label { min-height: 37px; margin-top: 12px; text-align: center; color: #8ea3bb; font-size: 10px; line-height: 1.65; }
+    .file-label strong { color: #67e8f9; font-weight: 500; }
+    .hint { margin-top: 22px; display: flex; align-items: center; gap: 8px; color: #51627a; font-size: 10px; }
+    .hint i { width: 6px; height: 6px; border-radius: 50%; background: #67e8f9; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="brand-dot"></span>Code Tutor</div>
+    <nav><span>首頁</span><span>檔案</span><span class="active">題目</span><span>測驗</span><span>設定</span></nav>
+    <div class="language">語言　繁體中文⌄</div>
+  </header>
+  <main>
+    <span class="proposal">設計提案 · 尚未套用正式頁面</span>
+    <h1>用資料夾方式瀏覽題目</h1>
+    <p class="intro">保留 Code Tutor 的深色工程風格，把原本的一列一列改成更容易掃視與點擊的格狀卡片。</p>
+    <div class="explanation">本提案暫定：每個資料夾代表一道題目；題目名稱放在資料夾內，資料夾下方原本像「檔名」的位置顯示這道題目的標籤。整張卡片都可以點擊。</div>
+    <div class="toolbar"><div class="control">⌕　搜尋題號、名稱或 #標籤…</div><div class="control">所有難度　⌄</div><div class="control">所有狀態　⌄</div></div>
+    <div class="section-title"><h2>題目資料夾</h2><span>找到 4 題</span></div>
+    <section class="grid">
+      <article class="problem selected"><div class="folder"><div class="folder-top"><div class="meta"><span class="id">#1001</span><span class="status">✓ 已通過</span></div><div class="title">A + B</div><span class="difficulty">簡單</span></div></div><div class="file-label"><strong>#數學</strong>　<strong>#實作</strong></div></article>
+      <article class="problem"><div class="folder"><div class="folder-top"><div class="meta"><span class="id">#1002</span><span class="status" style="color:#fde68a">◐ 嘗試過</span></div><div class="title">在排序陣列中<br>尋找目標</div><span class="difficulty medium">中等</span></div></div><div class="file-label"><strong>#二分搜尋</strong>　<strong>#陣列</strong></div></article>
+      <article class="problem"><div class="folder"><div class="folder-top"><div class="meta"><span class="id">#1003</span><span class="status" style="color:#52647b">○ 未作答</span></div><div class="title">迷宮最短路徑</div><span class="difficulty medium">中等</span></div></div><div class="file-label"><strong>#BFS</strong>　<strong>#圖論</strong></div></article>
+      <article class="problem"><div class="folder"><div class="folder-top"><div class="meta"><span class="id">#1004</span><span class="status" style="color:#52647b">○ 未作答</span></div><div class="title">最大連續和</div><span class="difficulty hard">困難</span></div></div><div class="file-label"><strong>#動態規劃</strong>　<strong>#陣列</strong></div></article>
+    </section>
+    <div class="hint"><i></i>核可後才會將這個格狀版面套用到正式 Problems 頁面。</div>
+  </main>
+</body>
+</html>

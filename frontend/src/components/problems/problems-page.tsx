@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useLanguage } from "@/lib/language-context";
 
@@ -9,8 +9,9 @@ import { ProblemSolverPage } from "./problem-solver-page";
 
 const allTags = Object.keys(tagLabels) as ProblemTag[];
 const hashtagPattern = /#[^\s#]+/gu;
+const selectedProblemStorageKey = "code-tutor:selected-problem";
 
-export function ProblemsPage() {
+export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: number }) {
   const { language } = useLanguage();
   const zh = language === "zh-Hant";
   const textKey = zh ? "zh" : "en";
@@ -19,6 +20,23 @@ export function ProblemsPage() {
   const [difficulty, setDifficulty] = useState<ProblemDifficulty | "all">("all");
   const [status, setStatus] = useState<ProblemStatus | "all">("all");
   const [selectedTags, setSelectedTags] = useState<ProblemTag[]>([]);
+  const previousResetRevision = useRef(resetListRevision);
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      const storedProblemId = window.localStorage.getItem(selectedProblemStorageKey);
+      const storedProblem = problems.find((problem) => problem.id === storedProblemId);
+      if (storedProblem) setSelectedProblem(storedProblem);
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, []);
+
+  useEffect(() => {
+    if (previousResetRevision.current === resetListRevision) return;
+    previousResetRevision.current = resetListRevision;
+    window.localStorage.removeItem(selectedProblemStorageKey);
+    setSelectedProblem(null);
+  }, [resetListRevision]);
 
   const queryTags = useMemo(() => {
     return (query.match(hashtagPattern) ?? []).map((token) => {
@@ -49,7 +67,10 @@ export function ProblemsPage() {
   }, [difficulty, language, query, queryTags, selectedTags, status, textKey]);
 
   if (selectedProblem) {
-    return <ProblemSolverPage problem={selectedProblem} onBack={() => setSelectedProblem(null)} />;
+    return <ProblemSolverPage problem={selectedProblem} onBack={() => {
+      window.localStorage.removeItem(selectedProblemStorageKey);
+      setSelectedProblem(null);
+    }} />;
   }
 
   const clearFilters = () => {
@@ -108,7 +129,10 @@ export function ProblemsPage() {
             <div className="hidden grid-cols-[80px_minmax(0,1fr)_140px_130px_72px] gap-4 border-b border-white/8 bg-white/[0.018] px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-600 md:grid">
               <span>ID</span><span>{zh ? "題目" : "Title"}</span><span>{zh ? "難度" : "Difficulty"}</span><span>{zh ? "狀態" : "Status"}</span><span />
             </div>
-            {filteredProblems.map((problem) => <ProblemRow key={problem.id} problem={problem} textKey={textKey} zh={zh} onOpen={() => setSelectedProblem(problem)} />)}
+            {filteredProblems.map((problem) => <ProblemRow key={problem.id} problem={problem} textKey={textKey} zh={zh} onOpen={() => {
+              window.localStorage.setItem(selectedProblemStorageKey, problem.id);
+              setSelectedProblem(problem);
+            }} />)}
           </div>
         ) : (
           <div className="mt-3 rounded-2xl border border-dashed border-white/10 py-16 text-center">

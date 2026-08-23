@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-detail|problem-ai|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-detail|problem-ai|problem-refresh|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -486,7 +486,7 @@ if (action === "interactive") {
     await sleep(500);
   }
 }
-if (action === "problems" || action === "english-problems" || action === "problem-detail" || action === "problem-ai") {
+if (action === "problems" || action === "english-problems" || action === "problem-detail" || action === "problem-ai" || action === "problem-refresh") {
   const englishProblems = action === "english-problems";
   const clicked = await evaluate(
     client,
@@ -501,7 +501,7 @@ if (action === "problems" || action === "english-problems" || action === "proble
   );
   if (!clicked) throw new Error("Problems navigation button was not found.");
   await sleep(1_000);
-  if (action === "problem-detail" || action === "problem-ai") {
+  if (action === "problem-detail" || action === "problem-ai" || action === "problem-refresh") {
     const problemOpened = await evaluate(
       client,
       `(() => {
@@ -515,7 +515,34 @@ if (action === "problems" || action === "english-problems" || action === "proble
     );
     if (!problemOpened) throw new Error("Problem detail button was not found.");
     await sleep(2_000);
-    if (action === "problem-ai") {
+    if (action === "problem-refresh") {
+      const reloaded = client.waitFor("Page.loadEventFired");
+      await client.send("Page.reload", { ignoreCache: true });
+      await reloaded;
+      await sleep(1_500);
+      const detailRestored = await evaluate(
+        client,
+        `document.body.innerText.includes("題目描述") && document.body.innerText.includes("A + B")`,
+      );
+      if (!detailRestored) throw new Error("Problem detail was not restored after refresh.");
+      const problemsClicked = await evaluate(
+        client,
+        `(() => {
+          const button = [...document.querySelectorAll("button")].find(
+            (candidate) => candidate.textContent.trim() === "題目",
+          );
+          if (!button) return false;
+          button.click();
+          return true;
+        })()`,
+      );
+      if (!problemsClicked) throw new Error("Problems navigation button was not found on detail view.");
+      await sleep(500);
+      actionSucceeded = await evaluate(
+        client,
+        `document.body.innerText.includes("題目列表") && !document.body.innerText.includes("題目描述")`,
+      );
+    } else if (action === "problem-ai") {
       const aiOpened = await evaluate(
         client,
         `(() => {
@@ -538,10 +565,17 @@ if (action === "problems" || action === "english-problems" || action === "proble
           const closeBounds = close.getBoundingClientRect();
           const coachBounds = coach.getBoundingClientRect();
           const overlaps = !(closeBounds.right <= coachBounds.left || closeBounds.left >= coachBounds.right || closeBounds.bottom <= coachBounds.top || closeBounds.top >= coachBounds.bottom);
-          return closeBounds.width >= 36 && closeBounds.height >= 36 && !overlaps;
+          const panel = close.closest("aside")?.parentElement;
+          const panelBounds = panel?.getBoundingClientRect();
+          return closeBounds.width >= 36 && closeBounds.height >= 36 && !overlaps && Boolean(panelBounds && panelBounds.top >= 112);
         })()`,
       );
     } else {
+    const defaultInputVisible = await evaluate(
+      client,
+      `document.body.innerText.includes("Text") && document.body.innerText.includes("Interactive Console") && Boolean(document.querySelector('textarea[aria-label="標準輸入"]'))`,
+    );
+    if (!defaultInputVisible) throw new Error("Problem compiler did not open on Input by default.");
     const languageMenuOpened = await evaluate(
       client,
       `(() => {
@@ -568,18 +602,6 @@ if (action === "problems" || action === "english-problems" || action === "proble
       const visibleText = await evaluate(client, `document.body.innerText.slice(-1400)`);
       throw new Error(`Python language option was not available. Visible text: ${visibleText}`);
     }
-    const inputOpened = await evaluate(
-      client,
-      `(() => {
-        const button = [...document.querySelectorAll("button")].find(
-          (candidate) => candidate.textContent.trim() === "輸入",
-        );
-        if (!button) return false;
-        button.click();
-        return true;
-      })()`,
-    );
-    if (!inputOpened) throw new Error("Problem console input tab was not found.");
     await evaluate(
       client,
       `([...document.querySelectorAll("button")].find(
@@ -599,7 +621,7 @@ if (action === "problems" || action === "english-problems" || action === "proble
           text.includes("Text") && text.includes("Interactive Console") &&
           text.includes("範例輸入 1") && text.includes("範例輸出 1") &&
           text.includes("範例輸入 2") && text.includes("範例輸出 2") &&
-          text.includes("Submit 版面已準備") &&
+          text.includes("Submit 版面已準備") && !text.includes("SUBMIT ONLY") &&
           Boolean(document.querySelector('button[aria-label="開啟 AI Tutor"]'));
       })()`,
     );

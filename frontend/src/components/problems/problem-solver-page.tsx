@@ -46,7 +46,7 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
   const [stdin, setStdin] = useState(problem.samples[0]?.input ?? "");
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [activeConsoleTab, setActiveConsoleTab] = useState<"output" | "input">("output");
+  const [activeConsoleTab, setActiveConsoleTab] = useState<"output" | "input">("input");
   const [inputMode, setInputMode] = useState<"batch" | "interactive">("batch");
   const [interactiveOutput, setInteractiveOutput] = useState<InteractiveOutput[]>([]);
   const [interactiveStatus, setInteractiveStatus] = useState<InteractiveStatus>("idle");
@@ -246,7 +246,7 @@ export function ProblemSolverPage({ problem, onBack }: { problem: Problem; onBac
       </div>
 
       {aiOpen ? (
-        <div className="fixed bottom-5 right-5 z-50 h-[min(600px,calc(100dvh-7rem))] w-[min(380px,calc(100vw-2.5rem))] overflow-hidden rounded-2xl border border-violet-300/20 bg-[#0b1018] shadow-2xl shadow-black/60">
+        <div className="fixed bottom-5 right-5 z-50 h-[min(600px,calc(100dvh-8.75rem))] w-[min(380px,calc(100vw-2.5rem))] overflow-hidden rounded-2xl border border-violet-300/20 bg-[#0b1018] shadow-2xl shadow-black/60">
           <AiTutorPanel code={code} errorOutput={aiErrorOutput} onClose={() => setAiOpen(false)} programmingLanguage={programmingLanguage} />
         </div>
       ) : (
@@ -276,7 +276,7 @@ function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey:
       <StatementSection title={zh ? "限制" : "Constraints"}><ul className="space-y-1 font-mono text-[11px]">{problem.constraints.map((constraint) => <li key={constraint[textKey]}>• {constraint[textKey]}</li>)}</ul><div className="mt-4 grid grid-cols-2 gap-2"><LimitCard label="Time Limit" value={`${problem.timeLimitMs / 1000} sec`} /><LimitCard label="Memory Limit" value={`${problem.memoryLimitMb} MB`} /></div></StatementSection>
       <StatementSection title={zh ? "測資與計分" : "Tests and scoring"}>
         <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2"><span>{zh ? "正式測資總數" : "Total judge cases"}</span><strong className="font-mono text-cyan-200">{totalCases}</strong></div>
-        <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={group.name[textKey]} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-lg border border-white/8 px-3 py-2"><span className="text-slate-300">{zh ? `群組 ${index + 1}：` : `Group ${index + 1}: `}{group.name[textKey]}</span><span className="font-mono text-[10px] text-slate-500">{group.testCaseCount} {zh ? "筆" : "cases"}</span><strong className="font-mono text-[10px] text-cyan-200">{group.scorePercent}%</strong></div>)}</div>
+        <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={group.name[textKey]} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-3"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold text-slate-300">{zh ? `子任務 ${index + 1}` : `Subtask ${index + 1}`}</span><strong className="font-mono text-[11px] text-cyan-200">{group.scorePercent}%</strong></div><p className="mt-2 text-[11px] leading-5 text-slate-300">{group.condition[textKey]}</p><p className="mt-1 font-mono text-[9px] text-slate-600">{group.testCaseCount} {zh ? "筆測資" : "judge cases"}</p></div>)}</div>
       </StatementSection>
     </article>
   );
@@ -290,12 +290,12 @@ function JudgePanel({ view, problem, textKey, zh }: { view: JudgeView; problem: 
   const totalCases = problem.testGroups.reduce((sum, group) => sum + group.testCaseCount, 0);
   return (
     <aside className="min-h-[420px] min-w-0 overflow-y-auto bg-[#0a0f17] p-5 xl:min-h-0" aria-label={zh ? "正式評分結果" : "Judge result"}>
-      <div className="flex items-center justify-between"><h2 className="text-xs font-semibold text-white">Judge Result</h2><span className="rounded-full border border-violet-300/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-violet-300/60">Submit only</span></div>
+      <div className="flex items-center justify-between"><h2 className="text-xs font-semibold text-white">Judge Result</h2></div>
       <div className="mt-5 rounded-2xl border border-white/8 bg-white/[0.025] p-4">
         <div className={`flex items-center gap-2 text-xs font-semibold ${view === "ready" ? "text-slate-300" : "text-violet-300"}`}><span>{view === "ready" ? "○" : "◇"}</span><span>{view === "ready" ? (zh ? "等待送出" : "Ready to submit") : (zh ? "Submit 版面已準備" : "Submit UI is ready")}</span></div>
         <p className="mt-3 text-[11px] leading-5 text-slate-500">{view === "ready" ? (zh ? "按下 Submit 後，正式 Judge 狀態才會顯示在這裡。Run 不會改變此區域。" : "This panel changes only after Submit. Run results stay below the editor.") : (zh ? "正式 Judge、隱藏測資與 Submission 紀錄將在下一階段串接，目前不會產生假分數。" : "The Judge, hidden tests, and submission records will be connected next. No placeholder score is generated.")}</p>
       </div>
-      <div className="mt-5 rounded-xl border border-white/8 p-4"><div className="flex items-center justify-between"><span className="text-[10px] text-slate-500">{zh ? "正式測資" : "Judge cases"}</span><strong className="font-mono text-xs text-white">{totalCases}</strong></div><div className="mt-3 space-y-2">{problem.testGroups.map((group) => <div key={group.name[textKey]} className="flex items-center justify-between text-[10px]"><span className="text-slate-500">{group.name[textKey]} · {group.testCaseCount}</span><span className="font-mono text-cyan-200">{group.scorePercent}%</span></div>)}</div><div className="mt-3 flex items-center justify-between border-t border-white/8 pt-3 text-[10px]"><span className="font-semibold text-slate-300">{zh ? "總分" : "Total"}</span><strong className="font-mono text-white">100%</strong></div></div>
+      <div className="mt-5 rounded-xl border border-white/8 p-4"><div className="flex items-center justify-between"><span className="text-[10px] text-slate-500">{zh ? "正式測資" : "Judge cases"}</span><strong className="font-mono text-xs text-white">{totalCases}</strong></div><div className="mt-3 space-y-3">{problem.testGroups.map((group) => <div key={group.name[textKey]} className="border-t border-white/6 pt-3 first:border-0 first:pt-0"><div className="flex items-center justify-between gap-2 text-[10px]"><span className="font-medium text-slate-300">{group.scorePercent}%</span><span className="font-mono text-slate-600">{group.testCaseCount} {zh ? "筆" : "cases"}</span></div><p className="mt-1 text-[10px] leading-4 text-slate-500">{group.condition[textKey]}</p></div>)}</div><div className="mt-3 flex items-center justify-between border-t border-white/8 pt-3 text-[10px]"><span className="font-semibold text-slate-300">{zh ? "總分" : "Total"}</span><strong className="font-mono text-white">100%</strong></div></div>
       <div className="mt-7 border-t border-white/8 pt-5"><p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">Judge status</p><div className="mt-3 grid gap-2 text-[10px] text-slate-600"><span>✓ Accepted</span><span>✕ Wrong Answer</span><span>⚠ Compilation Error</span><span>⏱ Time Limit Exceeded</span></div></div>
     </aside>
   );

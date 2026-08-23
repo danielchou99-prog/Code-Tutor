@@ -15,6 +15,7 @@ export type ProblemSample = {
 
 export type ProblemTestGroup = {
   name: LocalizedText;
+  condition: LocalizedText;
   testCaseCount: number;
   scorePercent: number;
 };
@@ -79,8 +80,8 @@ export const problems: Problem[] = [
     ],
     constraints: [{ zh: "−10⁹ ≤ A, B ≤ 10⁹", en: "−10⁹ ≤ A, B ≤ 10⁹" }],
     testGroups: [
-      { name: { zh: "基礎測資", en: "Basic cases" }, testCaseCount: 4, scorePercent: 40 },
-      { name: { zh: "邊界測資", en: "Boundary cases" }, testCaseCount: 6, scorePercent: 60 },
+      { name: { zh: "小範圍", en: "Small range" }, condition: { zh: "−100 ≤ A, B ≤ 100", en: "−100 ≤ A, B ≤ 100" }, testCaseCount: 4, scorePercent: 40 },
+      { name: { zh: "完整範圍", en: "Full range" }, condition: { zh: "無額外限制", en: "No additional constraints" }, testCaseCount: 6, scorePercent: 60 },
     ],
     timeLimitMs: 1000,
     memoryLimitMb: 256,
@@ -108,8 +109,8 @@ export const problems: Problem[] = [
       { zh: "−10⁹ ≤ 陣列元素, X ≤ 10⁹", en: "−10⁹ ≤ array values, X ≤ 10⁹" },
     ],
     testGroups: [
-      { name: { zh: "無重複元素", en: "Unique values" }, testCaseCount: 8, scorePercent: 40 },
-      { name: { zh: "完整測資", en: "Full cases" }, testCaseCount: 12, scorePercent: 60 },
+      { name: { zh: "小範圍且無重複", en: "Small unique range" }, condition: { zh: "N ≤ 1,000，且陣列元素皆不重複", en: "N ≤ 1,000 and all array values are unique" }, testCaseCount: 8, scorePercent: 40 },
+      { name: { zh: "完整範圍", en: "Full range" }, condition: { zh: "無額外限制", en: "No additional constraints" }, testCaseCount: 12, scorePercent: 60 },
     ],
     timeLimitMs: 1000,
     memoryLimitMb: 256,
@@ -130,12 +131,11 @@ export const problems: Problem[] = [
     outputFormat: { zh: "輸出最少步數；如果無法到達，輸出 −1。", en: "Print the minimum steps, or −1 if the exit is unreachable." },
     samples: [
       { input: "3 4\nS...\n.##.\n...E", output: "5" },
-      { input: "2 2\nS#\n.E", output: "2" },
     ],
     constraints: [{ zh: "1 ≤ H, W ≤ 1,000", en: "1 ≤ H, W ≤ 1,000" }],
     testGroups: [
-      { name: { zh: "小型迷宮", en: "Small mazes" }, testCaseCount: 10, scorePercent: 30 },
-      { name: { zh: "大型迷宮", en: "Large mazes" }, testCaseCount: 20, scorePercent: 70 },
+      { name: { zh: "小型迷宮", en: "Small mazes" }, condition: { zh: "H, W ≤ 30", en: "H, W ≤ 30" }, testCaseCount: 10, scorePercent: 30 },
+      { name: { zh: "完整範圍", en: "Full range" }, condition: { zh: "無額外限制", en: "No additional constraints" }, testCaseCount: 20, scorePercent: 70 },
     ],
     timeLimitMs: 2000,
     memoryLimitMb: 256,
@@ -156,14 +156,15 @@ export const problems: Problem[] = [
     samples: [
       { input: "8\n-2 -3 4 -1 -2 1 5 -3", output: "7" },
       { input: "3\n-5 -1 -8", output: "-1" },
+      { input: "5\n1 2 3 4 5", output: "15" },
     ],
     constraints: [
       { zh: "1 ≤ N ≤ 1,000,000", en: "1 ≤ N ≤ 1,000,000" },
       { zh: "−10⁹ ≤ Ai ≤ 10⁹", en: "−10⁹ ≤ Ai ≤ 10⁹" },
     ],
     testGroups: [
-      { name: { zh: "小範圍", en: "Small range" }, testCaseCount: 10, scorePercent: 30 },
-      { name: { zh: "完整範圍", en: "Full range" }, testCaseCount: 20, scorePercent: 70 },
+      { name: { zh: "小範圍", en: "Small range" }, condition: { zh: "N ≤ 5,000", en: "N ≤ 5,000" }, testCaseCount: 10, scorePercent: 30 },
+      { name: { zh: "完整範圍", en: "Full range" }, condition: { zh: "無額外限制", en: "No additional constraints" }, testCaseCount: 20, scorePercent: 70 },
     ],
     timeLimitMs: 1000,
     memoryLimitMb: 256,

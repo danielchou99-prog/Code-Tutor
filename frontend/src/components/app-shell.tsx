@@ -18,6 +18,8 @@ type OpenedProject = FileProject & { ownerId: string };
 type PendingAction = () => void | Promise<void>;
 
 const openProjectStoragePrefix = "code-tutor:open-project:";
+const activeSectionStorageKey = "code-tutor:active-section";
+const selectedProblemStorageKey = "code-tutor:selected-problem";
 
 function AppContent() {
   const { language, t } = useLanguage();
@@ -28,6 +30,17 @@ function AppContent() {
   const [openProject, setOpenProject] = useState<OpenedProject | null>(null);
   const [hasUnsavedCode, setHasUnsavedCode] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [problemsListRevision, setProblemsListRevision] = useState(0);
+
+  useEffect(() => {
+    const restoreTimer = window.setTimeout(() => {
+      const storedSection = window.localStorage.getItem(activeSectionStorageKey);
+      if (["home", "files", "problems", "quiz", "settings"].includes(storedSection ?? "")) {
+        setActiveSection(storedSection as PrimarySection);
+      }
+    }, 0);
+    return () => window.clearTimeout(restoreTimer);
+  }, []);
 
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
@@ -84,7 +97,12 @@ function AppContent() {
 
   const selectSection = (section: PrimarySection) => {
     protectUnsavedCode(() => {
+      if (section === "problems") {
+        window.localStorage.removeItem(selectedProblemStorageKey);
+        setProblemsListRevision((current) => current + 1);
+      }
       setActiveSection(section);
+      window.localStorage.setItem(activeSectionStorageKey, section);
       if (openProject) closeProject();
     });
   };
@@ -102,7 +120,7 @@ function AppContent() {
   } else if (activeSection === "files") {
     content = <FileHome key={user?.id ?? "guest"} onOpenProject={openUserProject} />;
   } else if (activeSection === "problems") {
-    content = <ProblemsPage />;
+    content = <ProblemsPage resetListRevision={problemsListRevision} />;
   } else if (activeSection === "home") {
     content = <HomePage onSelect={selectSection} />;
   } else if (activeSection === "settings") {
