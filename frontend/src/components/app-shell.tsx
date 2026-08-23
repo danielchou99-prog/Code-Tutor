@@ -97,8 +97,8 @@ function AppContent() {
 
   const selectSection = (section: PrimarySection) => {
     protectUnsavedCode(() => {
+      window.localStorage.removeItem(selectedProblemStorageKey);
       if (section === "problems") {
-        window.localStorage.removeItem(selectedProblemStorageKey);
         setProblemsListRevision((current) => current + 1);
       }
       setActiveSection(section);

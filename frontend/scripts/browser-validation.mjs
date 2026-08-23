@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-detail|problem-ai|problem-refresh|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-grid|problem-navigation|problem-detail|problem-ai|problem-refresh|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -486,7 +486,7 @@ if (action === "interactive") {
     await sleep(500);
   }
 }
-if (action === "problems" || action === "english-problems" || action === "problem-detail" || action === "problem-ai" || action === "problem-refresh") {
+if (action === "problems" || action === "problem-grid" || action === "problem-navigation" || action === "english-problems" || action === "problem-detail" || action === "problem-ai" || action === "problem-refresh") {
   const englishProblems = action === "english-problems";
   const clicked = await evaluate(
     client,
@@ -501,7 +501,7 @@ if (action === "problems" || action === "english-problems" || action === "proble
   );
   if (!clicked) throw new Error("Problems navigation button was not found.");
   await sleep(1_000);
-  if (action === "problem-detail" || action === "problem-ai" || action === "problem-refresh") {
+  if (action === "problem-detail" || action === "problem-ai" || action === "problem-refresh" || action === "problem-navigation") {
     const problemOpened = await evaluate(
       client,
       `(() => {
@@ -515,7 +515,65 @@ if (action === "problems" || action === "english-problems" || action === "proble
     );
     if (!problemOpened) throw new Error("Problem detail button was not found.");
     await sleep(2_000);
-    if (action === "problem-refresh") {
+    if (action === "problem-navigation") {
+      const destinations = ["首頁", "檔案", "設定"];
+      let navigationPassed = true;
+      for (const destination of destinations) {
+        const destinationClicked = await evaluate(
+          client,
+          `(() => {
+            const button = [...document.querySelectorAll("button")].find(
+              (candidate) => candidate.textContent.trim() === ${JSON.stringify(destination)},
+            );
+            if (!button) return false;
+            button.click();
+            return true;
+          })()`,
+        );
+        if (!destinationClicked) {
+          navigationPassed = false;
+          break;
+        }
+        await sleep(400);
+        const arrived = await evaluate(
+          client,
+          `(() => {
+            const active = [...document.querySelectorAll('button[aria-current="page"]')].some(
+              (button) => button.textContent.trim() === ${JSON.stringify(destination)},
+            );
+            return active && !document.body.innerText.includes("題目描述");
+          })()`,
+        );
+        if (!arrived) {
+          navigationPassed = false;
+          break;
+        }
+        if (destination !== destinations.at(-1)) {
+          await evaluate(
+            client,
+            `([...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "題目"))?.click()`,
+          );
+          await sleep(400);
+          const reopened = await evaluate(
+            client,
+            `(() => {
+              const button = [...document.querySelectorAll("button")].find(
+                (candidate) => candidate.textContent.includes("A + B") && candidate.textContent.includes("#1001"),
+              );
+              if (!button) return false;
+              button.click();
+              return true;
+            })()`,
+          );
+          if (!reopened) {
+            navigationPassed = false;
+            break;
+          }
+          await sleep(400);
+        }
+      }
+      actionSucceeded = navigationPassed;
+    } else if (action === "problem-refresh") {
       const reloaded = client.waitFor("Page.loadEventFired");
       await client.send("Page.reload", { ignoreCache: true });
       await reloaded;
@@ -626,6 +684,18 @@ if (action === "problems" || action === "english-problems" || action === "proble
       })()`,
     );
     }
+  } else if (action === "problem-grid") {
+  actionSucceeded = await evaluate(
+    client,
+    `(() => {
+      const cards = [...document.querySelectorAll('button[aria-label^="開啟題目"]')];
+      const grid = cards[0]?.parentElement?.parentElement;
+      if (!grid || cards.length !== 4) return false;
+      const columnCount = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
+      const firstTop = cards[0].getBoundingClientRect().top;
+      return columnCount >= 5 && cards.every((card) => Math.abs(card.getBoundingClientRect().top - firstTop) < 2);
+    })()`,
+  );
   } else {
   const tagsEntered = await evaluate(
     client,

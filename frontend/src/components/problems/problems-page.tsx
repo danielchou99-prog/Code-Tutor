@@ -125,11 +125,8 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
         </div>
 
         {filteredProblems.length ? (
-          <div className="mt-3 overflow-hidden rounded-2xl border border-white/8 bg-[#0d131d]">
-            <div className="hidden grid-cols-[80px_minmax(0,1fr)_140px_130px_72px] gap-4 border-b border-white/8 bg-white/[0.018] px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-600 md:grid">
-              <span>ID</span><span>{zh ? "題目" : "Title"}</span><span>{zh ? "難度" : "Difficulty"}</span><span>{zh ? "狀態" : "Status"}</span><span />
-            </div>
-            {filteredProblems.map((problem) => <ProblemRow key={problem.id} problem={problem} textKey={textKey} zh={zh} onOpen={() => {
+          <div className="mt-4 grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            {filteredProblems.map((problem) => <ProblemCard key={problem.id} problem={problem} textKey={textKey} zh={zh} onOpen={() => {
               window.localStorage.setItem(selectedProblemStorageKey, problem.id);
               setSelectedProblem(problem);
             }} />)}
@@ -146,20 +143,33 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   );
 }
 
-function ProblemRow({ problem, textKey, zh, onOpen }: { problem: Problem; textKey: "zh" | "en"; zh: boolean; onOpen: () => void }) {
+function ProblemCard({ problem, textKey, zh, onOpen }: { problem: Problem; textKey: "zh" | "en"; zh: boolean; onOpen: () => void }) {
   const difficultyLabel = { easy: zh ? "簡單" : "Easy", medium: zh ? "中等" : "Medium", hard: zh ? "困難" : "Hard" }[problem.difficulty];
   const statusLabel = { solved: zh ? "已通過" : "Solved", attempted: zh ? "嘗試過" : "Attempted", unsolved: zh ? "未作答" : "Unsolved" }[problem.status];
   return (
-    <button type="button" onClick={onOpen} className="group grid w-full gap-4 border-b border-white/8 px-5 py-5 text-left transition-colors last:border-b-0 hover:bg-cyan-300/[0.025] md:grid-cols-[80px_minmax(0,1fr)_140px_130px_72px] md:items-center">
-      <span className="font-mono text-[10px] text-slate-500">#{problem.id}</span>
-      <span className="min-w-0">
-        <span className="block text-sm font-semibold text-slate-200 group-hover:text-white">{problem.title[textKey]}</span>
-        <span className="mt-2 flex flex-wrap gap-1.5 md:hidden">{problem.tags.map((tag) => <span key={tag} className="text-[9px] text-cyan-300/60">#{tagLabels[tag][textKey]}</span>)}</span>
-      </span>
-      <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
-      <span className={`flex items-center gap-2 text-[10px] ${problem.status === "solved" ? "text-emerald-300" : problem.status === "attempted" ? "text-amber-200" : "text-slate-600"}`}><span aria-hidden="true">{problem.status === "solved" ? "✓" : problem.status === "attempted" ? "◐" : "○"}</span>{statusLabel}</span>
-      <span className="text-right text-[10px] text-slate-600 group-hover:text-cyan-300">{zh ? "開啟 →" : "Open →"}</span>
-    </button>
+    <article className="min-w-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${zh ? "開啟題目" : "Open problem"} #${problem.id} ${problem.title[textKey]}`}
+        className="group flex min-h-44 w-full flex-col rounded-2xl border border-white/9 bg-[#0d131d] p-4 text-left transition-[border-color,background-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-[#101925] hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
+      >
+        <span className="flex w-full items-start justify-between gap-2">
+          <span className="font-mono text-[10px] text-slate-500">#{problem.id}</span>
+          <span className={`flex shrink-0 items-center gap-1.5 text-[9px] font-semibold ${problem.status === "solved" ? "text-emerald-300" : problem.status === "attempted" ? "text-amber-200" : "text-slate-600"}`}>
+            <span aria-hidden="true">{problem.status === "solved" ? "✓" : problem.status === "attempted" ? "◐" : "○"}</span>{statusLabel}
+          </span>
+        </span>
+        <strong className="mt-5 line-clamp-3 text-sm leading-5 text-slate-100 group-hover:text-white">{problem.title[textKey]}</strong>
+        <span className="mt-auto flex w-full items-end justify-between gap-2 pt-5">
+          <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
+          <span aria-hidden="true" className="text-xs text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-300">→</span>
+        </span>
+      </button>
+      <div className="mt-2 flex min-h-5 flex-wrap justify-center gap-x-2 gap-y-1 px-1 text-center">
+        {problem.tags.map((tag) => <span key={tag} className="text-[9px] font-medium text-cyan-300/75">#{tagLabels[tag][textKey]}</span>)}
+      </div>
+    </article>
   );
 }
 
