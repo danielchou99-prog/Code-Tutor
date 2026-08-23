@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-detail|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -486,7 +486,7 @@ if (action === "interactive") {
     await sleep(500);
   }
 }
-if (action === "problems" || action === "english-problems") {
+if (action === "problems" || action === "english-problems" || action === "problem-detail") {
   const englishProblems = action === "english-problems";
   const clicked = await evaluate(
     client,
@@ -501,43 +501,62 @@ if (action === "problems" || action === "english-problems") {
   );
   if (!clicked) throw new Error("Problems navigation button was not found.");
   await sleep(1_000);
+  if (action === "problem-detail") {
+    const problemOpened = await evaluate(
+      client,
+      `(() => {
+        const button = [...document.querySelectorAll("button")].find(
+          (candidate) => candidate.textContent.includes("A + B") && candidate.textContent.includes("#1001"),
+        );
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`,
+    );
+    if (!problemOpened) throw new Error("Problem detail button was not found.");
+    await sleep(2_000);
+    actionSucceeded = await evaluate(
+      client,
+      `(() => {
+        const text = document.body.innerText;
+        const upperText = text.toUpperCase();
+        return text.includes("題目描述") && text.includes("輸入格式") &&
+          text.includes("輸出格式") && upperText.includes("TIME LIMIT") &&
+          upperText.includes("MEMORY LIMIT") && text.includes("main.cpp") &&
+          text.includes("Result") && text.includes("Submit") &&
+          Boolean(document.querySelector('button[aria-label="開啟 AI Tutor"]'));
+      })()`,
+    );
+  } else {
   const tagsEntered = await evaluate(
     client,
     `(() => {
       const input = document.querySelector('input[placeholder*="#"]');
       if (!input) return false;
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setter?.call(input, ${JSON.stringify(englishProblems ? "#APCSIntermediateAdvanced #BinarySearch" : "#APCS中高級 #二分搜")});
+      setter?.call(input, ${JSON.stringify(englishProblems ? "#Math #Implementation" : "#數學 #實作")});
       input.dispatchEvent(new Event("input", { bubbles: true }));
       return true;
     })()`,
   );
-  if (!tagsEntered) throw new Error("Problem search field was not found.");
+  if (!tagsEntered) {
+    const visibleText = await evaluate(client, `document.body.innerText.slice(0, 1200)`);
+    throw new Error(`Problem search field was not found. Visible text: ${visibleText}`);
+  }
   await sleep(500);
   actionSucceeded = await evaluate(
     client,
     englishProblems
       ? `document.documentElement.lang === "en" &&
-          document.body.innerText.includes("1 problems found") &&
-          document.body.innerText.includes("Find a Target in a Sorted Array") &&
-          !document.body.innerText.includes("Shortest Path Through a Maze") &&
-          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
-            (button) => button.textContent.trim() === "#APCSIntermediateAdvanced",
-          ) &&
-          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
-            (button) => button.textContent.trim() === "#BinarySearch",
-          )`
+          document.body.innerText.includes("1 found") &&
+          document.body.innerText.includes("A + B") &&
+          !document.body.innerText.includes("Shortest Path Through a Maze")`
       : `document.documentElement.lang === "zh-Hant" &&
           document.body.innerText.includes("找到 1 題") &&
-          document.body.innerText.includes("在排序陣列中尋找目標") &&
-          !document.body.innerText.includes("迷宮的最短路徑") &&
-          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
-            (button) => button.textContent.trim() === "#APCS中高級",
-          ) &&
-          [...document.querySelectorAll('button[aria-pressed="true"]')].some(
-            (button) => button.textContent.trim() === "#二分搜",
-          )`,
+          document.body.innerText.includes("A + B") &&
+          !document.body.innerText.includes("迷宮最短路徑")`,
   );
+  }
 }
 if (action === "run" || action === "run-blocked") {
   const clicked = await evaluate(

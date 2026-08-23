@@ -2,282 +2,152 @@
 
 import { useMemo, useState } from "react";
 
-import { type Language, useLanguage } from "@/lib/language-context";
+import { useLanguage } from "@/lib/language-context";
 
-type TagId =
-  | "apcsMiddleAdvanced"
-  | "binarySearch"
-  | "array"
-  | "bfs"
-  | "graph"
-  | "dynamicProgramming"
-  | "apcsBeginner"
-  | "apcsAdvanced"
-  | "knapsack";
+import { type Problem, type ProblemDifficulty, type ProblemStatus, type ProblemTag, problems, tagLabels } from "./problem-data";
+import { ProblemSolverPage } from "./problem-solver-page";
 
-type Difficulty = "beginner" | "medium" | "advanced";
-
-const tagLabels: Record<Language, Record<TagId | "all", string>> = {
-  "zh-Hant": {
-    all: "#全部",
-    apcsMiddleAdvanced: "#APCS中高級",
-    binarySearch: "#二分搜",
-    array: "#陣列",
-    bfs: "#BFS",
-    graph: "#圖論",
-    dynamicProgramming: "#動態規劃",
-    apcsBeginner: "#APCS初級",
-    apcsAdvanced: "#APCS高級",
-    knapsack: "#背包問題",
-  },
-  en: {
-    all: "#All",
-    apcsMiddleAdvanced: "#APCSIntermediateAdvanced",
-    binarySearch: "#BinarySearch",
-    array: "#Array",
-    bfs: "#BFS",
-    graph: "#Graph",
-    dynamicProgramming: "#DynamicProgramming",
-    apcsBeginner: "#APCSBeginner",
-    apcsAdvanced: "#APCSAdvanced",
-    knapsack: "#Knapsack",
-  },
-};
-
-const difficultyLabels: Record<Language, Record<Difficulty, string>> = {
-  "zh-Hant": { beginner: "入門", medium: "中等", advanced: "進階" },
-  en: { beginner: "Beginner", medium: "Medium", advanced: "Advanced" },
-};
-
-const problems: Array<{
-  id: string;
-  title: Record<"zh" | "en", string>;
-  description: Record<"zh" | "en", string>;
-  difficulty: Difficulty;
-  tags: TagId[];
-}> = [
-  {
-    id: "P001",
-    title: { zh: "在排序陣列中尋找目標", en: "Find a Target in a Sorted Array" },
-    description: {
-      zh: "練習縮小搜尋範圍，找出指定數字的位置。",
-      en: "Practice narrowing the search range to locate a target value.",
-    },
-    difficulty: "medium",
-    tags: ["apcsMiddleAdvanced", "binarySearch", "array"],
-  },
-  {
-    id: "P002",
-    title: { zh: "迷宮的最短路徑", en: "Shortest Path Through a Maze" },
-    description: {
-      zh: "從起點走到終點，計算最少需要經過幾個格子。",
-      en: "Find the minimum number of cells needed to reach the exit.",
-    },
-    difficulty: "medium",
-    tags: ["apcsMiddleAdvanced", "bfs", "graph"],
-  },
-  {
-    id: "P003",
-    title: { zh: "連續數字的最大總和", en: "Maximum Contiguous Sum" },
-    description: {
-      zh: "從數列中找出總和最大的連續區間。",
-      en: "Find the contiguous segment with the largest sum.",
-    },
-    difficulty: "beginner",
-    tags: ["apcsBeginner", "dynamicProgramming", "array"],
-  },
-  {
-    id: "P004",
-    title: { zh: "貨物裝箱最佳化", en: "Optimize Cargo Packing" },
-    description: {
-      zh: "在容量限制下，選出總價值最高的物品組合。",
-      en: "Choose the most valuable combination under a capacity limit.",
-    },
-    difficulty: "advanced",
-    tags: ["apcsAdvanced", "dynamicProgramming", "knapsack"],
-  },
-];
-
-const suggestedTags: Array<TagId | "all"> = [
-  "all",
-  "apcsMiddleAdvanced",
-  "binarySearch",
-  "bfs",
-  "dynamicProgramming",
-  "graph",
-];
-
-const hashtagPattern = /#[^\s#]+/g;
-
-function findTagId(label: string): TagId | null {
-  const normalizedLabel = label.toLocaleLowerCase();
-  for (const languageLabels of Object.values(tagLabels)) {
-    for (const [tagId, localizedLabel] of Object.entries(languageLabels)) {
-      if (
-        tagId !== "all" &&
-        localizedLabel.toLocaleLowerCase() === normalizedLabel
-      ) {
-        return tagId as TagId;
-      }
-    }
-  }
-  return null;
-}
+const allTags = Object.keys(tagLabels) as ProblemTag[];
+const hashtagPattern = /#[^\s#]+/gu;
 
 export function ProblemsPage() {
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
+  const zh = language === "zh-Hant";
+  const textKey = zh ? "zh" : "en";
+  const [selectedProblem, setSelectedProblem] = useState<Problem | null>(null);
   const [query, setQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<TagId[]>([]);
-  const localizedTags = tagLabels[language];
-  const textKey = language === "zh-Hant" ? "zh" : "en";
+  const [difficulty, setDifficulty] = useState<ProblemDifficulty | "all">("all");
+  const [status, setStatus] = useState<ProblemStatus | "all">("all");
+  const [selectedTags, setSelectedTags] = useState<ProblemTag[]>([]);
 
-  const { effectiveTags, hasUnknownHashtag } = useMemo(() => {
-    const queryHashtags = query.match(hashtagPattern) ?? [];
-    const queryTagIds = queryHashtags.map(findTagId);
-    const recognizedQueryTags = queryTagIds.filter(
-      (tag): tag is TagId => tag !== null,
-    );
-    return {
-      effectiveTags: [...new Set([...selectedTags, ...recognizedQueryTags])],
-      hasUnknownHashtag: queryTagIds.some((tag) => tag === null),
-    };
-  }, [query, selectedTags]);
+  const queryTags = useMemo(() => {
+    return (query.match(hashtagPattern) ?? []).map((token) => {
+      const normalized = token.slice(1).toLocaleLowerCase(language).replaceAll("-", "");
+      return allTags.find((tag) => {
+        const candidates = [tag, tagLabels[tag].zh, tagLabels[tag].en]
+          .map((label) => label.toLocaleLowerCase(language).replaceAll(" ", "").replaceAll("-", ""));
+        return candidates.includes(normalized);
+      }) ?? null;
+    });
+  }, [language, query]);
 
   const filteredProblems = useMemo(() => {
-    const normalizedQuery = query
-      .replace(hashtagPattern, " ")
-      .trim()
-      .toLocaleLowerCase(language);
+    const searchText = query.replace(hashtagPattern, " ").trim().toLocaleLowerCase(language);
+    const effectiveTags = [...new Set([...selectedTags, ...queryTags.filter((tag): tag is ProblemTag => tag !== null)])];
+    const hasUnknownTag = queryTags.some((tag) => tag === null);
+
     return problems.filter((problem) => {
-      const matchesTags =
-        !hasUnknownHashtag &&
-        effectiveTags.every((tag) => problem.tags.includes(tag));
-      const searchableText = [
-        problem.title[textKey],
-        problem.description[textKey],
-        ...problem.tags.map((tag) => localizedTags[tag]),
-      ]
+      if (difficulty !== "all" && problem.difficulty !== difficulty) return false;
+      if (status !== "all" && problem.status !== status) return false;
+      if (hasUnknownTag || !effectiveTags.every((tag) => problem.tags.includes(tag))) return false;
+      if (!searchText) return true;
+      const searchable = [problem.id, problem.title[textKey], problem.summary[textKey], ...problem.tags.flatMap((tag) => [tagLabels[tag].zh, tagLabels[tag].en])]
         .join(" ")
         .toLocaleLowerCase(language);
-      return matchesTags && (!normalizedQuery || searchableText.includes(normalizedQuery));
+      return searchable.includes(searchText);
     });
-  }, [effectiveTags, hasUnknownHashtag, language, localizedTags, query, textKey]);
+  }, [difficulty, language, query, queryTags, selectedTags, status, textKey]);
 
-  const toggleTag = (tag: TagId | "all") => {
-    if (tag === "all") {
-      setSelectedTags([]);
-      setQuery((current) => current.replace(hashtagPattern, " ").replace(/\s+/g, " ").trim());
-      return;
-    }
+  if (selectedProblem) {
+    return <ProblemSolverPage problem={selectedProblem} onBack={() => setSelectedProblem(null)} />;
+  }
 
-    setSelectedTags((current) =>
-      current.includes(tag)
-        ? current.filter((selectedTag) => selectedTag !== tag)
-        : [...current, tag],
-    );
+  const clearFilters = () => {
+    setQuery("");
+    setDifficulty("all");
+    setStatus("all");
+    setSelectedTags([]);
   };
 
   return (
     <section className="flex-1 bg-[#090d14] px-5 py-8 sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-6xl">
-        <div className="max-w-2xl">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/70">{t("problemLibrary")}</p>
-          <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">{t("problemHeroTitle")}</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-500">{t("problemHeroDetail")}</p>
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/70">{zh ? "題庫" : "Problem library"}</p>
+            <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">{zh ? "找到下一道練習題" : "Find your next problem"}</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-500">{zh ? "搜尋題目並依難度、標籤與作答狀態篩選，點擊題目後可以直接閱讀與寫程式。" : "Search and filter by difficulty, tag, or progress, then open a problem to read and code in one workspace."}</p>
+          </div>
+          <div className="flex gap-6 text-center">
+            <Metric value={String(problems.length)} label={zh ? "目前題目" : "Problems"} />
+            <Metric value={String(problems.filter((problem) => problem.status === "solved").length)} label={zh ? "已通過" : "Solved"} />
+          </div>
         </div>
 
-        <label className="mt-7 flex max-w-2xl items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 focus-within:border-cyan-300/30">
-          <span className="text-slate-600" aria-hidden="true">⌕</span>
-          <span className="sr-only">{t("problemSearchLabel")}</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("problemSearchPlaceholder")}
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-600"
-          />
-        </label>
-
-        <div className="mt-5 flex flex-wrap gap-2" aria-label={t("problemTagFilter")}>
-          {suggestedTags.map((tag) => {
-            const active = tag === "all" ? effectiveTags.length === 0 : effectiveTags.includes(tag);
-            return (
-              <button
-                key={tag}
-                type="button"
-                aria-pressed={active}
-                onClick={() => toggleTag(tag)}
-                className={`rounded-full border px-3 py-1.5 text-[11px] transition-colors ${
-                  active
-                    ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-200"
-                    : "border-white/8 bg-white/[0.025] text-slate-500 hover:border-white/15 hover:text-slate-300"
-                }`}
-              >
-                {localizedTags[tag]}
-              </button>
-            );
-          })}
+        <div className="mt-8 rounded-2xl border border-white/8 bg-[#0d131d] p-4 sm:p-5">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+            <label className="flex h-11 items-center gap-3 rounded-xl border border-white/10 bg-[#090e16] px-4 focus-within:border-cyan-300/30">
+              <SearchIcon />
+              <span className="sr-only">{zh ? "搜尋題目或標籤" : "Search problems or tags"}</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={zh ? "搜尋題號、名稱或輸入 #二分搜尋 #陣列…" : "Search ID, title, #BinarySearch #Array…"} className="min-w-0 flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-600" />
+            </label>
+            <FilterSelect label={zh ? "難度" : "Difficulty"} value={difficulty} onChange={(value) => setDifficulty(value as ProblemDifficulty | "all")} options={[
+              ["all", zh ? "所有難度" : "All difficulties"], ["easy", zh ? "簡單" : "Easy"], ["medium", zh ? "中等" : "Medium"], ["hard", zh ? "困難" : "Hard"],
+            ]} />
+            <FilterSelect label={zh ? "狀態" : "Status"} value={status} onChange={(value) => setStatus(value as ProblemStatus | "all")} options={[
+              ["all", zh ? "所有狀態" : "All statuses"], ["solved", zh ? "已通過" : "Solved"], ["attempted", zh ? "嘗試過" : "Attempted"], ["unsolved", zh ? "未作答" : "Unsolved"],
+            ]} />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-600">Tags</span>
+            {allTags.map((tag) => {
+              const active = selectedTags.includes(tag);
+              return <button key={tag} type="button" aria-pressed={active} onClick={() => setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])} className={`rounded-full border px-3 py-1.5 text-[10px] transition-colors ${active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-white/8 bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300"}`}>#{tagLabels[tag][textKey]}</button>;
+            })}
+            {(query || difficulty !== "all" || status !== "all" || selectedTags.length > 0) ? <button type="button" onClick={clearFilters} className="ml-auto px-2 py-1 text-[10px] text-slate-600 hover:text-cyan-300">{zh ? "清除篩選" : "Clear filters"}</button> : null}
+          </div>
         </div>
 
-        <div className="mt-9 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-200">{t("problemList")}</h2>
-          <span className="text-[11px] text-slate-600">
-            {t("foundProblems").replace("{count}", String(filteredProblems.length))}
-          </span>
+        <div className="mt-8 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">{zh ? "題目列表" : "Problem list"}</h2>
+          <span className="text-[10px] text-slate-600">{zh ? `找到 ${filteredProblems.length} 題` : `${filteredProblems.length} found`}</span>
         </div>
 
-        {filteredProblems.length > 0 ? (
-          <div className="mt-3 grid gap-3">
-            {filteredProblems.map((problem) => (
-              <button
-                key={problem.id}
-                type="button"
-                className="group rounded-2xl border border-white/8 bg-[#0d131d] p-5 text-left transition-colors hover:border-cyan-300/20 hover:bg-[#101925]"
-              >
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-[10px] text-slate-600">{problem.id}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                        problem.difficulty === "advanced"
-                          ? "bg-rose-400/8 text-rose-300"
-                          : problem.difficulty === "medium"
-                            ? "bg-amber-300/8 text-amber-200"
-                            : "bg-emerald-400/8 text-emerald-300"
-                      }`}>
-                        {difficultyLabels[language][problem.difficulty]}
-                      </span>
-                    </div>
-                    <h3 className="mt-3 text-sm font-semibold text-slate-200 group-hover:text-white">{problem.title[textKey]}</h3>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">{problem.description[textKey]}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {problem.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-white/[0.035] px-2.5 py-1 text-[10px] text-cyan-200/70">
-                          {localizedTags[tag]}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs text-slate-600 transition-colors group-hover:text-cyan-300">{t("viewProblem")}</span>
-                </div>
-              </button>
-            ))}
+        {filteredProblems.length ? (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-white/8 bg-[#0d131d]">
+            <div className="hidden grid-cols-[80px_minmax(0,1fr)_140px_130px_72px] gap-4 border-b border-white/8 bg-white/[0.018] px-5 py-3 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-600 md:grid">
+              <span>ID</span><span>{zh ? "題目" : "Title"}</span><span>{zh ? "難度" : "Difficulty"}</span><span>{zh ? "狀態" : "Status"}</span><span />
+            </div>
+            {filteredProblems.map((problem) => <ProblemRow key={problem.id} problem={problem} textKey={textKey} zh={zh} onOpen={() => setSelectedProblem(problem)} />)}
           </div>
         ) : (
           <div className="mt-3 rounded-2xl border border-dashed border-white/10 py-16 text-center">
-            <p className="text-sm text-slate-400">{t("noProblems")}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setSelectedTags([]);
-              }}
-              className="mt-3 text-xs text-cyan-300 hover:text-cyan-200"
-            >
-              {t("clearFilters")}
-            </button>
+            <p className="text-sm font-semibold text-slate-300">{zh ? "找不到符合條件的題目" : "No problems match your filters"}</p>
+            <p className="mt-2 text-xs text-slate-600">{zh ? "可以減少標籤數量或清除篩選後再試一次。" : "Try removing some tags or clearing the filters."}</p>
+            <button type="button" onClick={clearFilters} className="mt-4 text-xs text-cyan-300 hover:text-cyan-200">{zh ? "清除篩選" : "Clear filters"}</button>
           </div>
         )}
       </div>
     </section>
   );
+}
+
+function ProblemRow({ problem, textKey, zh, onOpen }: { problem: Problem; textKey: "zh" | "en"; zh: boolean; onOpen: () => void }) {
+  const difficultyLabel = { easy: zh ? "簡單" : "Easy", medium: zh ? "中等" : "Medium", hard: zh ? "困難" : "Hard" }[problem.difficulty];
+  const statusLabel = { solved: zh ? "已通過" : "Solved", attempted: zh ? "嘗試過" : "Attempted", unsolved: zh ? "未作答" : "Unsolved" }[problem.status];
+  return (
+    <button type="button" onClick={onOpen} className="group grid w-full gap-4 border-b border-white/8 px-5 py-5 text-left transition-colors last:border-b-0 hover:bg-cyan-300/[0.025] md:grid-cols-[80px_minmax(0,1fr)_140px_130px_72px] md:items-center">
+      <span className="font-mono text-[10px] text-slate-500">#{problem.id}</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-slate-200 group-hover:text-white">{problem.title[textKey]}</span>
+        <span className="mt-1.5 block text-[11px] leading-5 text-slate-500">{problem.summary[textKey]}</span>
+        <span className="mt-2 flex flex-wrap gap-1.5 md:hidden">{problem.tags.map((tag) => <span key={tag} className="text-[9px] text-cyan-300/60">#{tagLabels[tag][textKey]}</span>)}</span>
+      </span>
+      <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
+      <span className={`flex items-center gap-2 text-[10px] ${problem.status === "solved" ? "text-emerald-300" : problem.status === "attempted" ? "text-amber-200" : "text-slate-600"}`}><span aria-hidden="true">{problem.status === "solved" ? "✓" : problem.status === "attempted" ? "◐" : "○"}</span>{statusLabel}</span>
+      <span className="text-right text-[10px] text-slate-600 group-hover:text-cyan-300">{zh ? "開啟 →" : "Open →"}</span>
+    </button>
+  );
+}
+
+function Metric({ value, label }: { value: string; label: string }) {
+  return <div><strong className="block font-mono text-xl text-white">{value}</strong><span className="mt-1 block text-[9px] uppercase tracking-wider text-slate-600">{label}</span></div>;
+}
+
+function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]> }) {
+  return <label className="relative"><span className="sr-only">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full appearance-none rounded-xl border border-white/10 bg-[#090e16] px-4 pr-9 text-xs text-slate-300 outline-none focus:border-cyan-300/30">{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select><span aria-hidden="true" className="pointer-events-none absolute right-4 top-3.5 text-[10px] text-slate-600">⌄</span></label>;
+}
+
+function SearchIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 fill-none stroke-slate-600" strokeWidth="1.7"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>;
 }
