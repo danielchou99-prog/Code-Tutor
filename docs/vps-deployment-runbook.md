@@ -24,7 +24,7 @@ ssh YOUR_SSH_USER@YOUR_VPS_IP
 
 ```bash
 cat /etc/os-release
-apt-cache policy nginx python3-venv python3-pip ufw certbot python3-certbot-nginx fail2ban
+apt-cache policy nginx python3-venv ufw certbot python3-certbot-nginx fail2ban
 docker --version
 git --version
 python3 --version
@@ -35,7 +35,7 @@ python3 --version
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y git python3 python3-venv python3-pip curl ca-certificates xz-utils openssl ufw
+sudo apt install -y git python3 python3-venv curl ca-certificates xz-utils openssl ufw
 ```
 
 Nginx 安裝後可能立即監聽 80 埠，因此要先唯讀確認 SSH key、SSH 埠與 UFW 狀態，再建立「只允許 SSH」的防火牆基線：

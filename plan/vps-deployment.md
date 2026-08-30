@@ -100,8 +100,9 @@ FastAPI --------------------------HTTPS--------> Groq
 - [x] 沿用 Hostinger 既有的 `debian` 非 root 帳號，確認專用 SSH key 與非互動 sudo 可用。
 - [x] 更新 APT 套件索引並完成唯讀 upgrade 預演；目前 0 個可升級、0 個移除套件。
 - [x] 確認 Git 2.47.3、Python 3.13.5 與 Docker Engine 29.7.2 已存在。
-- [ ] 安裝 Nginx、Node.js 22、Python venv 與其他必要套件。
-- [ ] 同時檢查 Hostinger 防火牆與 Debian 主機防火牆，只開放 SSH、HTTP 80、HTTPS 443。
+- [x] 安裝並驗證 Nginx、Node.js 22、Python venv、Certbot、Fail2ban 與其他必要套件。
+- [x] 啟用 Debian UFW 基線；目前只允許 IPv4/IPv6 SSH 22，外部 80/443 仍封鎖。
+- [ ] 檢查 Hostinger 外層防火牆；網站完成後只增加 HTTP 80 與 HTTPS 443，不開放 3000、8000、8010。
 - [ ] 啟用系統安全更新及基本登入防護。
 - [ ] 評估並建立少量 Swap，降低 4 GB RAM 在建置或編譯尖峰時被 OOM 終止的風險。
 
@@ -223,12 +224,15 @@ FastAPI --------------------------HTTPS--------> Groq
 
 - Debian GNU/Linux 13.6（trixie），Linux 6.12，KVM，systemd 正常。
 - 1 vCPU、3.8 GiB 可用記憶體、無 Swap；根目錄 50 GB，已使用 3.3 GB。
-- 對外監聽只有 SSH 22；3000、8000、8010、80、443 尚未開放。
-- Docker 29.7.2、Git 2.47.3、Python 3.13.5 已安裝；Node.js 與 Nginx 尚未安裝。
+- Nginx 已在主機監聽 80，但 UFW 對外只允許 SSH 22；外部實測 80/443 封鎖，3000、8000、8010 未監聽。
+- Docker 29.7.2、Git 2.47.3、Python 3.13.5/venv、Node.js 22.23.2、npm 10.9.8、Nginx 1.26.3、Certbot 4.0.0 與 Fail2ban 1.1.0 已安裝。
 - `systemctl --failed` 為 0；Code Tutor 專用 SSH 公鑰已加入 root 與 `debian`，日常部署改用 `debian`。
 - `debian` 帳號的 `.ssh` 為 `700`、`authorized_keys` 為 `600`，公鑰只有一筆，非互動 sudo 驗證通過。
 - 兩份部署 Bash 腳本已透過標準輸入在實際 Debian 13 執行 `bash -n`，語法檢查通過且未在 VPS 建立檔案。
 - APT 套件索引更新成功；Debian、security、backports、Docker 與 Hostinger Monarx repository 正常，upgrade 預演為 0 個可升級或移除套件。
+- UFW 已啟用並設為開機套用，預設拒絕 incoming、允許 outgoing，只加入 22/tcp；新的非 root SSH key 連線驗證成功。
+- Node.js 官方 Linux x64 檔案以固定 SHA-256 驗證後安裝到 `/opt/node-v22.23.2-linux-x64`，正式 symlink 正常，已安全移除可重新下載的暫存壓縮檔。
+- Nginx 設定語法與本機 HTTP 200、Fail2ban `pong`、Certbot timer、UFW 外部阻擋及 `systemctl --failed=0` 均驗證通過。
 
 ## GitHub Ubuntu CI 紀錄（2026-08-30）
 
