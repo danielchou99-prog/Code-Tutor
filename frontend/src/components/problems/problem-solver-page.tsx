@@ -3,8 +3,10 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { OutputPanel } from "@/components/workspace/output-panel";
+import { useAuth } from "@/lib/auth-context";
 import { runCode, type RunResult, type SourceFile } from "@/lib/compiler-api";
 import type { ProgrammingLanguage } from "@/lib/file-items";
 import { JudgeApiError, type JudgeResult, submitProblem } from "@/lib/judge-api";
@@ -15,6 +17,15 @@ import {
   startInteractiveCode,
 } from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
+import {
+  clearLocalProblemCodeDraft,
+  loadLocalProblemCodeDraft,
+  loadSavedProblemCode,
+  ProblemCodeDraftError,
+  saveLocalProblemCodeDraft,
+  saveProblemCode,
+} from "@/lib/problem-code-drafts";
 
 import { getProblemTagLabel, type Problem } from "./problem-data";
 
@@ -29,20 +40,84 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 
 type ResizeTarget = "problem" | "result" | null;
 
+type ProblemWorkspaceState = {
+  activeConsoleTab: "output" | "input";
+  aiOpen: boolean;
+  inputMode: "batch" | "interactive";
+  judgeResult: JudgeResult | null;
+  problemWidth: number;
+  programmingLanguage: ProgrammingLanguage;
+  resultWidth: number;
+  runResult: RunResult | null;
+  stdin: string;
+};
+
+function isRunResult(value: unknown): value is RunResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<RunResult>;
+  return typeof result.status === "string"
+    && typeof result.stdout === "string"
+    && typeof result.stderr === "string"
+    && (typeof result.exit_code === "number" || result.exit_code === null)
+    && typeof result.duration_ms === "number"
+    && typeof result.truncated === "boolean";
+}
+
+function isJudgeResult(value: unknown): value is JudgeResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<JudgeResult>;
+  return (typeof result.submission_id === "string" || result.submission_id === null)
+    && typeof result.problem_id === "string"
+    && typeof result.status === "string"
+    && typeof result.score === "number"
+    && typeof result.passed_cases === "number"
+    && typeof result.total_cases === "number"
+    && typeof result.duration_ms === "number"
+    && Array.isArray(result.groups)
+    && typeof result.message === "string";
+}
+
+function isProblemWorkspaceState(value: unknown): value is ProblemWorkspaceState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<ProblemWorkspaceState>;
+  return ["output", "input"].includes(state.activeConsoleTab ?? "")
+    && typeof state.aiOpen === "boolean"
+    && ["batch", "interactive"].includes(state.inputMode ?? "")
+    && (state.judgeResult === null || isJudgeResult(state.judgeResult))
+    && typeof state.problemWidth === "number"
+    && state.problemWidth >= 25
+    && state.problemWidth <= 45
+    && ["cpp", "python"].includes(state.programmingLanguage ?? "")
+    && typeof state.resultWidth === "number"
+    && state.resultWidth >= 18
+    && state.resultWidth <= 32
+    && (state.runResult === null || isRunResult(state.runResult))
+    && typeof state.stdin === "string";
+}
+
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
 export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: Problem; onBack: () => void; onSubmitted?: (result: JudgeResult) => void }) {
   const { language } = useLanguage();
+  const { configured, user } = useAuth();
   const zh = language === "zh-Hant";
   const textKey = zh ? "zh" : "en";
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const interactiveConnection = useRef<InteractiveConnection | null>(null);
+  const editedLanguagesRef = useRef(new Set<ProgrammingLanguage>());
+  const hydratedLanguagesRef = useRef(new Set<ProgrammingLanguage>());
   const [programmingLanguage, setProgrammingLanguage] = useState<ProgrammingLanguage>("cpp");
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [codeByLanguage, setCodeByLanguage] = useState(() => ({ ...problem.starterCode }));
+  const [savedCodeByLanguage, setSavedCodeByLanguage] = useState(() => ({ ...problem.starterCode }));
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveNotice, setSaveNotice] = useState("");
+  const [pendingOverwrite, setPendingOverwrite] = useState<"import" | "reset" | null>(null);
+  const [pendingImportedCode, setPendingImportedCode] = useState("");
   const [stdin, setStdin] = useState(problem.samples[0]?.input ?? "");
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -57,7 +132,86 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
   const [resultWidth, setResultWidth] = useState(22);
   const [resizing, setResizing] = useState<ResizeTarget>(null);
   const [aiOpen, setAiOpen] = useState(false);
+  const [hydratedWorkspaceStateKey, setHydratedWorkspaceStateKey] = useState<string | null>(null);
+  const workspaceStateKey = pageStateKey(`problems:${problem.id}:workspace`, user?.id);
   const code = codeByLanguage[programmingLanguage];
+  const isDirty = code !== savedCodeByLanguage[programmingLanguage];
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(workspaceStateKey, isProblemWorkspaceState);
+      if (restored) {
+        setProgrammingLanguage(restored.programmingLanguage);
+        setStdin(restored.stdin);
+        setActiveConsoleTab(restored.activeConsoleTab);
+        setInputMode(restored.inputMode);
+        setRunResult(restored.runResult);
+        setJudgeResult(restored.judgeResult);
+        setProblemWidth(restored.problemWidth);
+        setResultWidth(restored.resultWidth);
+        setAiOpen(restored.aiOpen);
+      }
+      setHydratedWorkspaceStateKey(workspaceStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [workspaceStateKey]);
+
+  useEffect(() => {
+    if (hydratedWorkspaceStateKey !== workspaceStateKey) return;
+    savePageState(workspaceStateKey, {
+      activeConsoleTab,
+      aiOpen,
+      inputMode,
+      judgeResult,
+      problemWidth,
+      programmingLanguage,
+      resultWidth,
+      runResult,
+      stdin,
+    });
+  }, [activeConsoleTab, aiOpen, hydratedWorkspaceStateKey, inputMode, judgeResult, problemWidth, programmingLanguage, resultWidth, runResult, stdin, workspaceStateKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async (targetLanguage: ProgrammingLanguage) => {
+      await Promise.resolve();
+      const localDraft = loadLocalProblemCodeDraft(problem.id, targetLanguage);
+      if (cancelled || editedLanguagesRef.current.has(targetLanguage)) return;
+      if (localDraft) {
+        hydratedLanguagesRef.current.add(targetLanguage);
+        setCodeByLanguage((current) => ({ ...current, [targetLanguage]: localDraft.code }));
+        setSavedCodeByLanguage((current) => ({ ...current, [targetLanguage]: localDraft.savedCode }));
+        return;
+      }
+      if (configured && user) {
+        try {
+          const saved = await loadSavedProblemCode(problem.id, targetLanguage);
+          if (cancelled || editedLanguagesRef.current.has(targetLanguage)) return;
+          if (saved) {
+            setCodeByLanguage((current) => ({ ...current, [targetLanguage]: saved.code }));
+            setSavedCodeByLanguage((current) => ({ ...current, [targetLanguage]: saved.code }));
+          }
+        } catch {
+          // Loading failure must not block the editor; Save will show a specific error.
+        }
+      }
+      hydratedLanguagesRef.current.add(targetLanguage);
+    };
+    void Promise.all([hydrate("cpp"), hydrate("python")]);
+    return () => { cancelled = true; };
+  }, [configured, problem.id, user]);
+
+  useEffect(() => {
+    if (!hydratedLanguagesRef.current.has(programmingLanguage)) return;
+    if (isDirty) {
+      saveLocalProblemCodeDraft(problem.id, programmingLanguage, {
+        code,
+        savedCode: savedCodeByLanguage[programmingLanguage],
+      });
+    } else {
+      clearLocalProblemCodeDraft(problem.id, programmingLanguage);
+    }
+  }, [code, isDirty, problem.id, programmingLanguage, savedCodeByLanguage]);
 
   useEffect(() => {
     return () => interactiveConnection.current?.stop();
@@ -169,10 +323,96 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
     interactiveConnection.current = null;
     setProgrammingLanguage(nextLanguage);
     setLanguageMenuOpen(false);
+    setSaveNotice("");
     setRunResult(null);
     setInteractiveOutput([]);
     setInteractiveStatus("idle");
     setIsRunning(false);
+  };
+
+  const updateCurrentCode = (nextCode: string) => {
+    editedLanguagesRef.current.add(programmingLanguage);
+    hydratedLanguagesRef.current.add(programmingLanguage);
+    setSaveNotice("");
+    setCodeByLanguage((current) => ({ ...current, [programmingLanguage]: nextCode }));
+  };
+
+  const applyOverwrite = (kind: "import" | "reset", importedCode = pendingImportedCode) => {
+    updateCurrentCode(kind === "reset" ? problem.starterCode[programmingLanguage] : importedCode);
+    setPendingOverwrite(null);
+    setPendingImportedCode("");
+    setRunResult(null);
+    setInteractiveOutput([]);
+    setInteractiveStatus("idle");
+  };
+
+  const requestReset = () => {
+    if (isDirty) {
+      setPendingOverwrite("reset");
+      return;
+    }
+    applyOverwrite("reset");
+  };
+
+  const importCode = async (file: File) => {
+    const expectedExtension = programmingLanguage === "python" ? ".py" : ".cpp";
+    if (!file.name.toLocaleLowerCase().endsWith(expectedExtension)) {
+      setSaveNotice(zh ? `目前語言只接受 ${expectedExtension} 檔案。` : `The current language only accepts ${expectedExtension} files.`);
+      return;
+    }
+    if (file.size === 0) {
+      setSaveNotice(zh ? "無法匯入空白檔案。" : "An empty file cannot be imported.");
+      return;
+    }
+    if (file.size > 65_536) {
+      setSaveNotice(zh ? "檔案不可超過 64 KiB。" : "The file must not exceed 64 KiB.");
+      return;
+    }
+    try {
+      const importedCode = await file.text();
+      if (!importedCode.trim()) {
+        setSaveNotice(zh ? "無法匯入只有空白內容的檔案。" : "A whitespace-only file cannot be imported.");
+        return;
+      }
+      if (isDirty) {
+        setPendingImportedCode(importedCode);
+        setPendingOverwrite("import");
+      } else {
+        applyOverwrite("import", importedCode);
+      }
+    } catch {
+      setSaveNotice(zh ? "無法讀取這個檔案，請重新選擇。" : "The file could not be read. Choose it again.");
+    }
+  };
+
+  const saveCode = async () => {
+    if (isSaving || !isDirty) return;
+    if (!user) {
+      setSaveNotice(zh ? "請先登入，才能將程式碼儲存到帳號。未儲存內容仍保留在此裝置。" : "Sign in to save code to your account. The unsaved draft remains on this device.");
+      return;
+    }
+    if (new Blob([code]).size > 65_536) {
+      setSaveNotice(zh ? "程式碼不可超過 64 KiB。" : "Code must not exceed 64 KiB.");
+      return;
+    }
+    setIsSaving(true);
+    setSaveNotice("");
+    try {
+      const saved = await saveProblemCode(problem.id, programmingLanguage, code);
+      setSavedCodeByLanguage((current) => ({ ...current, [programmingLanguage]: saved.code }));
+      clearLocalProblemCodeDraft(problem.id, programmingLanguage);
+      setSaveNotice(zh ? "已儲存到你的帳號。" : "Saved to your account.");
+    } catch (error) {
+      if (error instanceof ProblemCodeDraftError && error.code === "migration_missing") {
+        setSaveNotice(zh ? "Supabase 尚未建立題目程式碼資料表，請先執行最新 migration。" : "The problem code table is missing. Run the latest Supabase migration first.");
+      } else if (error instanceof ProblemCodeDraftError && error.code === "not_authenticated") {
+        setSaveNotice(zh ? "登入狀態已失效，請重新登入後再儲存。" : "Your session expired. Sign in again before saving.");
+      } else {
+        setSaveNotice(zh ? "程式碼儲存失敗，請檢查網路後再試一次。" : "The code could not be saved. Check your connection and try again.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const submit = async () => {
@@ -222,8 +462,8 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
         <ResizeHandle label={zh ? "調整題目與編輯器寬度" : "Resize problem and editor"} active={resizing === "problem"} onPointerDown={() => setResizing("problem")} />
 
         <section className="flex min-h-[780px] min-w-0 flex-col border-y border-white/8 bg-[#0c111b] xl:min-h-0 xl:border-y-0" aria-label={zh ? "程式碼編輯器" : "Code editor"}>
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-white/8 px-4">
-            <div ref={languageMenuRef} className="relative">
+          <div className="relative z-30 flex min-h-12 shrink-0 items-center justify-between gap-3 overflow-visible border-b border-white/8 px-4 py-2">
+            <div ref={languageMenuRef} className="relative z-50 shrink-0">
               <button type="button" onClick={() => setLanguageMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={languageMenuOpen} aria-label={zh ? "選擇程式語言" : "Choose programming language"} className="flex h-8 items-center gap-2 rounded-lg border border-white/8 bg-white/[0.025] px-3 text-[10px] font-semibold text-slate-300 hover:border-white/15">
                 <span>{programmingLanguage === "python" ? "Python 3" : "C++20"}</span><span className={`text-[9px] text-slate-600 transition-transform ${languageMenuOpen ? "rotate-180" : ""}`}>⌄</span>
               </button>
@@ -233,14 +473,29 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
                 </div>
               ) : null}
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setCodeByLanguage((current) => ({ ...current, [programmingLanguage]: problem.starterCode[programmingLanguage] }))} className="h-8 rounded-lg border border-white/8 px-3 text-[10px] text-slate-400 hover:border-white/15 hover:text-white">{zh ? "還原程式碼" : "Reset code"}</button>
-              <button type="button" onClick={() => void run()} disabled={isRunning} className="h-8 rounded-lg bg-cyan-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60">▶ Run</button>
-              <button type="button" onClick={() => void submit()} disabled={isSubmitting || isRunning} className="h-8 rounded-lg bg-violet-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-violet-300 disabled:cursor-wait disabled:opacity-60">{isSubmitting ? (zh ? "評分中…" : "Judging…") : "Submit"}</button>
+            <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
+              <span className={`whitespace-nowrap text-[9px] font-medium ${isDirty ? "text-amber-200" : "text-emerald-300/75"}`}>{isDirty ? (zh ? "未儲存" : "Unsaved") : (zh ? "已儲存" : "Saved")}</span>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept={programmingLanguage === "python" ? ".py" : ".cpp"}
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void importCode(file);
+                }}
+              />
+              <button type="button" onClick={() => importInputRef.current?.click()} className="h-8 whitespace-nowrap rounded-lg border border-white/8 px-3 text-[10px] text-slate-400 hover:border-white/15 hover:text-white">{zh ? "匯入" : "Import"}</button>
+              <button type="button" onClick={() => void saveCode()} disabled={isSaving || !isDirty} className="h-8 whitespace-nowrap rounded-lg border border-cyan-300/20 px-3 text-[10px] font-semibold text-cyan-200 hover:bg-cyan-300/5 disabled:cursor-default disabled:opacity-35">{isSaving ? (zh ? "儲存中…" : "Saving…") : "Save"}</button>
+              <button type="button" onClick={requestReset} className="h-8 whitespace-nowrap rounded-lg border border-white/8 px-3 text-[10px] text-slate-400 hover:border-white/15 hover:text-white">{zh ? "還原" : "Reset"}</button>
+              <button type="button" onClick={() => void run()} disabled={isRunning} className="h-8 whitespace-nowrap rounded-lg bg-cyan-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-cyan-300 disabled:cursor-wait disabled:opacity-60">▶ Run</button>
+              <button type="button" onClick={() => void submit()} disabled={isSubmitting || isRunning} className="h-8 whitespace-nowrap rounded-lg bg-violet-400 px-4 text-[10px] font-bold text-slate-950 hover:bg-violet-300 disabled:cursor-wait disabled:opacity-60">{isSubmitting ? (zh ? "評分中…" : "Judging…") : "Submit"}</button>
             </div>
           </div>
+          {saveNotice ? <p role="status" className="shrink-0 border-b border-white/8 bg-[#0a0f17] px-4 py-2 text-[10px] text-amber-200">{saveNotice}</p> : null}
           <div className="min-h-[390px] flex-1 overflow-hidden xl:min-h-0">
-            <MonacoEditor language={programmingLanguage === "python" ? "python" : "cpp"} theme="vs-dark" value={code} onChange={(value) => setCodeByLanguage((current) => ({ ...current, [programmingLanguage]: value ?? "" }))} options={{ automaticLayout: true, fontFamily: "JetBrains Mono, Fira Code, Consolas, monospace", fontSize: 14, minimap: { enabled: false }, padding: { top: 18 }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: "off" }} />
+            <MonacoEditor language={programmingLanguage === "python" ? "python" : "cpp"} theme="vs-dark" value={code} onChange={(value) => updateCurrentCode(value ?? "")} options={{ automaticLayout: true, fontFamily: "JetBrains Mono, Fira Code, Consolas, monospace", fontSize: 14, minimap: { enabled: false }, padding: { top: 18 }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: "off" }} />
           </div>
           <OutputPanel
             activeTab={activeConsoleTab}
@@ -271,11 +526,25 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
 
       {aiOpen ? (
         <div className="fixed bottom-5 right-5 z-50 h-[min(600px,calc(100dvh-8.75rem))] w-[min(380px,calc(100vw-2.5rem))] overflow-hidden rounded-2xl border border-violet-300/20 bg-[#0b1018] shadow-2xl shadow-black/60">
-          <AiTutorPanel code={code} errorOutput={aiErrorOutput} onClose={() => setAiOpen(false)} programmingLanguage={programmingLanguage} />
+          <AiTutorPanel code={code} errorOutput={aiErrorOutput} judgeSummary={judgeResult} onClose={() => setAiOpen(false)} persistenceScope={`problem:${problem.id}`} programmingLanguage={programmingLanguage} />
         </div>
       ) : (
         <button type="button" onClick={() => setAiOpen(true)} aria-label={zh ? "開啟 AI Tutor" : "Open AI Tutor"} className="fixed bottom-6 right-6 z-40 grid size-14 place-items-center rounded-full border border-violet-300/25 bg-violet-400 text-sm font-black text-slate-950 shadow-lg shadow-violet-950/40 transition-transform hover:scale-105">AI</button>
       )}
+
+      <ConfirmDialog
+        open={pendingOverwrite !== null}
+        title={pendingOverwrite === "import" ? (zh ? "匯入並取代目前程式碼？" : "Import and replace the current code?") : (zh ? "還原預設程式碼？" : "Reset to the starter code?")}
+        description={pendingOverwrite === "import"
+          ? (zh ? "目前有尚未儲存的修改。繼續匯入會取代編輯器內容，但不會自動儲存到帳號。" : "You have unsaved changes. Importing will replace the editor contents and will not save automatically.")
+          : (zh ? "目前有尚未儲存的修改。還原後會取代編輯器內容，但不會自動儲存到帳號。" : "You have unsaved changes. Resetting will replace the editor contents and will not save automatically.")}
+        confirmLabel={pendingOverwrite === "import" ? (zh ? "繼續匯入" : "Import") : (zh ? "繼續還原" : "Reset")}
+        cancelLabel={zh ? "取消" : "Cancel"}
+        closeLabel={zh ? "關閉確認視窗" : "Close confirmation"}
+        tone={pendingOverwrite === "reset" ? "danger" : "default"}
+        onClose={() => { setPendingOverwrite(null); setPendingImportedCode(""); }}
+        onConfirm={() => applyOverwrite(pendingOverwrite ?? "reset")}
+      />
     </section>
   );
 }
@@ -297,16 +566,21 @@ function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey:
       <StatementSection title={zh ? "範例" : "Examples"}>
         {problem.samples.map((sample, index) => <div key={`${sample.input}-${index}`} className="mt-3 overflow-hidden rounded-xl border border-white/8 bg-[#070b11]"><SampleBlock label={`${zh ? "範例輸入" : "Sample Input"} ${index + 1}`} value={sample.input} /><SampleBlock label={`${zh ? "範例輸出" : "Sample Output"} ${index + 1}`} value={sample.output} bordered />{sample.explanation ? <p className="border-t border-white/8 px-4 py-3 text-[11px] text-slate-500">{sample.explanation[textKey]}</p> : null}</div>)}
       </StatementSection>
-      <StatementSection title={zh ? "限制" : "Constraints"}><ul className="space-y-1 font-mono text-[11px]">{problem.constraints.map((constraint) => <li key={constraint[textKey]}>• {constraint[textKey]}</li>)}</ul><div className="mt-4 grid grid-cols-2 gap-2"><LimitCard label="Time Limit" value={`${problem.timeLimitMs / 1000} sec`} /><LimitCard label="Memory Limit" value={`${problem.memoryLimitMb} MB`} /></div></StatementSection>
+      <StatementSection title={zh ? "限制" : "Constraints"}>
+        <ul className="space-y-1 font-mono text-[11px]">{problem.constraints.map((constraint) => <li key={constraint[textKey]}>• {constraint[textKey]}</li>)}</ul>
+        <TestGroupList problem={problem} textKey={textKey} zh={zh} />
+        <div className="mt-4 grid grid-cols-2 gap-2"><LimitCard label="Time Limit" value={`${problem.timeLimitMs / 1000} sec`} /><LimitCard label="Memory Limit" value={`${problem.memoryLimitMb} MB`} /></div>
+      </StatementSection>
       <StatementSection title={zh ? "測資與計分" : "Tests and scoring"}>
         <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2"><span>{zh ? "正式測資總數" : "Total judge cases"}</span><strong className="font-mono text-cyan-200">{totalCases}</strong></div>
-        <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={group.name[textKey]} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-3"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold text-slate-300">{zh ? `子任務 ${index + 1}` : `Subtask ${index + 1}`}</span><strong className="font-mono text-[11px] text-cyan-200">{group.scorePercent}%</strong></div><p className="mt-2 text-[11px] leading-5 text-slate-300">{group.condition[textKey]}</p><p className="mt-1 font-mono text-[9px] text-slate-600">{group.testCaseCount} {zh ? "筆測資" : "judge cases"}</p></div>)}</div>
+        <TestGroupList problem={problem} textKey={textKey} zh={zh} />
       </StatementSection>
     </article>
   );
 }
 
 function StatementSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mt-8"><h2 className="text-xs font-semibold text-white">{title}</h2><div className="mt-3 space-y-3 text-xs leading-6 text-slate-400">{children}</div></section>; }
+function TestGroupList({ problem, textKey, zh }: { problem: Problem; textKey: "zh" | "en"; zh: boolean }) { return <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={`${group.name[textKey]}-${index}`} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-3"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold text-slate-300">{zh ? `子任務 ${index + 1}` : `Subtask ${index + 1}`}</span><strong className="font-mono text-[11px] text-cyan-200">{group.scorePercent}%</strong></div><p className="mt-2 text-[11px] leading-5 text-slate-300">{group.condition[textKey]}</p><p className="mt-1 font-mono text-[9px] text-slate-600">{group.testCaseCount} {zh ? "筆測資" : "judge cases"}</p></div>)}</div>; }
 function SampleBlock({ label, value, bordered = false }: { label: string; value: string; bordered?: boolean }) { return <div className={bordered ? "border-t border-white/8" : ""}><div className="px-4 py-2 text-[9px] font-semibold uppercase tracking-wider text-slate-600">{label}</div><pre className="overflow-x-auto px-4 pb-3 font-mono text-xs text-slate-300">{value}</pre></div>; }
 function LimitCard({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-600">{label}</span><strong className="mt-1 block font-mono text-[11px] text-slate-300">{value}</strong></div>; }
 
@@ -318,8 +592,11 @@ function JudgePanel({ error, isSubmitting, result, problem, textKey, zh }: { err
     compile_error: zh ? "編譯錯誤" : "Compilation Error",
     runtime_error: zh ? "執行錯誤" : "Runtime Error",
     timeout: zh ? "超出時間限制" : "Time Limit Exceeded",
+    memory_limit: zh ? "記憶體超出限制" : "Memory Limit Exceeded",
+    output_limit: zh ? "輸出超過限制" : "Output Limit Exceeded",
     service_unavailable: zh ? "Judge 暫時無法使用" : "Judge Unavailable",
     server_busy: zh ? "Judge 忙碌中" : "Judge Busy",
+    system_error: zh ? "Judge 系統錯誤" : "Judge System Error",
   }[result.status]) : "";
   return (
     <aside className="min-h-[420px] min-w-0 overflow-y-auto bg-[#0a0f17] p-5 xl:min-h-0" aria-label={zh ? "正式評分結果" : "Judge result"}>

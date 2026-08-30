@@ -12,6 +12,7 @@ import { ProjectWorkspace } from "@/components/workspace/project-workspace";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { clearProjectDraft, type FileProject } from "@/lib/file-items";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
+import { clearUserPageStates, loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { SettingsProvider, useSettings } from "@/lib/settings-context";
 
 type OpenedProject = FileProject & { ownerId: string };
@@ -56,7 +57,6 @@ function AppContent() {
         const project = JSON.parse(storedProject) as FileProject;
         if (typeof project.id === "string" && typeof project.name === "string") {
           setOpenProject({ ...project, language: project.language === "python" ? "python" : "cpp", ownerId: userId });
-          setActiveSection("files");
         }
       } catch {
         window.localStorage.removeItem(`${openProjectStoragePrefix}${userId}`);
@@ -64,6 +64,26 @@ function AppContent() {
     }, 0);
     return () => window.clearTimeout(restoreTimer);
   }, [userId]);
+
+  useEffect(() => {
+    const scrollStateKey = pageStateKey(`scroll:${activeSection}`, userId);
+    let saveTimer: number | null = null;
+    const restoreTimer = window.setTimeout(() => {
+      const restored = loadPageState(scrollStateKey, (value): value is number => typeof value === "number" && value >= 0);
+      if (restored !== null) window.scrollTo({ top: restored });
+    }, 0);
+    const rememberScroll = () => {
+      if (saveTimer !== null) window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => savePageState(scrollStateKey, window.scrollY), 120);
+    };
+    window.addEventListener("scroll", rememberScroll, { passive: true });
+    return () => {
+      window.clearTimeout(restoreTimer);
+      if (saveTimer !== null) window.clearTimeout(saveTimer);
+      savePageState(scrollStateKey, window.scrollY);
+      window.removeEventListener("scroll", rememberScroll);
+    };
+  }, [activeSection, userId]);
 
   useEffect(() => {
     if (!hasUnsavedCode) return;
@@ -96,15 +116,13 @@ function AppContent() {
   };
 
   const selectSection = (section: PrimarySection) => {
-    protectUnsavedCode(() => {
+    const isActiveProblemSection = section === "problems" && activeSection === "problems";
+    if (isActiveProblemSection) {
       window.localStorage.removeItem(selectedProblemStorageKey);
-      if (section === "problems") {
-        setProblemsListRevision((current) => current + 1);
-      }
-      setActiveSection(section);
-      window.localStorage.setItem(activeSectionStorageKey, section);
-      if (openProject) closeProject();
-    });
+      setProblemsListRevision((current) => current + 1);
+    }
+    setActiveSection(section);
+    window.localStorage.setItem(activeSectionStorageKey, section);
   };
 
   let content;
@@ -145,7 +163,10 @@ function AppContent() {
     <main data-code-tutor-theme={settings.theme} className={`flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden text-slate-200 ${settings.theme === "light" ? settings.background === "grid" ? "bg-[#dbe8f3] bg-[linear-gradient(rgba(30,64,96,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(30,64,96,0.055)_1px,transparent_1px)] bg-[size:42px_42px]" : settings.background === "soft" ? "bg-[#dbe8f3] bg-[radial-gradient(circle_at_70%_20%,rgba(14,116,144,0.13),transparent_34%)]" : "bg-[#dbe8f3]" : settings.background === "grid" ? "bg-[#090d14] bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:42px_42px]" : settings.background === "soft" ? "bg-[#090d14] bg-[radial-gradient(circle_at_70%_20%,rgba(34,211,238,0.07),transparent_32%)]" : "bg-[#090d14]"}`}>
       <SiteHeader
         activeSection={activeSection}
-        onBeforeSignOut={(signOut) => protectUnsavedCode(signOut)}
+        onBeforeSignOut={(signOut) => protectUnsavedCode(async () => {
+          if (user) clearUserPageStates(user.id);
+          await signOut();
+        })}
         onSelect={selectSection}
       />
       {content}

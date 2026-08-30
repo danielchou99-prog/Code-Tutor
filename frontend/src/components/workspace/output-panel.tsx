@@ -47,6 +47,11 @@ const statusPresentation: Record<
     color: "text-amber-300",
     icon: "⌛",
   },
+  output_limit: {
+    labelKey: "statusOutputLimit",
+    color: "text-amber-300",
+    icon: "!",
+  },
   service_unavailable: {
     labelKey: "statusUnavailable",
     color: "text-slate-400",

@@ -2,7 +2,7 @@ import type { ProgrammingLanguage } from "@/lib/file-items";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getApiUrl, type SourceFile } from "@/lib/compiler-api";
 
-export type JudgeStatus = "accepted" | "wrong_answer" | "compile_error" | "runtime_error" | "timeout" | "service_unavailable" | "server_busy";
+export type JudgeStatus = "accepted" | "wrong_answer" | "compile_error" | "runtime_error" | "timeout" | "memory_limit" | "output_limit" | "service_unavailable" | "server_busy" | "system_error";
 
 export type JudgeGroupResult = {
   group_order: number;
@@ -21,6 +21,7 @@ export type JudgeResult = {
   passed_cases: number;
   total_cases: number;
   duration_ms: number;
+  peak_memory_kb: number;
   groups: JudgeGroupResult[];
   message: string;
 };

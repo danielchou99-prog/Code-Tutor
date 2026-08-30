@@ -1,4 +1,5 @@
 import subprocess
+import base64
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,6 +15,26 @@ from app.models import ProjectSourceFile
 
 def compiler() -> DockerCompiler:
     return DockerCompiler(Settings())
+
+
+def test_batch_response_parser_preserves_order_and_status() -> None:
+    first_stdout = base64.b64encode(b"first\n").decode("ascii")
+    second_stderr = base64.b64encode(b"bad input\n").decode("ascii")
+    completed = subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout=(
+            f"accepted\t0\t0\t{first_stdout}\t\n"
+            f"runtime_error\t1\t0\t\t{second_stderr}\n"
+        ),
+        stderr="",
+    )
+
+    results = compiler()._to_batch_responses(completed, 2, 100)
+
+    assert [result.status for result in results] == ["accepted", "runtime_error"]
+    assert results[0].stdout == "first\n"
+    assert results[1].stderr == "bad input"
 
 
 def test_maps_successful_process_to_accepted() -> None:

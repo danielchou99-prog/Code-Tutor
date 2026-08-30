@@ -72,6 +72,32 @@ def sample_prompt(action: str = "analyze") -> TutorPrompt:
     )
 
 
+def test_judge_summary_prompt_contains_only_aggregate_fields() -> None:
+    prompt = TutorPrompt(
+        action="common_errors",
+        code="int main() {}",
+        error_output="",
+        question="",
+        language="en",
+        judge_summary={
+            "status": "wrong_answer",
+            "score": 40,
+            "passed_cases": 4,
+            "total_cases": 10,
+            "duration_ms": 25,
+            "peak_memory_kb": 2048,
+            "groups": [],
+        },
+    )
+
+    messages = build_messages(prompt)
+    serialized = repr(messages)
+    user_message = messages[-1]["content"]
+    assert "wrong_answer" in serialized
+    assert "expected_output" not in user_message
+    assert "input" not in user_message
+
+
 def test_service_decrypts_key_only_on_backend_and_streams() -> None:
     provider = FakeProvider()
     service = AiTutorService(FakeKeyStore(), FakeCipher(), provider)

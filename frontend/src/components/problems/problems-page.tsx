@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { loadProblems } from "@/lib/problem-repository";
 
 import { getProblemTagLabel, type Problem, type ProblemDifficulty, type ProblemStatus, type ProblemTag, problems } from "./problem-data";
@@ -11,6 +12,23 @@ import { ProblemSolverPage } from "./problem-solver-page";
 
 const hashtagPattern = /#[^\s#]+/gu;
 const selectedProblemStorageKey = "code-tutor:selected-problem";
+
+type ProblemListState = {
+  difficulty: ProblemDifficulty | "all";
+  query: string;
+  selectedTags: ProblemTag[];
+  status: ProblemStatus | "all";
+};
+
+function isProblemListState(value: unknown): value is ProblemListState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<ProblemListState>;
+  return typeof state.query === "string"
+    && ["all", "easy", "medium", "hard"].includes(state.difficulty ?? "")
+    && ["all", "solved", "attempted", "unsolved"].includes(state.status ?? "")
+    && Array.isArray(state.selectedTags)
+    && state.selectedTags.every((tag) => typeof tag === "string");
+}
 
 export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: number }) {
   const { language } = useLanguage();
@@ -24,7 +42,28 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   const [status, setStatus] = useState<ProblemStatus | "all">("all");
   const [selectedTags, setSelectedTags] = useState<ProblemTag[]>([]);
   const previousResetRevision = useRef(resetListRevision);
+  const [hydratedStateKey, setHydratedStateKey] = useState<string | null>(null);
+  const listStateKey = pageStateKey("problems:list", user?.id);
   const allTags = useMemo(() => [...new Set(availableProblems.flatMap((problem) => problem.tags))], [availableProblems]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(listStateKey, isProblemListState);
+      if (restored) {
+        setQuery(restored.query);
+        setDifficulty(restored.difficulty);
+        setStatus(restored.status);
+        setSelectedTags(restored.selectedTags);
+      }
+      setHydratedStateKey(listStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [listStateKey]);
+
+  useEffect(() => {
+    if (hydratedStateKey !== listStateKey) return;
+    savePageState(listStateKey, { difficulty, query, selectedTags, status });
+  }, [difficulty, hydratedStateKey, listStateKey, query, selectedTags, status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,11 +78,11 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   useEffect(() => {
     const restoreTimer = window.setTimeout(() => {
       const storedProblemId = window.localStorage.getItem(selectedProblemStorageKey);
-      const storedProblem = problems.find((problem) => problem.id === storedProblemId);
+      const storedProblem = availableProblems.find((problem) => problem.id === storedProblemId);
       if (storedProblem) setSelectedProblem(storedProblem);
     }, 0);
     return () => window.clearTimeout(restoreTimer);
-  }, []);
+  }, [availableProblems]);
 
   useEffect(() => {
     if (previousResetRevision.current === resetListRevision) return;
@@ -85,7 +124,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   }, [availableProblems, difficulty, language, query, queryTags, selectedTags, status, textKey]);
 
   if (selectedProblem) {
-    return <ProblemSolverPage problem={selectedProblem} onBack={() => {
+    return <ProblemSolverPage key={selectedProblem.id} problem={selectedProblem} onBack={() => {
       window.localStorage.removeItem(selectedProblemStorageKey);
       setSelectedProblem(null);
     }} onSubmitted={(result) => {

@@ -52,6 +52,7 @@ class AnsweringCompiler:
     def __init__(self, answers: dict[str, str], status: str = "accepted") -> None:
         self.answers = answers
         self.status = status
+        self.limits: list[tuple[int | None, int | None]] = []
 
     def is_available(self) -> bool:
         return True
@@ -62,14 +63,25 @@ class AnsweringCompiler:
         stdin: str,
         files: list[ProjectSourceFile] | None = None,
         language: str = "cpp",
+        *,
+        time_limit_ms: int | None = None,
+        memory_limit_mb: int | None = None,
     ) -> RunResponse:
+        self.limits.append((time_limit_ms, memory_limit_mb))
         if self.status != "accepted":
-            return RunResponse(status=self.status, stderr="compiler message", duration_ms=5)  # type: ignore[arg-type]
+            return RunResponse(status=self.status, stderr="compiler message", duration_ms=5, peak_memory_kb=524288)  # type: ignore[arg-type]
         return RunResponse(
             status="accepted",
             stdout=self.answers.get(stdin, "wrong") + "  \n\n",
             duration_ms=5,
         )
+
+
+class UnavailableCompiler(AnsweringCompiler):
+    def run(self, *args, **kwargs) -> RunResponse:
+        from app.compiler import CompilerUnavailable
+
+        raise CompilerUnavailable("Docker unavailable")
 
 
 user = AuthenticatedUser(user_id="student-1", email="student@example.com")
@@ -91,9 +103,10 @@ def test_supabase_store_keeps_legacy_service_role_bearer_compatibility() -> None
 
 def test_judge_accepts_normalized_output_and_awards_all_groups() -> None:
     store = FakeJudgeStore()
+    compiler = AnsweringCompiler({"1 2": "3", "-5 12": "7", "20 22": "42"})
     service = JudgeService(
         store,
-        AnsweringCompiler({"1 2": "3", "-5 12": "7", "20 22": "42"}),
+        compiler,
     )
 
     result = service.submit(user, "1001", SubmitRequest(code="solution"))
@@ -103,6 +116,20 @@ def test_judge_accepts_normalized_output_and_awards_all_groups() -> None:
     assert result.passed_cases == 3
     assert result.submission_id == "submission-123"
     assert [group.earned_score for group in result.groups] == [40, 60]
+    assert compiler.limits == [(3000, 512)] * 3
+
+
+def test_judge_persists_peak_memory_and_memory_limit_status() -> None:
+    store = FakeJudgeStore()
+    compiler = AnsweringCompiler({}, status="memory_limit")
+    result = JudgeService(store, compiler).submit(
+        user, "1001", SubmitRequest(code="large allocation")
+    )
+
+    assert result.status == "memory_limit"
+    assert result.peak_memory_kb == 524288
+    assert result.groups[0].status == "failed"
+    assert result.groups[1].status == "not_run"
 
 
 def test_judge_uses_all_or_nothing_group_scoring_for_wrong_answer() -> None:
@@ -133,6 +160,16 @@ def test_judge_stops_after_compile_error_without_exposing_cases() -> None:
     serialized = result.model_dump_json()
     assert "1 2" not in serialized
     assert "expected_output" not in serialized
+
+
+def test_judge_persists_infrastructure_failure_as_system_error() -> None:
+    result = JudgeService(FakeJudgeStore(), UnavailableCompiler({})).submit(
+        user, "1001", SubmitRequest(code="solution")
+    )
+
+    assert result.status == "system_error"
+    assert result.groups[0].status == "failed"
+    assert result.groups[1].status == "not_run"
 
 
 def test_submit_endpoint_requires_authentication() -> None:

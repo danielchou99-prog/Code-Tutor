@@ -28,6 +28,7 @@ dist/
 coverage/
 .coverage
 htmlcov/
+.tmp/
 
 # Editors and operating systems
 .vscode/

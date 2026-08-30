@@ -1,10 +1,13 @@
 import type { ProgrammingLanguage } from "@/lib/file-items";
+export { getApiUrl } from "@/lib/api-url";
+import { getApiUrl } from "@/lib/api-url";
 
 export type RunStatus =
   | "accepted"
   | "compile_error"
   | "runtime_error"
   | "timeout"
+  | "output_limit"
   | "service_unavailable"
   | "rate_limited"
   | "server_busy";
@@ -23,13 +26,6 @@ export type SourceFile = {
   name: string;
   content: string;
 };
-
-export function getApiUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-
-  return `${window.location.protocol}//${window.location.hostname}:8000`;
-}
 
 export async function runCode(
   files: SourceFile[],

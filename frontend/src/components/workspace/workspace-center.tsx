@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { runCode, type SourceFile, type RunResult } from "@/lib/compiler-api";
+import { useAuth } from "@/lib/auth-context";
 import type { FileProject, ProjectFile } from "@/lib/file-items";
 import {
   type InteractiveConnection,
@@ -11,6 +12,7 @@ import {
   startInteractiveCode,
 } from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { useSettings } from "@/lib/settings-context";
 import { CodeEditorPanel } from "./code-editor-panel";
 import { OutputPanel } from "./output-panel";
@@ -18,6 +20,33 @@ import { OutputPanel } from "./output-panel";
 const initialInput = `5
 1 2 3 4 5
 `;
+
+type ProjectConsoleState = {
+  activeTab: "output" | "input";
+  inputMode: "batch" | "interactive";
+  result: RunResult | null;
+  stdin: string;
+};
+
+function isRunResult(value: unknown): value is RunResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<RunResult>;
+  return typeof result.status === "string"
+    && typeof result.stdout === "string"
+    && typeof result.stderr === "string"
+    && (typeof result.exit_code === "number" || result.exit_code === null)
+    && typeof result.duration_ms === "number"
+    && typeof result.truncated === "boolean";
+}
+
+function isProjectConsoleState(value: unknown): value is ProjectConsoleState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<ProjectConsoleState>;
+  return ["output", "input"].includes(state.activeTab ?? "")
+    && ["batch", "interactive"].includes(state.inputMode ?? "")
+    && (state.result === null || isRunResult(state.result))
+    && typeof state.stdin === "string";
+}
 
 export function WorkspaceCenter({
   project,
@@ -37,6 +66,7 @@ export function WorkspaceCenter({
   requestedFileId: string | null;
 }) {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const { settings } = useSettings();
   const [stdin, setStdin] = useState(initialInput);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -48,6 +78,27 @@ export function WorkspaceCenter({
   const [notification, setNotification] = useState<string | null>(null);
   const interactiveConnection = useRef<InteractiveConnection | null>(null);
   const interactiveTranscript = useRef("");
+  const [hydratedConsoleStateKey, setHydratedConsoleStateKey] = useState<string | null>(null);
+  const consoleStateKey = pageStateKey(`projects:${project.id}:console`, user?.id);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(consoleStateKey, isProjectConsoleState);
+      if (restored) {
+        setActiveTab(restored.activeTab);
+        setInputMode(restored.inputMode);
+        setResult(restored.result);
+        setStdin(restored.stdin);
+      }
+      setHydratedConsoleStateKey(consoleStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [consoleStateKey]);
+
+  useEffect(() => {
+    if (hydratedConsoleStateKey !== consoleStateKey) return;
+    savePageState(consoleStateKey, { activeTab, inputMode, result, stdin });
+  }, [activeTab, consoleStateKey, hydratedConsoleStateKey, inputMode, result, stdin]);
 
   useEffect(() => {
     return () => interactiveConnection.current?.stop();

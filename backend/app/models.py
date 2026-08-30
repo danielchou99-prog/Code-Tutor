@@ -8,6 +8,8 @@ RunStatus = Literal[
     "compile_error",
     "runtime_error",
     "timeout",
+    "memory_limit",
+    "output_limit",
     "service_unavailable",
     "rate_limited",
     "server_busy",
@@ -19,8 +21,11 @@ JudgeStatus = Literal[
     "compile_error",
     "runtime_error",
     "timeout",
+    "memory_limit",
+    "output_limit",
     "service_unavailable",
     "server_busy",
+    "system_error",
 ]
 
 
@@ -99,6 +104,7 @@ class RunResponse(BaseModel):
     stderr: str = ""
     exit_code: int | None = None
     duration_ms: int = 0
+    peak_memory_kb: int = 0
     truncated: bool = False
 
 
@@ -123,6 +129,7 @@ class SubmitResponse(BaseModel):
     passed_cases: int = 0
     total_cases: int = 0
     duration_ms: int = 0
+    peak_memory_kb: int = 0
     groups: list[JudgeGroupResult] = Field(default_factory=list)
     message: str = ""
 
@@ -149,9 +156,28 @@ class AiConnectionStatusResponse(BaseModel):
 
 
 class AiTutorRequest(BaseModel):
-    action: Literal["analyze", "explain_error", "hint", "ask"]
+    action: Literal["analyze", "explain_error", "hint", "common_errors", "test_strategy", "ask"]
     code: str = Field(default="", max_length=40_000)
     error_output: str = Field(default="", max_length=8_000)
     question: str = Field(default="", max_length=2_000)
     language: Literal["zh-Hant", "en"] = "zh-Hant"
     programming_language: Literal["cpp", "python"] = "cpp"
+    judge_summary: "JudgeAiSummary | None" = None
+
+
+class JudgeAiGroupSummary(BaseModel):
+    group_order: int = Field(ge=1, le=20)
+    earned_score: int = Field(ge=0, le=100)
+    passed_cases: int = Field(ge=0, le=500)
+    total_cases: int = Field(ge=0, le=500)
+    status: Literal["passed", "failed", "not_run"]
+
+
+class JudgeAiSummary(BaseModel):
+    status: JudgeStatus
+    score: int = Field(ge=0, le=100)
+    passed_cases: int = Field(ge=0, le=10_000)
+    total_cases: int = Field(ge=0, le=10_000)
+    duration_ms: int = Field(ge=0)
+    peak_memory_kb: int = Field(default=0, ge=0)
+    groups: list[JudgeAiGroupSummary] = Field(default_factory=list, max_length=20)

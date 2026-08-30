@@ -1,8 +1,19 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Language } from "@/lib/language-context";
 import type { ProgrammingLanguage } from "@/lib/file-items";
+import { getApiUrl } from "@/lib/api-url";
 
-export type AiTutorAction = "analyze" | "explain_error" | "hint" | "ask";
+export type AiTutorAction = "analyze" | "explain_error" | "hint" | "common_errors" | "test_strategy" | "ask";
+
+export type SanitizedJudgeSummary = {
+  status: string;
+  score: number;
+  passed_cases: number;
+  total_cases: number;
+  duration_ms: number;
+  peak_memory_kb: number;
+  groups: Array<{ group_order: number; earned_score: number; passed_cases: number; total_cases: number; status: "passed" | "failed" | "not_run" }>;
+};
 
 export type AiTutorRequest = {
   action: AiTutorAction;
@@ -11,13 +22,8 @@ export type AiTutorRequest = {
   question: string;
   language: Language;
   programmingLanguage: ProgrammingLanguage;
+  judgeSummary?: SanitizedJudgeSummary | null;
 };
-
-function getApiUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-  return `${window.location.protocol}//${window.location.hostname}:8000`;
-}
 
 export async function streamAiTutor(
   request: AiTutorRequest,
@@ -41,6 +47,7 @@ export async function streamAiTutor(
       question: request.question,
       language: request.language,
       programming_language: request.programmingLanguage,
+      judge_summary: request.judgeSummary ?? null,
     }),
     cache: "no-store",
     signal,

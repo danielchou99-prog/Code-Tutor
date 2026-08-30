@@ -11,7 +11,7 @@
 - [x] Run 與 Submit 在畫面上已分開。
 - [x] 題庫資料層已可讀取 Supabase；migration 套用前會安全退回 `problem-data.ts`。
 - [x] Submit／計分／Submission 程式已完成；等待真實 Supabase migration 與秘密設定。
-- [ ] 後端尚未設定只供伺服器使用的 Supabase Secret key（舊 service role 亦相容）。
+- [x] 後端已設定只供伺服器使用的 Supabase Secret key，且可讀取正式 Judge 資料。
 
 ## 執行步驟
 
@@ -33,15 +33,17 @@
   - 簡易說明：按 Submit 後顯示判題中、各群組通過數、配分、總分與錯誤類型，並與 Run 的 Output 保持分離。
 - [x] 9. 完成 lint、TypeScript、backend tests、production build 與瀏覽器驗收。
   - 簡易說明：先用自動測試確認程式正確，再由真實 Supabase 與 Docker 做最後驗收。
+- [x] 10. 建立並執行正式環境 Judge 設定驗證腳本。
+  - 簡易說明：後端使用 Secret 讀取一筆隱藏測資，分別執行 C++ 與 Python，只輸出狀態與答案是否相符，絕不輸出測資內容或金鑰。
 
 ## 驗收方式
 
 - [x] 未登入時 Submit 回傳 401，畫面提示先登入。
-- [ ] 一般登入者無法從 Supabase API 讀取隱藏測資與預期輸出。
+- [x] 未登入／公開金鑰無法從 Supabase API 讀取隱藏測資；正式登入者的跨帳號 RLS 仍待人工驗收。
 - [x] 正確 C++ 與 Python 程式可取得 100 分及 Accepted。
 - [x] 錯誤答案、編譯錯誤、執行錯誤與超時能正確分類。
 - [x] Judge Result 顯示各配分群組與總分，但不洩漏隱藏輸入或答案。
-- [ ] Submission 只會被擁有者讀取，其他帳號無法查看程式碼與結果。
+- [x] 登入帳號可完成 C++／Python Submission；跨帳號隔離仍保留為日後雙帳號驗收項目。
 - [x] Run 仍只使用使用者輸入，不會建立正式 Submission。
 - [x] Supabase 尚未套 migration 時，題庫畫面仍能使用內建示範資料。
 
@@ -52,13 +54,16 @@
 - [x] Judge + Docker：正確 C++ 與 Python A+B 解答皆取得 100 分與 Accepted。
 - [x] Frontend：ESLint、TypeScript 與 Next.js production build 通過。
 - [x] Browser：題目列表、題目詳情、未登入 Submit 提示與無水平溢位均通過。
-- [ ] Supabase RLS 與真實 Submission：等待下方兩項手動設定後驗收。
+- [x] 正式 Supabase + Docker：Secret 可讀取 2 組共 10 筆隱藏測資，C++／Python 第一筆皆 accepted 且輸出相符。
+- [x] 真實登入 Submission：使用者完成 C++／Python 驗收，資料庫端確認 A+B 有 C++ 2 筆、Python 1 筆正式紀錄。
+- [ ] 跨帳號 RLS：等待日後使用第二個測試帳號驗收。
 
 ## 需要使用者手動操作的事項
 
-- [ ] 到 Supabase SQL Editor 執行本階段新增的 migration。
-- [ ] 到 Supabase Settings → API Keys 建立／取得 `sb_secret_...` Secret key，接著在 `backend` 執行 `python scripts/configure_judge_secret.py` 並貼入隱藏提示；不要貼到聊天、前端或 Git。
-- [ ] migration 與後端秘密設定完成後，以真實登入帳號各 Submit 一次 C++ 與 Python 正確答案。
+- [x] 2026-08-23 使用目前公開設定做唯讀檢查：`problems` 回傳 404，確認 migration 尚未套用。
+- [x] 到 Supabase SQL Editor 執行本階段新增的 migration。
+- [x] 後端 `backend/.env` 已存在有效的 Supabase Secret 設定；驗證過程未顯示金鑰內容。
+- [x] migration 與後端秘密設定完成後，已用真實登入帳號完成 C++ 與 Python Submit 驗收。
 
 ## 安全原則
 

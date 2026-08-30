@@ -44,6 +44,28 @@ def test_docker_compiler_accepts_python_with_stdin() -> None:
     assert result.stdout == "42\n"
 
 
+def test_docker_compiler_runs_cpp_batch_in_order() -> None:
+    results = compiler.run_many(
+        """#include <iostream>
+int main() { int value = 0; std::cin >> value; std::cout << value * 2 << '\\n'; }
+""",
+        ["1\n", "21\n", "-5\n"],
+    )
+
+    assert [result.status for result in results] == ["accepted"] * 3
+    assert [result.stdout for result in results] == ["2\n", "42\n", "-10\n"]
+
+
+def test_docker_compiler_runs_python_batch_in_order() -> None:
+    results = compiler.run_many(
+        "value = int(input())\nprint(value + 1)\n",
+        ["0\n", "9\n"],
+        language="python",
+    )
+
+    assert [result.stdout for result in results] == ["1\n", "10\n"]
+
+
 def test_docker_compiler_reports_python_syntax_error() -> None:
     result = compiler.run("print(", "", language="python")
 
@@ -142,7 +164,7 @@ int main() {
         "",
     )
 
-    assert result.status == "accepted"
+    assert result.status == "output_limit"
     assert result.truncated is True
     assert len(result.stdout) == Settings().max_output_bytes
 
@@ -173,6 +195,48 @@ int main() {
 
     assert result.status == "accepted"
     assert result.stdout.splitlines() == ["50000 100000", "536870912", "64"]
+
+
+def test_docker_compiler_uses_per_request_limits_and_reports_memory() -> None:
+    result = compiler.run(
+        """#include <fstream>
+#include <iostream>
+#include <string>
+int main() {
+    std::string memory_limit;
+    std::ifstream memory_file("/sys/fs/cgroup/memory.max");
+    std::getline(memory_file, memory_limit);
+    std::cout << memory_limit << '\\n';
+}
+""",
+        "",
+        time_limit_ms=1000,
+        memory_limit_mb=64,
+    )
+
+    assert result.status == "accepted"
+    assert result.stdout == "67108864\n"
+    assert result.peak_memory_kb > 0
+
+
+def test_docker_compiler_distinguishes_memory_limit() -> None:
+    result = compiler.run(
+        """#include <cstdlib>
+#include <cstring>
+int main() {
+    while (true) {
+        void* block = std::malloc(1024 * 1024);
+        if (block == nullptr) continue;
+        std::memset(block, 1, 1024 * 1024);
+    }
+}
+""",
+        "",
+        time_limit_ms=5000,
+        memory_limit_mb=32,
+    )
+
+    assert result.status == "memory_limit"
 
 
 def test_docker_compiler_enforces_process_limit() -> None:

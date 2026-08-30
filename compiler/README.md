@@ -2,7 +2,7 @@
 
 The compiler uses the official GCC image and is invoked by the FastAPI backend with runtime restrictions.
 
-Build the local image after Docker Desktop is installed and running:
+Build the image after Docker Engine (Linux) or Docker Desktop (Windows/macOS) is installed and running:
 
 ```powershell
 docker build -t code-tutor-compiler:local compiler

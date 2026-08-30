@@ -1,11 +1,14 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProblemAdminSettings } from "@/components/settings/problem-admin-settings";
 import { connectAi, getAiConnection, type AiConnectionStatus, removeAiConnection } from "@/lib/ai-connection-api";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { getProblemAdminStatus } from "@/lib/problem-admin-api";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { type AppSettings, useSettings } from "@/lib/settings-context";
 
 type SettingsSection =
@@ -19,8 +22,15 @@ type SettingsSection =
   | "notifications"
   | "language"
   | "ai"
+  | "problem-admin"
   | "security"
   | "danger";
+
+type ProblemAdminAccess = "checking" | "allowed" | "denied" | "error";
+
+function isSettingsSection(value: unknown): value is SettingsSection {
+  return typeof value === "string" && sections.some((section) => section.id === value);
+}
 
 const sections: Array<{ id: SettingsSection; icon: string; zh: string; en: string }> = [
   { id: "profile", icon: "♟", zh: "個人資料", en: "Profile" },
@@ -33,6 +43,7 @@ const sections: Array<{ id: SettingsSection; icon: string; zh: string; en: strin
   { id: "notifications", icon: "●", zh: "通知", en: "Notifications" },
   { id: "language", icon: "◎", zh: "語言", en: "Language" },
   { id: "ai", icon: "✦", zh: "AI / Groq", en: "AI / Groq" },
+  { id: "problem-admin", icon: "◆", zh: "題目管理", en: "Problem Admin" },
   { id: "security", icon: "◇", zh: "帳號安全", en: "Account security" },
   { id: "danger", icon: "△", zh: "危險區域", en: "Danger zone" },
 ];
@@ -92,6 +103,48 @@ export function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<"remove-groq" | "signout-all" | null>(null);
   const [groqRevision, setGroqRevision] = useState(0);
+  const [problemAdminAccess, setProblemAdminAccess] = useState<ProblemAdminAccess>("denied");
+  const [problemAdminError, setProblemAdminError] = useState<string | null>(null);
+  const [hydratedSectionStateKey, setHydratedSectionStateKey] = useState<string | null>(null);
+  const sectionStateKey = pageStateKey("settings:section", user?.id);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(sectionStateKey, isSettingsSection);
+      if (restored) setActiveSection(restored);
+      setHydratedSectionStateKey(sectionStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [sectionStateKey]);
+
+  useEffect(() => {
+    if (hydratedSectionStateKey === sectionStateKey) savePageState(sectionStateKey, activeSection);
+  }, [activeSection, hydratedSectionStateKey, sectionStateKey]);
+
+  const checkProblemAdminAccess = useCallback(async () => {
+    if (!user) {
+      setProblemAdminAccess("denied");
+      setProblemAdminError(null);
+      return;
+    }
+    setProblemAdminAccess("checking");
+    setProblemAdminError(null);
+    try {
+      const isAdmin = await getProblemAdminStatus();
+      setProblemAdminAccess(isAdmin ? "allowed" : "denied");
+    } catch (requestError) {
+      setProblemAdminAccess("error");
+      setProblemAdminError(requestError instanceof Error ? requestError.message : "Unknown admin access error.");
+    }
+  }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) void checkProblemAdminAccess();
+    }, 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [checkProblemAdminAccess]);
 
   const clearFeedback = () => { setMessage(null); setError(null); };
   const showResult = (result: { error: string | null }, success: string) => {
@@ -116,9 +169,12 @@ export function SettingsPage() {
         <div className="mt-8 grid min-w-0 gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
           <nav aria-label={zh ? "設定分類" : "Settings categories"} className="flex gap-2 overflow-x-auto pb-2 lg:block lg:overflow-visible lg:pb-0">
             {sections.map((section) => (
-              <button key={section.id} type="button" onClick={() => { setActiveSection(section.id); clearFeedback(); }} className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs transition-colors lg:mb-1 lg:w-full ${activeSection === section.id ? "bg-cyan-300/8 text-cyan-200" : "text-slate-500 hover:bg-white/[0.025] hover:text-slate-300"}`}>
+              <button key={section.id} type="button" onClick={() => { setActiveSection(section.id); savePageState(sectionStateKey, section.id); clearFeedback(); }} className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs transition-colors lg:mb-1 lg:w-full ${activeSection === section.id ? "bg-cyan-300/8 text-cyan-200" : "text-slate-500 hover:bg-white/[0.025] hover:text-slate-300"}`}>
                 <span className="grid w-5 place-items-center font-mono text-[11px] text-cyan-300/70" aria-hidden="true">{section.icon}</span>
                 {zh ? section.zh : section.en}
+                {section.id === "problem-admin" && problemAdminAccess === "checking" ? <span className="ml-auto text-[9px] text-slate-600">…</span> : null}
+                {section.id === "problem-admin" && problemAdminAccess === "error" ? <span className="ml-auto text-[9px] text-amber-300">!</span> : null}
+                {section.id === "problem-admin" && problemAdminAccess === "denied" ? <span className="ml-auto text-[9px] text-slate-600">{zh ? "受限" : "Restricted"}</span> : null}
               </button>
             ))}
           </nav>
@@ -134,13 +190,27 @@ export function SettingsPage() {
             {activeSection === "notifications" ? <NotificationSettings settings={settings} updateSettings={updateSettings} zh={zh} /> : null}
             {activeSection === "language" ? <LanguageSettings language={language} setLanguage={setLanguage} zh={zh} /> : null}
             {activeSection === "ai" ? <GroqSettings key={`${user?.id ?? "guest"}-${groqRevision}`} user={user} busy={busy} setBusy={setBusy} setConfirmAction={setConfirmAction} showResult={showResult} setError={setError} zh={zh} /> : null}
+            {activeSection === "problem-admin" && problemAdminAccess === "allowed" ? <ProblemAdminSettings zh={zh} /> : null}
+            {activeSection === "problem-admin" && problemAdminAccess !== "allowed" ? (
+              <section>
+                <h2 className="text-lg font-semibold text-white">{zh ? "題目管理權限檢查" : "Problem admin access check"}</h2>
+                <p className="mt-2 text-xs leading-6 text-slate-500">
+                  {problemAdminAccess === "checking"
+                    ? (zh ? "正在向後端確認管理員身分…" : "Checking your administrator access with the backend…")
+                    : problemAdminAccess === "denied"
+                      ? (zh ? "這個帳號目前沒有修改題目、查看隱藏測資或發布題目的權限。一般題庫與解題功能仍可正常使用。" : "This account cannot edit problems, view hidden tests, or publish problems. The public problem library and solver remain available.")
+                      : (zh ? "管理員狀態無法確認，系統已保留入口並顯示實際錯誤。" : "Administrator status could not be confirmed. The entry remains visible and the actual error is shown.")}
+                </p>
+                {problemAdminError ? <p role="alert" className="mt-5 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-3 text-[11px] leading-5 text-amber-200">{problemAdminError}</p> : null}
+              </section>
+            ) : null}
             {activeSection === "security" ? <SecuritySettings key={user?.id ?? "guest"} user={user} busy={busy} setBusy={setBusy} updateEmail={updateEmail} updatePassword={updatePassword} showResult={showResult} zh={zh} /> : null}
             {activeSection === "danger" ? <DangerSettings user={user} setConfirmAction={setConfirmAction} zh={zh} /> : null}
 
             {error ? <p role="alert" className="mt-5 rounded-xl border border-rose-300/15 bg-rose-300/[0.04] p-3 text-[11px] leading-5 text-rose-300">{error}</p> : null}
             {message ? <p role="status" className="mt-5 rounded-xl border border-emerald-300/15 bg-emerald-300/[0.04] p-3 text-[11px] leading-5 text-emerald-300">{message}</p> : null}
 
-            {!(["profile", "ai", "security", "danger"] as SettingsSection[]).includes(activeSection) ? (
+            {!(["profile", "ai", "problem-admin", "security", "danger"] as SettingsSection[]).includes(activeSection) ? (
               <div className="mt-7 flex justify-end">
                 <button type="button" onClick={resetSettings} className="rounded-lg border border-white/8 px-4 py-2 text-[10px] text-slate-500 hover:text-slate-300">{zh ? "恢復預設值" : "Restore defaults"}</button>
               </div>
@@ -189,7 +259,31 @@ function ProfileSettings({ user, busy, setBusy, updateProfile, showResult, zh }:
   const [username, setUsername] = useState(user?.user_metadata.username ?? "");
   const [bio, setBio] = useState(user?.user_metadata.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.user_metadata.avatar_url ?? "");
+  const [hydratedDraftStateKey, setHydratedDraftStateKey] = useState<string | null>(null);
+  const draftStateKey = pageStateKey("settings:profile-draft", user?.id);
   const initial = (displayName || username || user?.email || "?").trim().charAt(0).toUpperCase();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(draftStateKey, (value): value is { avatarUrl: string; bio: string; displayName: string; username: string } => {
+        if (!value || typeof value !== "object") return false;
+        const draft = value as Record<string, unknown>;
+        return [draft.avatarUrl, draft.bio, draft.displayName, draft.username].every((item) => typeof item === "string");
+      });
+      if (restored) {
+        setDisplayName(restored.displayName);
+        setUsername(restored.username);
+        setBio(restored.bio);
+        setAvatarUrl(restored.avatarUrl);
+      }
+      setHydratedDraftStateKey(draftStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [draftStateKey]);
+
+  useEffect(() => {
+    if (hydratedDraftStateKey === draftStateKey) savePageState(draftStateKey, { avatarUrl, bio, displayName, username });
+  }, [avatarUrl, bio, displayName, draftStateKey, hydratedDraftStateKey, username]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

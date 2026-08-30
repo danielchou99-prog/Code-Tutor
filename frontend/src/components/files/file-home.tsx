@@ -20,6 +20,7 @@ import {
   updateFileItem,
 } from "@/lib/file-items";
 import { useLanguage } from "@/lib/language-context";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { useSettings } from "@/lib/settings-context";
 
 type FileHomeProps = {
@@ -27,6 +28,25 @@ type FileHomeProps = {
 };
 
 type FolderCrumb = Pick<FileItem, "id" | "name">;
+
+type FileListState = {
+  path: FolderCrumb[];
+  query: string;
+  selectedTags: string[];
+};
+
+function isFileListState(value: unknown): value is FileListState {
+  if (!value || typeof value !== "object") return false;
+  const state = value as Partial<FileListState>;
+  return typeof state.query === "string"
+    && Array.isArray(state.selectedTags)
+    && state.selectedTags.every((tag) => typeof tag === "string")
+    && Array.isArray(state.path)
+    && state.path.every((crumb) => Boolean(crumb)
+      && typeof crumb === "object"
+      && typeof (crumb as FolderCrumb).id === "string"
+      && typeof (crumb as FolderCrumb).name === "string");
+}
 
 type ItemDialogState =
   | { mode: "create"; kind: FileItemKind }
@@ -203,7 +223,27 @@ export function FileHome({ onOpenProject }: FileHomeProps) {
   const [moving, setMoving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [hydratedFileStateKey, setHydratedFileStateKey] = useState<string | null>(null);
+  const fileListStateKey = pageStateKey("files:list", user?.id);
   const currentFolderId = path.at(-1)?.id ?? null;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(fileListStateKey, isFileListState);
+      if (restored) {
+        setPath(restored.path);
+        setQuery(restored.query);
+        setSelectedTags(restored.selectedTags);
+      }
+      setHydratedFileStateKey(fileListStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fileListStateKey]);
+
+  useEffect(() => {
+    if (hydratedFileStateKey !== fileListStateKey) return;
+    savePageState(fileListStateKey, { path, query, selectedTags });
+  }, [fileListStateKey, hydratedFileStateKey, path, query, selectedTags]);
 
   const friendlyError = useCallback((error: unknown, fallback: "load" | "save" | "delete" | "move", pythonProject = false) => {
     const code = errorCode(error) ?? "";

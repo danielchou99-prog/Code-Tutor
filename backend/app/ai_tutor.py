@@ -68,6 +68,7 @@ class TutorPrompt:
     question: str
     language: str
     programming_language: str = "cpp"
+    judge_summary: dict[str, object] | None = None
 
 
 class GroqTextStream:
@@ -101,7 +102,7 @@ class GroqTutorProvider:
 
     def __init__(
         self,
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "openai/gpt-oss-120b",
         timeout_seconds: float = 60,
         max_completion_tokens: int = 900,
     ) -> None:
@@ -212,6 +213,15 @@ def build_messages(prompt: TutorPrompt) -> list[dict[str, str]]:
             "Act as a coach. Give one or two progressive hints and a question that helps the learner think. "
             "Do not reveal a complete solution or provide a full replacement program."
         ),
+        "common_errors": (
+            "Infer likely mistakes from the learner code and the aggregate Judge summary. "
+            "Explain patterns and debugging steps without guessing or requesting hidden test inputs or expected outputs."
+        ),
+        "test_strategy": (
+            "Suggest a concise hidden-test strategy using only the public problem statement and constraints in QUESTION. "
+            "Cover basic, boundary, extreme, special, duplicate, ordered, and large-random categories when relevant. "
+            "Do not generate expected outputs, do not ask for hidden cases, and do not request Generator or Reference source."
+        ),
         "ask": f"Answer the learner's question about this {programming_language} program with concise, practical guidance.",
     }
     system = (
@@ -225,6 +235,12 @@ def build_messages(prompt: TutorPrompt) -> list[dict[str, str]]:
         user_parts.append(f"<PROGRAM_OUTPUT>\n{prompt.error_output}\n</PROGRAM_OUTPUT>")
     if prompt.question:
         user_parts.append(f"<QUESTION>\n{prompt.question}\n</QUESTION>")
+    if prompt.judge_summary:
+        user_parts.append(
+            "<JUDGE_SUMMARY>\n"
+            + json.dumps(prompt.judge_summary, ensure_ascii=False, separators=(",", ":"))
+            + "\n</JUDGE_SUMMARY>"
+        )
     return [
         {"role": "system", "content": system},
         {"role": "user", "content": "\n\n".join(user_parts)},

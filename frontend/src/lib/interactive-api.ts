@@ -1,5 +1,6 @@
 import type { SourceFile } from "@/lib/compiler-api";
 import type { ProgrammingLanguage } from "@/lib/file-items";
+import { getWebSocketApiUrl } from "@/lib/api-url";
 
 export type InteractiveStatus =
   | "idle"
@@ -33,20 +34,12 @@ export type InteractiveConnection = {
   stop: () => void;
 };
 
-function getWebSocketUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
-  const apiUrl = configuredUrl
-    ? configuredUrl.replace(/\/$/, "")
-    : `${window.location.protocol}//${window.location.hostname}:8000`;
-  return `${apiUrl.replace(/^http/, "ws")}/api/run/interactive`;
-}
-
 export function startInteractiveCode(
   files: SourceFile[],
   language: ProgrammingLanguage,
   handlers: InteractiveHandlers,
 ): InteractiveConnection {
-  const socket = new WebSocket(getWebSocketUrl());
+  const socket = new WebSocket(getWebSocketApiUrl("/api/run/interactive"));
   let intentionallyStopped = false;
 
   socket.addEventListener("open", () => {

@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getApiUrl } from "@/lib/api-url";
 
 export type AiConnectionStatus = {
   connected: boolean;
@@ -6,12 +7,6 @@ export type AiConnectionStatus = {
   key_last_four: string | null;
   updated_at: string | null;
 };
-
-function getApiUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
-  return `${window.location.protocol}//${window.location.hostname}:8000`;
-}
 
 async function authenticatedRequest(
   method: "GET" | "PUT" | "DELETE",

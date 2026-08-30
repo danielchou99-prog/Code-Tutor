@@ -27,6 +27,7 @@ import {
 } from "@/lib/file-items";
 import type { SourceFile } from "@/lib/compiler-api";
 import { useLanguage } from "@/lib/language-context";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { useSettings } from "@/lib/settings-context";
 
 function EditorLoading() {
@@ -106,6 +107,7 @@ export function CodeEditorPanel({
   const [runError, setRunError] = useState<string | null>(null);
   const [pendingFileAction, setPendingFileAction] = useState<(() => void) | null>(null);
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
+  const [hydratedTabsStateKey, setHydratedTabsStateKey] = useState<string | null>(null);
   const cursorListener = useRef<IDisposable | null>(null);
   const loadSequence = useRef(0);
   const activeFileRef = useRef<ProjectFile | null>(null);
@@ -117,6 +119,7 @@ export function CodeEditorPanel({
   const runProjectRef = useRef<() => void>(() => undefined);
   const settingsRef = useRef(settings);
   const isDirty = hasLoadedCode && code !== savedCode;
+  const tabsStateKey = pageStateKey(`projects:${project.id}:open-files`, user?.id);
   const displayedSaveStatus: SaveStatus = saveStatus === "saving" || saveStatus === "failed"
     ? saveStatus
     : isDirty ? "unsaved" : "saved";
@@ -183,7 +186,11 @@ export function CodeEditorPanel({
           ?? nextFiles[0]
           ?? null;
         if (initialFile) {
-          setOpenFileIds([initialFile.id]);
+          const restoredIds = loadPageState(tabsStateKey, (value): value is string[] => Array.isArray(value) && value.every((id) => typeof id === "string")) ?? [];
+          const availableIds = new Set(nextFiles.map((file) => file.id));
+          const nextOpenIds = restoredIds.filter((id) => availableIds.has(id));
+          if (!nextOpenIds.includes(initialFile.id)) nextOpenIds.push(initialFile.id);
+          setOpenFileIds(nextOpenIds);
           void loadFile(initialFile);
         } else {
           activeFileRef.current = null;
@@ -194,13 +201,18 @@ export function CodeEditorPanel({
           hasLoadedCodeRef.current = true;
           onDirtyChange(false);
         }
+        setHydratedTabsStateKey(tabsStateKey);
       });
     }, 0);
     return () => {
       cancelled = true;
       window.clearTimeout(restoreTimer);
     };
-  }, [loadFile, onDirtyChange, project.id, project.language, zh]);
+  }, [loadFile, onDirtyChange, project.id, project.language, tabsStateKey, zh]);
+
+  useEffect(() => {
+    if (hydratedTabsStateKey === tabsStateKey) savePageState(tabsStateKey, openFileIds);
+  }, [hydratedTabsStateKey, openFileIds, tabsStateKey]);
 
   useEffect(() => () => cursorListener.current?.dispose(), []);
 

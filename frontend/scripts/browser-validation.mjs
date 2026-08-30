@@ -6,7 +6,7 @@ const [, , portText, url, widthText, heightText, screenshotPath, action = "none"
 
 if (!portText || !url || !widthText || !heightText || !screenshotPath) {
   throw new Error(
-    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-grid|problem-navigation|problem-detail|problem-ai|problem-refresh|interactive|language-menu|english|english-problems|run|run-blocked]",
+    "Usage: node browser-validation.mjs <port> <url> <width> <height> <screenshot> [current|account|account-clear|files-guest|settings|settings-light|home-logo|project|problems|problem-grid|problem-navigation|problem-detail|problem-language-menu|problem-code-tools|problem-ai|problem-refresh|interactive|language-menu|english|english-problems|run|run-blocked]",
   );
 }
 
@@ -486,7 +486,7 @@ if (action === "interactive") {
     await sleep(500);
   }
 }
-if (action === "problems" || action === "problem-grid" || action === "problem-navigation" || action === "english-problems" || action === "problem-detail" || action === "problem-ai" || action === "problem-refresh") {
+if (action === "problems" || action === "problem-grid" || action === "problem-navigation" || action === "english-problems" || action === "problem-detail" || action === "problem-language-menu" || action === "problem-code-tools" || action === "problem-ai" || action === "problem-refresh") {
   const englishProblems = action === "english-problems";
   const clicked = await evaluate(
     client,
@@ -501,12 +501,12 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
   );
   if (!clicked) throw new Error("Problems navigation button was not found.");
   await sleep(1_000);
-  if (action === "problem-detail" || action === "problem-ai" || action === "problem-refresh" || action === "problem-navigation") {
+  if (action === "problem-detail" || action === "problem-language-menu" || action === "problem-code-tools" || action === "problem-ai" || action === "problem-refresh" || action === "problem-navigation") {
     const problemOpened = await evaluate(
       client,
       `(() => {
         const button = [...document.querySelectorAll("button")].find(
-          (candidate) => candidate.textContent.includes("A + B") && candidate.textContent.includes("#1001"),
+          (candidate) => candidate.textContent.includes("星際補給站") && candidate.textContent.includes("#1001"),
         );
         if (!button) return false;
         button.click();
@@ -558,7 +558,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
             client,
             `(() => {
               const button = [...document.querySelectorAll("button")].find(
-                (candidate) => candidate.textContent.includes("A + B") && candidate.textContent.includes("#1001"),
+                (candidate) => candidate.textContent.includes("星際補給站") && candidate.textContent.includes("#1001"),
               );
               if (!button) return false;
               button.click();
@@ -580,7 +580,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       await sleep(1_500);
       const detailRestored = await evaluate(
         client,
-        `document.body.innerText.includes("題目描述") && document.body.innerText.includes("A + B")`,
+        `document.body.innerText.includes("題目描述") && document.body.innerText.includes("星際補給站")`,
       );
       if (!detailRestored) throw new Error("Problem detail was not restored after refresh.");
       const problemsClicked = await evaluate(
@@ -599,6 +599,82 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       actionSucceeded = await evaluate(
         client,
         `document.body.innerText.includes("題目列表") && !document.body.innerText.includes("題目描述")`,
+      );
+    } else if (action === "problem-language-menu") {
+      const menuOpened = await evaluate(
+        client,
+        `(() => { const trigger = document.querySelector('button[aria-label="選擇程式語言"]'); trigger?.click(); return Boolean(trigger); })()`,
+      );
+      if (!menuOpened) throw new Error("Problem programming language trigger was not found.");
+      await sleep(250);
+      actionSucceeded = await evaluate(
+        client,
+        `(() => {
+          const trigger = document.querySelector('button[aria-label="選擇程式語言"]');
+          const menu = document.querySelector('[role="menu"][aria-label="選擇程式語言"]');
+          const python = [...document.querySelectorAll('[role="menuitemradio"]')].find((item) => item.textContent.includes("Python 3"));
+          if (!trigger || !menu || !python) return false;
+          const triggerBounds = trigger.getBoundingClientRect();
+          const menuBounds = menu.getBoundingClientRect();
+          const pythonBounds = python.getBoundingClientRect();
+          const topElement = document.elementFromPoint(pythonBounds.left + pythonBounds.width / 2, pythonBounds.top + pythonBounds.height / 2);
+          return menuBounds.top >= triggerBounds.bottom && menuBounds.height >= 70 && menuBounds.bottom < window.innerHeight && Boolean(topElement && python.contains(topElement));
+        })()`,
+      );
+    } else if (action === "problem-code-tools") {
+      await evaluate(client, `window.localStorage.removeItem("code-tutor:problem-code-draft:1001:cpp")`);
+      const cleanReload = client.waitFor("Page.loadEventFired");
+      await client.send("Page.reload", { ignoreCache: true });
+      await cleanReload;
+      await sleep(1_500);
+      await client.send("DOM.enable");
+      const documentNode = await client.send("DOM.getDocument");
+      const fileInput = await client.send("DOM.querySelector", {
+        nodeId: documentNode.root.nodeId,
+        selector: 'input[type="file"]',
+      });
+      if (!fileInput.nodeId) throw new Error("Problem code import input was not found.");
+      await client.send("DOM.setFileInputFiles", {
+        nodeId: fileInput.nodeId,
+        files: [resolve("scripts/fixtures/import-code-test.cpp")],
+      });
+      await sleep(1_000);
+      const imported = await evaluate(
+        client,
+        `document.body.innerText.includes("未儲存") && document.body.innerText.includes("匯入") && document.body.innerText.includes("Save") && document.body.innerText.includes("還原") && document.body.innerText.includes("Imported") && document.body.innerText.includes("Code Tutor")`,
+      );
+      if (!imported) {
+        const visibleText = await evaluate(client, `document.body.innerText.slice(-1800)`);
+        throw new Error(`The imported code or Unsaved state was not visible. Visible text: ${visibleText}`);
+      }
+      const reloaded = client.waitFor("Page.loadEventFired");
+      await client.send("Page.reload", { ignoreCache: true });
+      await reloaded;
+      await sleep(2_000);
+      const draftRestored = await evaluate(
+        client,
+        `document.body.innerText.includes("Imported") && document.body.innerText.includes("Code Tutor") && document.body.innerText.includes("未儲存")`,
+      );
+      if (!draftRestored) throw new Error("The local unsaved problem draft was not restored after refresh.");
+      await evaluate(
+        client,
+        `([...document.querySelectorAll("button")].find((candidate) => candidate.textContent.trim() === "Save"))?.click()`,
+      );
+      await sleep(250);
+      const guestSaveExplained = await evaluate(
+        client,
+        `document.body.innerText.includes("請先登入，才能將程式碼儲存到帳號") && document.body.innerText.includes("未儲存內容仍保留在此裝置")`,
+      );
+      if (!guestSaveExplained) throw new Error("Guest Save did not explain account storage and local draft behavior.");
+      const resetClicked = await evaluate(
+        client,
+        `(() => { const button = [...document.querySelectorAll("button")].find((candidate) => candidate.textContent.trim() === "還原"); button?.click(); return Boolean(button); })()`,
+      );
+      if (!resetClicked) throw new Error("Reset button was not found.");
+      await sleep(250);
+      actionSucceeded = await evaluate(
+        client,
+        `document.body.innerText.includes("還原預設程式碼？") && document.body.innerText.includes("尚未儲存的修改") && document.body.innerText.includes("繼續還原")`,
       );
     } else if (action === "problem-ai") {
       const aiOpened = await evaluate(
@@ -679,6 +755,10 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
           text.includes("Text") && text.includes("Interactive Console") &&
           text.includes("範例輸入 1") && text.includes("範例輸出 1") &&
           text.includes("範例輸入 2") && text.includes("範例輸出 2") &&
+          text.includes("匯入") && text.includes("Save") && text.includes("已儲存") &&
+          (text.match(/−100 ≤ A, B ≤ 100/g) ?? []).length >= 2 &&
+          (text.match(/4 筆測資/g) ?? []).length === 2 &&
+          (text.match(/40%/g) ?? []).length >= 2 &&
           text.includes("請先登入 Code Tutor") && !text.includes("SUBMIT ONLY") &&
           Boolean(document.querySelector('button[aria-label="開啟 AI Tutor"]'));
       })()`,
@@ -690,7 +770,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
     `(() => {
       const cards = [...document.querySelectorAll('button[aria-label^="開啟題目"]')];
       const grid = cards[0]?.parentElement?.parentElement;
-      if (!grid || cards.length !== 4) return false;
+      if (!grid || cards.length < 5) return false;
       const columnCount = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
       const firstTop = cards[0].getBoundingClientRect().top;
       return columnCount >= 5 && cards.every((card) => Math.abs(card.getBoundingClientRect().top - firstTop) < 2);
@@ -718,13 +798,13 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
     englishProblems
       ? `document.documentElement.lang === "en" &&
           document.body.innerText.includes("1 found") &&
-          document.body.innerText.includes("A + B") &&
-          !document.body.innerText.includes("Shortest Path Through a Maze")`
+          document.body.innerText.includes("Orbital Supply Depot") &&
+          !document.body.innerText.includes("Forest of Mist")`
       : `document.documentElement.lang === "zh-Hant" &&
           document.body.innerText.includes("找到 1 題") &&
-          document.body.innerText.includes("A + B") &&
-          !document.body.innerText.includes("讀入兩個整數並輸出它們的總和") &&
-          !document.body.innerText.includes("迷宮最短路徑")`,
+          document.body.innerText.includes("星際補給站") &&
+          !document.body.innerText.includes("合併兩批送達太空站的補給數量") &&
+          !document.body.innerText.includes("迷霧森林")`,
   );
   }
 }

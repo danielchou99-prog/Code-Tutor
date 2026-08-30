@@ -37,6 +37,8 @@ class JudgeGroup:
 class JudgeProblem:
     problem_id: str
     groups: tuple[JudgeGroup, ...]
+    time_limit_ms: int = 3000
+    memory_limit_mb: int = 512
 
     @property
     def total_cases(self) -> int:
@@ -102,7 +104,7 @@ class SupabaseJudgeStore:
         encoded_id = quote(problem_id, safe="")
         problem_response = self._request(
             "GET",
-            f"problems?id=eq.{encoded_id}&published=eq.true&select=id&limit=1",
+            f"problems?id=eq.{encoded_id}&published=eq.true&select=id,time_limit_ms,memory_limit_mb&limit=1",
         )
         problem_records = problem_response.json()
         if not isinstance(problem_records, list) or not problem_records:
@@ -152,7 +154,13 @@ class SupabaseJudgeStore:
         )
         if any(not group.cases for group in groups):
             raise JudgeStorageUnavailable("A Judge group has no test cases.")
-        return JudgeProblem(problem_id=problem_id, groups=groups)
+        problem_record = problem_records[0]
+        return JudgeProblem(
+            problem_id=problem_id,
+            groups=groups,
+            time_limit_ms=int(problem_record.get("time_limit_ms", 3000)),
+            memory_limit_mb=int(problem_record.get("memory_limit_mb", 512)),
+        )
 
     def save_submission(
         self,
@@ -174,6 +182,7 @@ class SupabaseJudgeStore:
                 "passed_cases": result.passed_cases,
                 "total_cases": result.total_cases,
                 "duration_ms": result.duration_ms,
+                "peak_memory_kb": result.peak_memory_kb,
                 "group_results": [group.model_dump() for group in result.groups],
             },
         )
@@ -206,6 +215,7 @@ class JudgeService:
         groups: list[JudgeGroupResult] = []
         passed_cases = 0
         duration_ms = 0
+        peak_memory_kb = 0
         fatal_status: str | None = None
         fatal_message = ""
 
@@ -218,13 +228,16 @@ class JudgeService:
                         case.input,
                         request.files or None,
                         request.language,
+                        time_limit_ms=problem.time_limit_ms,
+                        memory_limit_mb=problem.memory_limit_mb,
                     )
                 except CompilerUnavailable:
-                    fatal_status = "service_unavailable"
+                    fatal_status = "system_error"
                     fatal_message = "The isolated compiler is unavailable."
                     break
 
                 duration_ms += run_result.duration_ms
+                peak_memory_kb = max(peak_memory_kb, run_result.peak_memory_kb)
                 if run_result.status != "accepted":
                     fatal_status = run_result.status
                     fatal_message = run_result.stderr[:2000]
@@ -273,6 +286,7 @@ class JudgeService:
             passed_cases=passed_cases,
             total_cases=problem.total_cases,
             duration_ms=duration_ms,
+            peak_memory_kb=peak_memory_kb,
             groups=groups,
             message=fatal_message,
         )

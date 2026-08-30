@@ -33,6 +33,22 @@ def read_allowed_origins() -> tuple[str, ...]:
     return origins
 
 
+def read_admin_user_ids() -> frozenset[str]:
+    return frozenset(
+        user_id.strip()
+        for user_id in os.getenv("CODE_TUTOR_ADMIN_USER_IDS", "").split(",")
+        if user_id.strip()
+    )
+
+
+def read_admin_emails() -> frozenset[str]:
+    return frozenset(
+        email.strip().casefold()
+        for email in os.getenv("CODE_TUTOR_ADMIN_EMAILS", "").split(",")
+        if email.strip()
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
     compiler_image: str = os.getenv(
@@ -74,6 +90,17 @@ class Settings:
     judge_rate_limit_window_seconds: int = int(
         os.getenv("CODE_TUTOR_JUDGE_RATE_LIMIT_WINDOW_SECONDS", "60")
     )
+    judge_worker_url: str | None = (
+        os.getenv("CODE_TUTOR_JUDGE_WORKER_URL", "").strip().rstrip("/") or None
+    )
+    judge_worker_token: str | None = (
+        os.getenv("CODE_TUTOR_JUDGE_WORKER_TOKEN", "").strip() or None
+    )
+    judge_worker_timeout_seconds: float = float(
+        os.getenv("CODE_TUTOR_JUDGE_WORKER_TIMEOUT_SECONDS", "120")
+    )
+    admin_user_ids: frozenset[str] = field(default_factory=read_admin_user_ids)
+    admin_emails: frozenset[str] = field(default_factory=read_admin_emails)
     ai_encryption_key: str | None = (
         os.getenv("CODE_TUTOR_AI_ENCRYPTION_KEY", "").strip() or None
     )
@@ -84,7 +111,7 @@ class Settings:
         os.getenv("CODE_TUTOR_AI_TUTOR_TIMEOUT_SECONDS", "60")
     )
     ai_model: str = os.getenv(
-        "CODE_TUTOR_AI_MODEL", "llama-3.3-70b-versatile"
+        "CODE_TUTOR_AI_MODEL", "openai/gpt-oss-120b"
     ).strip()
     ai_max_completion_tokens: int = int(
         os.getenv("CODE_TUTOR_AI_MAX_COMPLETION_TOKENS", "900")

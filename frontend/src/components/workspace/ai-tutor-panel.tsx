@@ -2,10 +2,11 @@
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
 
-import { streamAiTutor, type AiTutorAction } from "@/lib/ai-tutor-api";
+import { streamAiTutor, type AiTutorAction, type SanitizedJudgeSummary } from "@/lib/ai-tutor-api";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import type { ProgrammingLanguage } from "@/lib/file-items";
+import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 
 type TutorMessage = {
   id: string;
@@ -17,6 +18,7 @@ const actions: Array<{ action: AiTutorAction; icon: string }> = [
   { action: "analyze", icon: "AI" },
   { action: "explain_error", icon: "!" },
   { action: "hint", icon: "?" },
+  { action: "common_errors", icon: "≋" },
 ];
 
 function messageId(): string {
@@ -25,7 +27,19 @@ function messageId(): string {
     : `${Date.now()}-${Math.random()}`;
 }
 
-export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }: { code: string; errorOutput: string; onClose?: () => void; programmingLanguage: ProgrammingLanguage }) {
+function isTutorDraftState(value: unknown): value is { messages: TutorMessage[]; question: string } {
+  if (!value || typeof value !== "object") return false;
+  const state = value as { messages?: unknown; question?: unknown };
+  return typeof state.question === "string"
+    && Array.isArray(state.messages)
+    && state.messages.every((message) => Boolean(message)
+      && typeof message === "object"
+      && typeof (message as TutorMessage).id === "string"
+      && ["user", "assistant"].includes((message as TutorMessage).role)
+      && typeof (message as TutorMessage).content === "string");
+}
+
+export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, persistenceScope, programmingLanguage }: { code: string; errorOutput: string; judgeSummary?: SanitizedJudgeSummary | null; onClose?: () => void; persistenceScope: string; programmingLanguage: ProgrammingLanguage }) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const zh = language === "zh-Hant";
@@ -33,6 +47,7 @@ export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }
   const [question, setQuestion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hydratedTutorStateKey, setHydratedTutorStateKey] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const profileName = [user?.user_metadata.display_name, user?.user_metadata.username]
@@ -43,6 +58,23 @@ export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }
   const greeting = learnerName
     ? t("tutorGreetingNamed").replace("{name}", learnerName)
     : t("tutorGreeting");
+  const tutorStateKey = pageStateKey(`ai-tutor:${persistenceScope}`, user?.id);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const restored = loadPageState(tutorStateKey, isTutorDraftState);
+      if (restored) {
+        setMessages(restored.messages);
+        setQuestion(restored.question);
+      }
+      setHydratedTutorStateKey(tutorStateKey);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [tutorStateKey]);
+
+  useEffect(() => {
+    if (hydratedTutorStateKey === tutorStateKey) savePageState(tutorStateKey, { messages, question });
+  }, [hydratedTutorStateKey, messages, question, tutorStateKey]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -55,6 +87,8 @@ export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }
     analyze: { title: t("analyzeCode"), detail: t("analyzeCodeDetail") },
     explain_error: { title: t("explainError"), detail: t("explainErrorDetail") },
     hint: { title: t("giveHint"), detail: t("giveHintDetail") },
+    common_errors: { title: zh ? "分析常見錯誤" : "Analyze common errors", detail: zh ? "根據分數與群組結果找出可能問題" : "Use score and group results to identify likely issues" },
+    test_strategy: { title: zh ? "建議測資策略" : "Suggest test strategy", detail: zh ? "僅使用公開題目內容" : "Uses public problem content only" },
     ask: { title: zh ? "詢問 AI" : "Ask AI", detail: "" },
   };
 
@@ -86,6 +120,7 @@ export function AiTutorPanel({ code, errorOutput, onClose, programmingLanguage }
           question: customQuestion.trim(),
           language,
           programmingLanguage,
+          judgeSummary,
         },
         (chunk) => {
           setMessages((current) => current.map((message) =>

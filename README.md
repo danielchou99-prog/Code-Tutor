@@ -1,5 +1,13 @@
 # Code Tutor
 
+## Linux / VPS deployment
+
+Code Tutor supports Ubuntu Linux with Next.js, FastAPI, a private Judge Worker,
+and an isolated Docker compiler. Production deployment files are in `deploy/`;
+follow `docs/vps-deployment-runbook.md` before exposing the server to the
+Internet. Only Nginx ports 80/443 should be public. The application ports 3000,
+8000, and 8010 bind to `127.0.0.1`.
+
 Code Tutor 是一個以程式設計學習為核心的 AI Agent。使用者可以在線上撰寫與執行 C++ 或 Python，並取得錯誤解釋、除錯建議與漸進式提示。
 
 ## MVP 功能

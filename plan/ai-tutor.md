@@ -15,7 +15,7 @@
 - [x] 使用者可以登入並安全連接 Groq。
 - [x] Groq Key 只以加密形式儲存在 Supabase，前端無法讀回完整 Key。
 - [x] 程式頁已有 AI Tutor 外觀與三個快捷按鈕，但尚未連接真實 AI。
-- [x] 已確認 Groq 官方目前支援 Chat Completions 串流，且 `llama-3.3-70b-versatile` 列於免費方案限制表。
+- [x] 已確認 Groq 官方目前支援 Chat Completions 串流；2026-08-25 已依官方淘汰公告將預設模型更新為 `openai/gpt-oss-120b`。
 
 ## 三、執行步驟與簡易說明
 
