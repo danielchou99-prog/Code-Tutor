@@ -53,4 +53,4 @@ jobs:
 
       - name: Test backend and compiler
         working-directory: backend
-        run: python -m pytest
+        run: python scripts/run_ci_tests.py

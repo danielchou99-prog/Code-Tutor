@@ -41,6 +41,7 @@
 - [x] 提供 Ubuntu 首次安裝與正式更新操作手冊。
 - [x] 新增 Ubuntu GitHub Actions，持續驗證 Linux build、後端測試與 Docker 編譯器。
 - [x] 通過前端 lint、正式 build、Linux Bash 語法與完整後端 Docker 測試。
+- [ ] 修正首次 Ubuntu CI 的後端測試失敗，並加入不洩漏秘密的公開錯誤 annotation。（進行中）
 
 簡易說明：這一階段先讓程式與部署檔都能直接放進 Linux，不把 Windows 路徑、Docker Desktop 或開發用公開埠帶進正式環境。真正的 HTTPS 憑證與服務啟動仍必須等 VPS 和網域存在後驗收。
 
@@ -214,3 +215,10 @@ FastAPI --------------------------HTTPS--------> Groq
 - Linux compiler container 中執行 `bash -n`：兩份部署腳本皆通過。
 - systemd 與 Nginx 範本必要欄位靜態檢查：通過。
 - 尚待 VPS 驗證：Ubuntu 套件安裝、systemd 實際啟動、Nginx `nginx -t`、DNS、HTTPS 及外部裝置驗收。
+
+## GitHub Ubuntu CI 紀錄（2026-08-30）
+
+- Release `6adaa88` 已安全 fast-forward push 到 GitHub `main`。
+- Linux CI 的前端安裝、lint、build、Python 安裝、compiler image 與 Bash 語法檢查全部通過。
+- 後端 pytest step 回傳 exit code 1；未登入的 GitHub API 不提供完整 job log，因此部署暫停。
+- 正在加入遮蔽敏感字串的 pytest failure annotation，取得實際失敗測試後才進行修正。
