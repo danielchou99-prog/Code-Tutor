@@ -41,7 +41,7 @@
 - [x] 提供 Ubuntu 首次安裝與正式更新操作手冊。
 - [x] 新增 Ubuntu GitHub Actions，持續驗證 Linux build、後端測試與 Docker 編譯器。
 - [x] 通過前端 lint、正式 build、Linux Bash 語法與完整後端 Docker 測試。
-- [ ] 修正首次 Ubuntu CI 的後端測試失敗，並加入不洩漏秘密的公開錯誤 annotation。（進行中）
+- [x] 修正首次 Ubuntu CI 的後端測試失敗，並加入不洩漏秘密的公開錯誤 annotation；提交 `17e853c` 已在 GitHub Actions 通過。
 
 簡易說明：這一階段先讓程式與部署檔都能直接放進 Linux，不把 Windows 路徑、Docker Desktop 或開發用公開埠帶進正式環境。真正的 HTTPS 憑證與服務啟動仍必須等 VPS 和網域存在後驗收。
 
@@ -211,7 +211,7 @@ FastAPI --------------------------HTTPS--------> Groq
 
 - Frontend ESLint：通過。
 - Next.js production build 與 TypeScript：通過。
-- Backend 單元、API、Judge 及 Docker integration：`112 passed`。
+- Backend 單元、API、Judge 及 Docker integration：`115 passed`。
 - Linux compiler container 中執行 `bash -n`：兩份部署腳本皆通過。
 - systemd 與 Nginx 範本必要欄位靜態檢查：通過。
 - 尚待 VPS 驗證：Ubuntu 套件安裝、systemd 實際啟動、Nginx `nginx -t`、DNS、HTTPS 及外部裝置驗收。
@@ -223,4 +223,5 @@ FastAPI --------------------------HTTPS--------> Groq
 - 後端 pytest step 回傳 exit code 1；未登入的 GitHub API 不提供完整 job log，因此部署暫停。
 - 已加入遮蔽敏感字串的 pytest failure annotation，成功取得實際失敗測試。
 - 根因是 `test_writes_all_project_sources` 寫死 Windows `C:/project-sources`；正式 Linux 程式的 `chmod` 正確，但測試提供了不存在的路徑。
-- 正在將測試改為跨平台 `tmp_path`，並驗證 Linux 資料夾 `755` 與檔案 `644` 權限。
+- 已將測試改為跨平台 `tmp_path`，並驗證 Linux 資料夾 `755` 與檔案 `644` 權限。
+- 修正提交 `17e853c` 已推送至 GitHub `main`；Linux CI 執行 `33296500898` 的 `verify` 工作完成且結果為 `success`。
