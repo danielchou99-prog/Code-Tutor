@@ -98,7 +98,7 @@ FastAPI --------------------------HTTPS--------> Groq
 - [x] 從本機透過 SSH 登入 Hostinger VPS，完成第一輪唯讀環境檢查。
 - [x] 將 Code Tutor 專用 SSH 公鑰加入 VPS，並確認 key 登入不會退回密碼。
 - [x] 沿用 Hostinger 既有的 `debian` 非 root 帳號，確認專用 SSH key 與非互動 sudo 可用。
-- [ ] 更新系統套件。
+- [x] 更新 APT 套件索引並完成唯讀 upgrade 預演；目前 0 個可升級、0 個移除套件。
 - [x] 確認 Git 2.47.3、Python 3.13.5 與 Docker Engine 29.7.2 已存在。
 - [ ] 安裝 Nginx、Node.js 22、Python venv 與其他必要套件。
 - [ ] 同時檢查 Hostinger 防火牆與 Debian 主機防火牆，只開放 SSH、HTTP 80、HTTPS 443。
@@ -228,6 +228,7 @@ FastAPI --------------------------HTTPS--------> Groq
 - `systemctl --failed` 為 0；Code Tutor 專用 SSH 公鑰已加入 root 與 `debian`，日常部署改用 `debian`。
 - `debian` 帳號的 `.ssh` 為 `700`、`authorized_keys` 為 `600`，公鑰只有一筆，非互動 sudo 驗證通過。
 - 兩份部署 Bash 腳本已透過標準輸入在實際 Debian 13 執行 `bash -n`，語法檢查通過且未在 VPS 建立檔案。
+- APT 套件索引更新成功；Debian、security、backports、Docker 與 Hostinger Monarx repository 正常，upgrade 預演為 0 個可升級或移除套件。
 
 ## GitHub Ubuntu CI 紀錄（2026-08-30）
 

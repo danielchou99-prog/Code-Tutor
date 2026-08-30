@@ -30,12 +30,35 @@ git --version
 python3 --version
 ```
 
-確認是 Debian 13、Docker 可用且套件來源正確後，才更新套件清單並安裝缺少的基礎工具：
+確認是 Debian 13、Docker 可用且套件來源正確後，才更新套件清單並先安裝不會開放網站埠的基礎工具：
 
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y git nginx python3 python3-venv python3-pip curl ca-certificates xz-utils openssl ufw certbot python3-certbot-nginx fail2ban
+sudo apt install -y git python3 python3-venv python3-pip curl ca-certificates xz-utils openssl ufw
+```
+
+Nginx 安裝後可能立即監聽 80 埠，因此要先唯讀確認 SSH key、SSH 埠與 UFW 狀態，再建立「只允許 SSH」的防火牆基線：
+
+```bash
+sshd -T | grep '^port '
+sudo ufw status verbose
+ss -lntup
+```
+
+確認專用 SSH key 可登入且 SSH 是 22 埠後，才執行：
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp
+sudo ufw --force enable
+```
+
+重新開一條 SSH key 連線並確認沒有被鎖在門外，才安裝會啟動網路服務的套件；此時 80/443 仍會被 UFW 阻擋：
+
+```bash
+sudo apt install -y nginx certbot python3-certbot-nginx fail2ban
 ```
 
 目前 Hostinger 主機已由 Docker 官方 Debian repository 安裝 Docker Engine，不要重裝。若未來重建一台全新主機，依 Docker 官方 Debian 文件安裝，不使用 Docker Desktop：
@@ -224,12 +247,10 @@ sudo ufw status verbose
 ss -lntup
 ```
 
-確認專用 SSH key 登入正常、SSH 埠為 22，且 Hostinger Firewall 也準備開放 22、80、443 後，才啟用主機防火牆：
+確認 Nginx 設定完成、專用 SSH key 登入正常，且 Hostinger Firewall 也準備開放 22、80、443 後，才加入網站入口規則：
 
 ```bash
-sudo ufw allow OpenSSH
 sudo ufw allow 'Nginx Full'
-sudo ufw enable
 sudo ufw status verbose
 ```
 
