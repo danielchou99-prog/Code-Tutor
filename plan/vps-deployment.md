@@ -84,10 +84,10 @@ FastAPI --------------------------HTTPS--------> Groq
 ### 階段 0：部署前整理
 
 - [ ] 套用所有必要的 Supabase migrations。
-- [ ] 執行前端 lint、TypeScript、正式 build。
-- [ ] 執行後端單元測試與 Docker 整合測試。
-- [ ] 確認 Git 中沒有 `.env`、Supabase Secret key、Groq key 或 AI 加密金鑰。
-- [ ] 建立可辨識的 Git commit 或 release tag，作為回復版本。
+- [x] 執行前端 lint、TypeScript、正式 build。
+- [x] 執行後端單元測試與 Docker 整合測試。
+- [x] 確認 Git 中沒有 `.env`、Supabase Secret key、正式 Groq key 或 AI 加密金鑰。
+- [x] 建立可辨識的本機 Git commit `28925ed`，作為部署版本基礎。
 
 簡易說明：正式部署前先固定一個已通過測試的版本。如果部署失敗，可以退回這個版本，不必在 VPS 上臨時修改程式。
 
