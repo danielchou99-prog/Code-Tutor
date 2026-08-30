@@ -2,19 +2,18 @@
 
 ## 目標
 
-將 Code Tutor 部署到 Hostinger VPS，使用 Ubuntu Container OS，讓其他裝置能透過正式網域與 HTTPS 使用網站，同時保留目前的 Next.js 前端、FastAPI API、Supabase 帳號與資料庫，以及 Docker 隔離編譯功能。
+將 Code Tutor 部署到 Hostinger VPS，使用 Debian 13 作業系統，讓其他裝置能透過正式網域與 HTTPS 使用網站，同時保留目前的 Next.js 前端、FastAPI API、Supabase 帳號與資料庫，以及 Docker 隔離編譯功能。
 
 ## 已確認的部署環境
 
 - [x] VPS 供應商：Hostinger。
-- [x] Container OS：Ubuntu。
-- [ ] Ubuntu 詳細版本：待確認；若 Hostinger 可選，優先使用 Ubuntu 24.04 LTS 64 位元。
-- [ ] Hostinger VPS 方案與 CPU、RAM、磁碟容量：待確認。
-- [ ] VPS 公開 IP：待確認。
-- [ ] SSH 使用者名稱與連接埠：待確認。
+- [x] VPS 作業系統：Debian GNU/Linux 13.6（trixie）x86_64，由使用者選定。
+- [x] Hostinger VPS 規格：1 vCPU、4 GB RAM、50 GB 磁碟。
+- [x] VPS 公開 IP：`72.62.254.246`。
+- [x] 初始 SSH：`root@72.62.254.246:22`；正式部署前改用非 root 帳號與專用 SSH key。
 - [ ] 正式網域：待確認。
 
-簡易說明：Hostinger 提供實際執行網站的 VPS，Ubuntu 是 VPS 裡面的 Linux 作業系統。Supabase 仍然維持雲端服務，不會搬進 Hostinger；Next.js、FastAPI、Judge Worker、Nginx 與 Docker 編譯器會安裝在這台 Hostinger VPS。
+簡易說明：Hostinger 提供實際執行網站的 VPS，Debian 13 是 VPS 裡面的 Linux 作業系統。Supabase 仍然維持雲端服務，不會搬進 Hostinger；Next.js、FastAPI、Judge Worker、Nginx 與 Docker 編譯器會安裝在這台 Hostinger VPS。
 
 ## 目前狀態
 
@@ -24,11 +23,11 @@
 - [x] Supabase 已負責帳號、題目、檔案、測資與提交紀錄。
 - [x] 已有 Judge Worker 的安全邊界設計文件。
 - [ ] 完成尚未套用的 Supabase migration，並再次驗收題目管理功能。
-- [x] 已選定 Hostinger VPS 與 Ubuntu Container OS。
-- [ ] 取得 Hostinger VPS 公開 IP、SSH 登入資料、實際規格與網域。
+- [x] 已選定 Hostinger VPS 與 Debian 13。
+- [x] 已取得 Hostinger VPS 公開 IP、初始 SSH 登入方式與實際規格；正式網域仍待確認。
 - [x] 已完成 Linux 相容性盤點，正式環境不依賴 Docker Desktop 或 Windows 路徑。
 - [x] 已建立 Linux 正式部署設定與操作手冊。
-- [ ] 在實際 Ubuntu VPS 完成首次部署與外部驗收。
+- [ ] 在實際 Debian 13 VPS 完成首次部署與外部驗收。
 
 ## Linux 穩定性改良
 
@@ -38,7 +37,7 @@
 - [x] 提供 Nginx 反向代理設定，包含 HTTPS 後的 WebSocket 支援。
 - [x] 提供 Next.js、FastAPI、Judge Worker 的 systemd 服務。
 - [x] 提供可重複執行的 Linux 部署與健康檢查腳本。
-- [x] 提供 Ubuntu 首次安裝與正式更新操作手冊。
+- [ ] 將 Ubuntu 操作手冊調整並驗證為 Debian 13 首次安裝與正式更新流程。
 - [x] 新增 Ubuntu GitHub Actions，持續驗證 Linux build、後端測試與 Docker 編譯器。
 - [x] 通過前端 lint、正式 build、Linux Bash 語法與完整後端 Docker 測試。
 - [x] 修正首次 Ubuntu CI 的後端測試失敗，並加入不洩漏秘密的公開錯誤 annotation；提交 `17e853c` 已在 GitHub Actions 通過。
@@ -72,11 +71,12 @@ FastAPI --------------------------HTTPS--------> Groq
 ## VPS 建議規格
 
 - 供應商：Hostinger VPS。
-- Container OS：Ubuntu；詳細版本待確認，建議 Ubuntu 24.04 LTS 64 位元。
+- VPS 作業系統：Debian GNU/Linux 13.6（trixie）x86_64。
+- 實際起步規格：1 vCPU、4 GB RAM、50 GB 磁碟；適合部署驗證與少量使用者。
 - 最低測試規格：2 vCPU、4 GB RAM、40 GB SSD。
 - 建議正式起步：4 vCPU、8 GB RAM、80 GB SSD。
 - 必須支援硬體虛擬化及 Docker Engine。
-- 建議先限制同時執行 2 份程式；實際流量增加後再調整。
+- 目前 1 vCPU 先限制同時執行 1 份程式；實際流量增加後再升級 VPS 與調整 worker 數量。
 
 簡易說明：一般網站本身不太吃資源，但使用者編譯 C++、執行 Python 與 Judge 測資會同時占用 CPU、記憶體和磁碟，所以不能只用最小型網頁主機。
 
@@ -94,15 +94,18 @@ FastAPI --------------------------HTTPS--------> Groq
 
 ### 階段 1：準備 VPS
 
-- [ ] 在 Hostinger hPanel 確認 VPS 狀態、Ubuntu 版本、公開 IP 與資源規格。
-- [ ] 從本機透過 SSH 登入 Hostinger VPS，先做唯讀環境檢查。
+- [x] 在 Hostinger hPanel 與 VPS 確認 Debian 13.6、公開 IP、1 vCPU、4 GB RAM 與 50 GB 磁碟。
+- [x] 從本機透過 SSH 登入 Hostinger VPS，完成第一輪唯讀環境檢查。
+- [ ] 將 Code Tutor 專用 SSH 公鑰加入 VPS，確認 key 登入後停止使用 root 密碼部署。
 - [ ] 建立非 root 的部署帳號並設定 SSH key。
 - [ ] 更新系統套件。
-- [ ] 安裝 Git、Nginx、Node.js、Python 3、venv 與 Docker Engine。
-- [ ] 同時檢查 Hostinger 防火牆與 Ubuntu UFW，只開放 SSH、HTTP 80、HTTPS 443。
+- [x] 確認 Git 2.47.3、Python 3.13.5 與 Docker Engine 29.7.2 已存在。
+- [ ] 安裝 Nginx、Node.js 22、Python venv 與其他必要套件。
+- [ ] 同時檢查 Hostinger 防火牆與 Debian 主機防火牆，只開放 SSH、HTTP 80、HTTPS 443。
 - [ ] 啟用系統安全更新及基本登入防護。
+- [ ] 評估並建立少量 Swap，降低 4 GB RAM 在建置或編譯尖峰時被 OOM 終止的風險。
 
-簡易說明：Hostinger VPS 是一台長時間連上網路的 Linux 電腦。hPanel 負責 VPS 外層管理，Ubuntu 則負責網站內部服務；兩邊的防火牆都要確認，避免 3000、8000、8010 意外對外開放。
+簡易說明：Hostinger VPS 是一台長時間連上網路的 Linux 電腦。hPanel 負責 VPS 外層管理，Debian 13 則負責網站內部服務；兩邊的防火牆都要確認，避免 3000、8000、8010 意外對外開放。
 
 ### 階段 2：取得程式與建立執行環境
 
@@ -186,7 +189,7 @@ FastAPI --------------------------HTTPS--------> Groq
 
 ## 需要使用者手動操作的事項
 
-- 在 Hostinger hPanel 確認 Ubuntu 詳細版本、VPS 規格、公開 IP、SSH 使用者名稱與連接埠。
+- 已在 Hostinger hPanel 與 SSH 確認 Debian 13.6、VPS 規格、公開 IP、root 初始登入與 22 埠。
 - 在自己的電腦完成 Hostinger VPS 的 SSH 登入測試；不要提供密碼或 SSH 私鑰內容。
 - 準備一個網域，並在 DNS 服務商設定指向 VPS 的紀錄。
 - 在 Supabase Dashboard 套用 migrations，設定正式 Site URL 與 Redirect URL。
@@ -214,7 +217,15 @@ FastAPI --------------------------HTTPS--------> Groq
 - Backend 單元、API、Judge 及 Docker integration：`115 passed`。
 - Linux compiler container 中執行 `bash -n`：兩份部署腳本皆通過。
 - systemd 與 Nginx 範本必要欄位靜態檢查：通過。
-- 尚待 VPS 驗證：Ubuntu 套件安裝、systemd 實際啟動、Nginx `nginx -t`、DNS、HTTPS 及外部裝置驗收。
+- 尚待 VPS 驗證：Debian 套件安裝、systemd 實際啟動、Nginx `nginx -t`、DNS、HTTPS 及外部裝置驗收。
+
+## Hostinger Debian 13 唯讀檢查紀錄（2026-08-30）
+
+- Debian GNU/Linux 13.6（trixie），Linux 6.12，KVM，systemd 正常。
+- 1 vCPU、3.8 GiB 可用記憶體、無 Swap；根目錄 50 GB，已使用 3.3 GB。
+- 對外監聽只有 SSH 22；3000、8000、8010、80、443 尚未開放。
+- Docker 29.7.2、Git 2.47.3、Python 3.13.5 已安裝；Node.js 與 Nginx 尚未安裝。
+- `systemctl --failed` 為 0；Code Tutor 專用 SSH 公鑰尚未加入。
 
 ## GitHub Ubuntu CI 紀錄（2026-08-30）
 
