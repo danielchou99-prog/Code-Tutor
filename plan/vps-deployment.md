@@ -221,4 +221,6 @@ FastAPI --------------------------HTTPS--------> Groq
 - Release `6adaa88` 已安全 fast-forward push 到 GitHub `main`。
 - Linux CI 的前端安裝、lint、build、Python 安裝、compiler image 與 Bash 語法檢查全部通過。
 - 後端 pytest step 回傳 exit code 1；未登入的 GitHub API 不提供完整 job log，因此部署暫停。
-- 正在加入遮蔽敏感字串的 pytest failure annotation，取得實際失敗測試後才進行修正。
+- 已加入遮蔽敏感字串的 pytest failure annotation，成功取得實際失敗測試。
+- 根因是 `test_writes_all_project_sources` 寫死 Windows `C:/project-sources`；正式 Linux 程式的 `chmod` 正確，但測試提供了不存在的路徑。
+- 正在將測試改為跨平台 `tmp_path`，並驗證 Linux 資料夾 `755` 與檔案 `644` 權限。

@@ -1,7 +1,7 @@
 import subprocess
 import base64
+import os
 from pathlib import Path
-from unittest.mock import patch
 
 from app.compiler import (
     COMPILE_ERROR_MARKER,
@@ -100,18 +100,20 @@ def test_python_docker_command_uses_python_with_same_sandbox() -> None:
     assert "--memory 512m" in combined
 
 
-def test_writes_all_project_sources() -> None:
+def test_writes_all_project_sources(tmp_path: Path) -> None:
     sources = [
         ProjectSourceFile(name="main.cpp", content='#include "helper.hpp"\nint main() {}'),
         ProjectSourceFile(name="helper.hpp", content="int helper();"),
         ProjectSourceFile(name="helper.cpp", content="int helper() { return 1; }"),
     ]
 
-    with patch.object(Path, "write_text") as write_text:
-        DockerCompiler._write_source_files(Path("C:/project-sources"), sources)
+    DockerCompiler._write_source_files(tmp_path, sources)
 
-    assert [call.args[0] for call in write_text.call_args_list] == [
+    assert [(tmp_path / source.name).read_text(encoding="utf-8") for source in sources] == [
         '#include "helper.hpp"\nint main() {}',
         "int helper();",
         "int helper() { return 1; }",
     ]
+    if os.name != "nt":
+        assert tmp_path.stat().st_mode & 0o777 == 0o755
+        assert all((tmp_path / source.name).stat().st_mode & 0o777 == 0o644 for source in sources)
