@@ -152,17 +152,18 @@ test ! -e /srv/code-tutor
 ```
 
 ```bash
-sudo useradd --system --create-home --home-dir /home/code-tutor --shell /bin/bash code-tutor
+sudo useradd --system --create-home --home-dir /home/code-tutor --shell /usr/sbin/nologin code-tutor
 sudo usermod -aG docker code-tutor
 sudo install -d -o code-tutor -g code-tutor -m 0750 /srv/code-tutor
 ```
 
-注意：可以存取 Docker socket 的帳號具有很高權限。因此網站 API 必須只綁定 `127.0.0.1`，而且不能讓使用者控制 Docker 指令或映像名稱。
+`code-tutor` 是不能互動登入的服務帳號；clone 與建置仍由管理者透過 `sudo -u code-tutor` 執行。注意：可以存取 Docker socket 的帳號具有很高權限，因此網站 API 必須只綁定 `127.0.0.1`，而且不能讓使用者控制 Docker 指令或映像名稱。
 
 下載程式：
 
 ```bash
-sudo -u code-tutor git clone https://github.com/danielchou99-prog/Code-Tutor.git /srv/code-tutor
+cd /
+sudo -u code-tutor git clone --branch main --single-branch https://github.com/danielchou99-prog/Code-Tutor.git /srv/code-tutor
 ```
 
 如果 GitHub repository 尚未包含最新本機修改，必須先在開發電腦完成 commit 與 push，VPS 才能取得相同版本。

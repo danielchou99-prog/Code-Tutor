@@ -110,17 +110,18 @@ FastAPI --------------------------HTTPS--------> Groq
 
 ### 階段 2：取得程式與建立執行環境
 
-- [ ] 從 GitHub clone Code-Tutor 到固定目錄，例如 `/srv/code-tutor`。
-- [ ] 在 `frontend/` 安裝鎖定版本的 npm 套件。
-- [ ] 在 `backend/` 建立 Python venv 並安裝 requirements。
-- [ ] 執行 `docker build -t code-tutor-compiler:local compiler`。
+- [x] 建立不可互動登入的 `code-tutor` 服務帳號，並限制程式目錄權限。
+- [x] 從 GitHub clone Code-Tutor 到固定目錄 `/srv/code-tutor`。
+- [x] 在 `frontend/` 安裝鎖定版本的 npm 套件。
+- [x] 在 `backend/` 建立 Python venv 並安裝 requirements。
+- [x] 執行 `docker build -t code-tutor-compiler:local compiler`。
 - [ ] 建立專用的環境變數檔並限制為只有服務帳號可讀。
 
 簡易說明：GitHub 保存程式碼，VPS 則建立真正用來執行它的 Node、Python 與 Docker 環境。
 
 ### 階段 3：正式環境變數
 
-- [ ] 前端設定正式 `NEXT_PUBLIC_API_URL`、Supabase URL 與 publishable key。
+- [x] 前端設定正式 `NEXT_PUBLIC_API_URL`、Supabase URL 與 publishable key。
 - [ ] 後端設定正式網站來源、Supabase URL、publishable key 與 server-only secret key。
 - [ ] 設定管理員 UUID、AI encryption key、AI model 與執行限制。
 - [ ] 產生至少 32 bytes 的隨機 Judge Worker token，Web API 與 Worker 使用同一值。
@@ -234,6 +235,12 @@ FastAPI --------------------------HTTPS--------> Groq
 - Node.js 官方 Linux x64 檔案以固定 SHA-256 驗證後安裝到 `/opt/node-v22.23.2-linux-x64`，正式 symlink 正常，已安全移除可重新下載的暫存壓縮檔。
 - Nginx 設定語法與本機 HTTP 200、Fail2ban `pong`、Certbot timer、UFW 外部阻擋及 `systemctl --failed=0` 均驗證通過。
 - `/swapfile` 為 root `600`、2 GiB，`swapfile.swap` active；`fstab` 只有一筆且 0 errors，live/persistent swappiness 均為 10，原始 `fstab` 已備份。
+- `code-tutor` 服務帳號使用 `/usr/sbin/nologin`、沒有 `.ssh`，`/home/code-tutor` 為 `700`、`/srv/code-tutor` 為 `750`；帳號可寫程式目錄並可存取 Docker Engine。
+- GitHub `main` 已以 `code-tutor` 身分 clone 到 `/srv/code-tutor`；VPS HEAD 與 GitHub、本機皆為 `572fc16edd3ff8e12049968aa94394c945b9d0e5`，工作樹乾淨、擁有者正確，且沒有真正的 `.env`、PEM 或私鑰檔。
+- 前端已依 `package-lock.json` 以 `npm ci` 安裝 382 個套件，`npm ls --depth=0` 通過；後端 venv 的 `pip check` 與 FastAPI 等核心模組匯入測試通過。
+- `code-tutor-compiler:local` 已在 VPS 建置完成；C++20 與 Python 3 均在無網路、唯讀 root filesystem、非 root、CPU/RAM/PID 限制下通過 `Hello, World!` smoke test，且沒有殘留容器。
+- `/etc/code-tutor/frontend.env` 已建立為 `root:code-tutor 0640`，只包含三個瀏覽器公開欄位；同網域 API URL 留空，Supabase URL 與 publishable key 格式驗證通過且沒有 placeholder。
+- 前端 ESLint、Next.js 16.3 production build、TypeScript 與 6 個頁面資料產生均通過，`.next` BUILD_ID 有效；後端 Python 3.13 `compileall` 產生 16 個 bytecode 檔且無語法錯誤。
 
 ## GitHub Ubuntu CI 紀錄（2026-08-30）
 
