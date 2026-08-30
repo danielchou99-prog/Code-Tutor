@@ -68,4 +68,5 @@
 - `npm.cmd run lint`：通過。
 - `npm.cmd run build`：Next.js 16.3 編譯、TypeScript、page data 與 6 個頁面產生全部通過。
 - production build 產物可以找到 Dev Compass，找不到公開的 Code Tutor 舊品牌字樣。
+- VPS 已同步到 commit `231dc78` 並重新執行 lint 與 production build；正式產物中有 23 個檔案包含 Dev Compass，舊品牌檔案為 0，服務仍維持未啟動。
 - `dev-compass.com` 的 RDAP 狀態為已註冊，DNS 目前指向 `91.134.91.131`，不是本專案 VPS `72.62.254.246`；在確認控制權前不修改 Nginx 或 HTTPS。
