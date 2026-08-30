@@ -161,7 +161,7 @@ export function SettingsPage() {
     <section className="min-w-0 flex-1 px-4 py-8 sm:px-7 lg:px-10">
       <div className="mx-auto max-w-6xl">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">Code Tutor</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300">Dev Compass</p>
           <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">{zh ? "設定" : "Settings"}</h1>
           <p className="mt-2 text-xs leading-6 text-slate-500">{zh ? "管理個人資料、編輯器、執行方式、AI 連線與帳號安全。" : "Manage your profile, editor, run behavior, AI connection, and account security."}</p>
         </div>
@@ -222,7 +222,7 @@ export function SettingsPage() {
       <ConfirmDialog
         open={confirmAction !== null}
         title={confirmAction === "remove-groq" ? (zh ? "移除 Groq 連線？" : "Remove Groq connection?") : (zh ? "登出所有裝置？" : "Sign out every device?")}
-        description={confirmAction === "remove-groq" ? (zh ? "加密保存的 API Key 將從 Code Tutor 刪除。" : "The encrypted API key will be deleted from Code Tutor.") : (zh ? "目前瀏覽器與其他登入中的裝置都需要重新登入。" : "This browser and every other signed-in device will need to sign in again.")}
+        description={confirmAction === "remove-groq" ? (zh ? "加密保存的 API Key 將從 Dev Compass 刪除。" : "The encrypted API key will be deleted from Dev Compass.") : (zh ? "目前瀏覽器與其他登入中的裝置都需要重新登入。" : "This browser and every other signed-in device will need to sign in again.")}
         confirmLabel={confirmAction === "remove-groq" ? (zh ? "移除" : "Remove") : (zh ? "全部登出" : "Sign out all")}
         cancelLabel={t("cancel")}
         closeLabel={t("closeDialog")}
@@ -351,7 +351,7 @@ function NotificationSettings({ settings, updateSettings, zh }: PreferenceProps)
 }
 
 function LanguageSettings({ language, setLanguage, zh }: { language: "zh-Hant" | "en"; setLanguage: (value: "zh-Hant" | "en") => void; zh: boolean }) {
-  return <><SettingHeader title={zh ? "語言" : "Language"} detail={zh ? "設定 Code Tutor 的介面語言。" : "Choose the Code Tutor interface language."} /><div className="mt-6 space-y-3"><LanguageOption label="繁體中文" selected={language === "zh-Hant"} onClick={() => setLanguage("zh-Hant")} /><LanguageOption label="简体中文" selected={false} disabled badge={zh ? "翻譯準備中" : "Translation planned"} onClick={() => undefined} /><LanguageOption label="English" selected={language === "en"} onClick={() => setLanguage("en")} /></div></>;
+  return <><SettingHeader title={zh ? "語言" : "Language"} detail={zh ? "設定 Dev Compass 的介面語言。" : "Choose the Dev Compass interface language."} /><div className="mt-6 space-y-3"><LanguageOption label="繁體中文" selected={language === "zh-Hant"} onClick={() => setLanguage("zh-Hant")} /><LanguageOption label="简体中文" selected={false} disabled badge={zh ? "翻譯準備中" : "Translation planned"} onClick={() => undefined} /><LanguageOption label="English" selected={language === "en"} onClick={() => setLanguage("en")} /></div></>;
 }
 
 function LanguageOption({ label, selected, disabled = false, badge, onClick }: { label: string; selected: boolean; disabled?: boolean; badge?: string; onClick: () => void }) {
@@ -377,5 +377,5 @@ function DangerSettings({ user, setConfirmAction, zh }: { user: AccountUser; set
 }
 
 function SignInNotice({ zh }: { zh: boolean }) {
-  return <div className="mt-6 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-xs leading-6 text-amber-100/75">{zh ? "請先登入 Code Tutor，才能修改這個帳號設定。" : "Sign in to Code Tutor to change this account setting."}</div>;
+  return <div className="mt-6 rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-xs leading-6 text-amber-100/75">{zh ? "請先登入 Dev Compass，才能修改這個帳號設定。" : "Sign in to Dev Compass to change this account setting."}</div>;
 }

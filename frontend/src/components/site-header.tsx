@@ -67,7 +67,7 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
         className="flex min-w-max items-center gap-2 py-4 text-left transition-opacity hover:opacity-80 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 md:py-0"
       >
         <span className="size-2 rounded-full shadow-[0_0_10px_rgba(103,232,249,0.65)]" style={{ backgroundColor: accentColor }} />
-        <span className="text-sm font-semibold tracking-wide text-white">Code Tutor</span>
+        <span className="text-sm font-semibold tracking-wide text-white">Dev Compass</span>
       </button>
 
       <nav

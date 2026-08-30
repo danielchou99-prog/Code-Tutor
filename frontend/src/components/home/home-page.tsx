@@ -92,10 +92,10 @@ export function HomePage({ onSelect }: HomePageProps) {
               <span className="rounded-md border border-white/8 px-2 py-1 font-mono text-[9px] text-slate-600">main.cpp</span>
             </div>
             <div className="grid min-h-72 min-w-0 grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,0.56fr)]">
-              <pre className="w-full max-w-full overflow-x-auto border-b border-white/8 p-5 font-mono text-[11px] leading-7 text-slate-400 md:border-b-0 md:border-r"><code><span className="text-fuchsia-300">#include</span> <span className="text-emerald-300">&lt;iostream&gt;</span>{"\n\n"}<span className="text-fuchsia-300">int</span> <span className="text-cyan-200">main</span>() {`{`}{"\n"}  std::cout &lt;&lt; <span className="text-emerald-300">&quot;Hello, Code Tutor!&quot;</span>;{"\n"}  <span className="text-fuchsia-300">return</span> <span className="text-cyan-200">0</span>;{"\n"}{`}`}</code></pre>
+              <pre className="w-full max-w-full overflow-x-auto border-b border-white/8 p-5 font-mono text-[11px] leading-7 text-slate-400 md:border-b-0 md:border-r"><code><span className="text-fuchsia-300">#include</span> <span className="text-emerald-300">&lt;iostream&gt;</span>{"\n\n"}<span className="text-fuchsia-300">int</span> <span className="text-cyan-200">main</span>() {`{`}{"\n"}  std::cout &lt;&lt; <span className="text-emerald-300">&quot;Hello, Dev Compass!&quot;</span>;{"\n"}  <span className="text-fuchsia-300">return</span> <span className="text-cyan-200">0</span>;{"\n"}{`}`}</code></pre>
               <div className="flex flex-col bg-[#080d14] p-5 font-mono text-[10px]">
                 <p className="uppercase tracking-[0.18em] text-slate-600">{t("homePreviewOutput")}</p>
-                <p className="mt-5 text-slate-300">Hello, Code Tutor!</p>
+                <p className="mt-5 text-slate-300">Hello, Dev Compass!</p>
                 <div className="mt-auto flex items-center gap-2 border-t border-white/8 pt-4 text-emerald-300/80">
                   <span className="size-1.5 rounded-full bg-emerald-400" />
                   {t("homePreviewStatus")}

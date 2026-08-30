@@ -426,7 +426,7 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
       onSubmitted?.(result);
     } catch (error) {
       if (error instanceof JudgeApiError && error.statusCode === 401) {
-        setJudgeError(zh ? "請先登入 Code Tutor，再送出正式評分。" : "Sign in to Code Tutor before submitting for judging.");
+        setJudgeError(zh ? "請先登入 Dev Compass，再送出正式評分。" : "Sign in to Dev Compass before submitting for judging.");
       } else if (error instanceof JudgeApiError && error.statusCode === 503) {
         setJudgeError(zh ? "Judge 尚未完成伺服器設定，或目前暫時無法使用。" : "The Judge is not configured or is temporarily unavailable.");
       } else {

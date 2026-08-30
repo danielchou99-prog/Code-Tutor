@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Code Tutor | AI Coding Workspace",
-  description: "Learn C++ and Python with runtime feedback and an AI tutor.",
+  title: "Dev Compass | AI Coding Workspace",
+  description: "Find your direction in C++ and Python with runtime feedback, organized practice, and an AI tutor.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
