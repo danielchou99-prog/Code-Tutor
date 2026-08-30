@@ -104,7 +104,7 @@ FastAPI --------------------------HTTPS--------> Groq
 - [x] 啟用 Debian UFW 基線；目前只允許 IPv4/IPv6 SSH 22，外部 80/443 仍封鎖。
 - [ ] 檢查 Hostinger 外層防火牆；網站完成後只增加 HTTP 80 與 HTTPS 443，不開放 3000、8000、8010。
 - [ ] 啟用系統安全更新及基本登入防護。
-- [ ] 評估並建立少量 Swap，降低 4 GB RAM 在建置或編譯尖峰時被 OOM 終止的風險。
+- [x] 建立 2 GiB Swap 並將 swappiness 設為 10，降低建置或編譯尖峰時被 OOM 終止的風險。
 
 簡易說明：Hostinger VPS 是一台長時間連上網路的 Linux 電腦。hPanel 負責 VPS 外層管理，Debian 13 則負責網站內部服務；兩邊的防火牆都要確認，避免 3000、8000、8010 意外對外開放。
 
@@ -223,7 +223,7 @@ FastAPI --------------------------HTTPS--------> Groq
 ## Hostinger Debian 13 唯讀檢查紀錄（2026-08-30）
 
 - Debian GNU/Linux 13.6（trixie），Linux 6.12，KVM，systemd 正常。
-- 1 vCPU、3.8 GiB 可用記憶體、無 Swap；根目錄 50 GB，已使用 3.3 GB。
+- 1 vCPU、3.8 GiB RAM、2 GiB Swap；根目錄 50 GB，建立 Swap 後仍有約 42 GB 可用。
 - Nginx 已在主機監聽 80，但 UFW 對外只允許 SSH 22；外部實測 80/443 封鎖，3000、8000、8010 未監聽。
 - Docker 29.7.2、Git 2.47.3、Python 3.13.5/venv、Node.js 22.23.2、npm 10.9.8、Nginx 1.26.3、Certbot 4.0.0 與 Fail2ban 1.1.0 已安裝。
 - `systemctl --failed` 為 0；Code Tutor 專用 SSH 公鑰已加入 root 與 `debian`，日常部署改用 `debian`。
@@ -233,6 +233,7 @@ FastAPI --------------------------HTTPS--------> Groq
 - UFW 已啟用並設為開機套用，預設拒絕 incoming、允許 outgoing，只加入 22/tcp；新的非 root SSH key 連線驗證成功。
 - Node.js 官方 Linux x64 檔案以固定 SHA-256 驗證後安裝到 `/opt/node-v22.23.2-linux-x64`，正式 symlink 正常，已安全移除可重新下載的暫存壓縮檔。
 - Nginx 設定語法與本機 HTTP 200、Fail2ban `pong`、Certbot timer、UFW 外部阻擋及 `systemctl --failed=0` 均驗證通過。
+- `/swapfile` 為 root `600`、2 GiB，`swapfile.swap` active；`fstab` 只有一筆且 0 errors，live/persistent swappiness 均為 10，原始 `fstab` 已備份。
 
 ## GitHub Ubuntu CI 紀錄（2026-08-30）
 

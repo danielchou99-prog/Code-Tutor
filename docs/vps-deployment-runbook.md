@@ -35,7 +35,7 @@ python3 --version
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y git python3 python3-venv curl ca-certificates xz-utils openssl ufw
+sudo apt install -y git python3 python3-venv curl ca-certificates xz-utils openssl util-linux-extra ufw
 ```
 
 Nginx 安裝後可能立即監聽 80 埠，因此要先唯讀確認 SSH key、SSH 埠與 UFW 狀態，再建立「只允許 SSH」的防火牆基線：
@@ -98,6 +98,48 @@ python3 --version
 nginx -v
 python3 -m venv --help >/dev/null
 ```
+
+### 2.1 為 4 GB RAM 主機建立 Swap
+
+目前主機只有 4 GB RAM。先唯讀確認沒有既有 Swap、目標檔案不存在、根目錄為 ext4 且空間足夠：
+
+```bash
+free -h
+sudo swapon --show
+test ! -e /swapfile
+test ! -e /etc/fstab.code-tutor-before-swap-20260830
+test ! -e /etc/sysctl.d/99-code-tutor-swap.conf
+grep -nF '/swapfile' /etc/fstab || true
+findmnt -no SOURCE,FSTYPE,OPTIONS /
+df -h /
+```
+
+確認 `/swapfile`、備份與設定檔均不存在後，才建立 2 GiB Swap；先備份 `fstab`，不覆寫任何既有檔案：
+
+```bash
+sudo cp --preserve=all /etc/fstab /etc/fstab.code-tutor-before-swap-20260830
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+printf '%s\n' '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+printf '%s\n' 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-code-tutor-swap.conf >/dev/null
+sudo sysctl -w vm.swappiness=10
+sudo systemctl daemon-reload
+```
+
+完成後唯讀驗證：
+
+```bash
+free -h
+sudo swapon --show
+systemctl is-active swapfile.swap
+grep -cFx '/swapfile none swap sw 0 0' /etc/fstab
+cat /proc/sys/vm/swappiness
+sudo findmnt --verify
+```
+
+`findmnt --verify` 對一般 swapfile 顯示「source 是普通檔案」warning 屬正常；必須同時為 0 parse errors、0 errors。
 
 ## 3. 建立服務帳號與程式目錄
 
