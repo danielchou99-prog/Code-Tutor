@@ -1,16 +1,16 @@
-# Code Tutor Ubuntu VPS 部署操作手冊
+# Code Tutor Debian 13 VPS 部署操作手冊
 
-本文件搭配 [`plan/vps-deployment.md`](../plan/vps-deployment.md) 使用。指令以 Ubuntu 24.04 LTS 為準；第一次部署先不要把 3000、8000、8010 對外開放。
+本文件搭配 [`plan/vps-deployment.md`](../plan/vps-deployment.md) 使用。指令以 Hostinger Debian GNU/Linux 13（trixie）為準；第一次部署先不要把 3000、8000、8010 對外開放。每一節都先執行唯讀檢查，確認結果後才執行會寫入系統的指令。
 
 ## 1. 部署前必須準備
 
-- 一台 64 位元 Ubuntu 24.04 VPS。
+- 一台 64 位元 Debian 13 VPS；目前主機為 1 vCPU、4 GB RAM、50 GB 磁碟。
 - VPS 公開 IP、可使用 `sudo` 的 SSH 帳號與 SSH key。
 - 一個網域，例如 `code.example.com`。
 - 已完成 migrations 的 Supabase 專案。
 - GitHub 上可部署的 Code Tutor 版本。
 
-VPS 建議至少 4 vCPU、8 GB RAM。若只有 2 vCPU、4 GB RAM，請維持 `CODE_TUTOR_MAX_CONCURRENT_RUNS=2`，並先小規模測試。
+VPS 建議至少 4 vCPU、8 GB RAM。目前只有 1 vCPU、4 GB RAM，因此必須維持 `CODE_TUTOR_MAX_CONCURRENT_RUNS=1`、API 與 Worker 各 1 個 process，並先小規模測試。
 
 ## 2. 安裝系統套件
 
@@ -20,28 +20,71 @@ VPS 建議至少 4 vCPU、8 GB RAM。若只有 2 vCPU、4 GB RAM，請維持 `CO
 ssh YOUR_SSH_USER@YOUR_VPS_IP
 ```
 
-更新系統並安裝基礎工具：
+先做唯讀檢查：
+
+```bash
+cat /etc/os-release
+apt-cache policy nginx python3-venv python3-pip ufw certbot python3-certbot-nginx fail2ban
+docker --version
+git --version
+python3 --version
+```
+
+確認是 Debian 13、Docker 可用且套件來源正確後，才更新套件清單並安裝缺少的基礎工具：
 
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y git nginx python3 python3-venv python3-pip curl ca-certificates ufw
+sudo apt install -y git nginx python3 python3-venv python3-pip curl ca-certificates xz-utils openssl ufw certbot python3-certbot-nginx fail2ban
 ```
 
-按照 Docker 官方 Ubuntu 文件安裝 Docker Engine，不使用 Docker Desktop：
+目前 Hostinger 主機已由 Docker 官方 Debian repository 安裝 Docker Engine，不要重裝。若未來重建一台全新主機，依 Docker 官方 Debian 文件安裝，不使用 Docker Desktop：
 
-- <https://docs.docker.com/engine/install/ubuntu/>
+- <https://docs.docker.com/engine/install/debian/>
 
-安裝 Node.js 20.9 以上版本，建議 Node.js 22 LTS。完成後驗證：
+Debian 13 官方套件只有 Node.js 20，但目前 Supabase 套件要求 Node.js 22 以上。先唯讀確認目標不存在：
+
+```bash
+command -v node || true
+test ! -e /opt/node-v22.23.2-linux-x64
+test ! -e /usr/local/bin/node
+test ! -e /usr/local/bin/npm
+```
+
+四項均未發現既有 Node.js 22 後，下載 Node.js 官方 Linux x64 壓縮檔並驗證固定 SHA-256，再安裝到 `/opt`：
+
+```bash
+node_tmp="$(mktemp -d)"
+cd "$node_tmp"
+curl --fail --show-error --location --output node-v22.23.2-linux-x64.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
+printf '%s  %s\n' 'd60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307' 'node-v22.23.2-linux-x64.tar.xz' | sha256sum --check --strict
+sudo tar -xJf node-v22.23.2-linux-x64.tar.xz -C /opt
+sudo ln -s /opt/node-v22.23.2-linux-x64/bin/node /usr/local/bin/node
+sudo ln -s /opt/node-v22.23.2-linux-x64/bin/npm /usr/local/bin/npm
+sudo ln -s /opt/node-v22.23.2-linux-x64/bin/npx /usr/local/bin/npx
+sudo ln -s /opt/node-v22.23.2-linux-x64/bin/corepack /usr/local/bin/corepack
+```
+
+完成後唯讀驗證：
 
 ```bash
 node --version
 npm --version
 docker --version
 python3 --version
+nginx -v
+python3 -m venv --help >/dev/null
 ```
 
 ## 3. 建立服務帳號與程式目錄
+
+先確認帳號與目錄尚未存在：
+
+```bash
+getent passwd code-tutor || true
+getent group code-tutor || true
+test ! -e /srv/code-tutor
+```
 
 ```bash
 sudo useradd --system --create-home --home-dir /home/code-tutor --shell /bin/bash code-tutor
@@ -174,6 +217,14 @@ sudo certbot renew --dry-run
 ## 9. 防火牆
 
 先確認目前 SSH 服務使用的埠，再開啟防火牆。標準 22 埠範例：
+
+```bash
+sshd -T | grep '^port '
+sudo ufw status verbose
+ss -lntup
+```
+
+確認專用 SSH key 登入正常、SSH 埠為 22，且 Hostinger Firewall 也準備開放 22、80、443 後，才啟用主機防火牆：
 
 ```bash
 sudo ufw allow OpenSSH

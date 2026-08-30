@@ -21,7 +21,7 @@
   |
   | HTTPS 443
   v
-Hostinger VPS（Ubuntu）
+Hostinger VPS（Debian 13）
   |
   +-- Nginx：網站唯一公開入口
   |     |
@@ -47,7 +47,7 @@ Hostinger VPS（Ubuntu）
 | 分類 | 使用技術 | 負責的工作 |
 |---|---|---|
 | VPS | Hostinger VPS | 提供長時間運作的遠端主機 |
-| 作業系統 | Ubuntu Linux | 執行網站服務、Docker、Nginx 與系統工具 |
+| 作業系統 | Debian GNU/Linux 13 | 執行網站服務、Docker、Nginx 與系統工具 |
 | 網頁入口 | Nginx | 接收網域請求，轉送到前端或 API |
 | HTTPS | Let's Encrypt／Certbot | 加密瀏覽器與 VPS 之間的資料 |
 | 前端 | Next.js 16、React 19 | 顯示首頁、檔案、題目、編輯器、設定與 AI Tutor |
@@ -65,7 +65,7 @@ Hostinger VPS（Ubuntu）
 | AI | Groq API | AI Tutor、錯誤說明、提示及題目翻譯 |
 | AI Key 加密 | Fernet／Python cryptography | 加密使用者儲存的 Groq API Key |
 | 常駐服務 | systemd | 開機啟動、失敗重啟與服務日誌 |
-| 防火牆 | Hostinger Firewall、Ubuntu UFW | 只允許 SSH、HTTP 與 HTTPS 進入 VPS |
+| 防火牆 | Hostinger Firewall、Debian UFW／nftables | 只允許 SSH、HTTP 與 HTTPS 進入 VPS |
 | 程式碼版本 | Git、GitHub | 保存網站程式碼及部署版本 |
 | 自動測試 | GitHub Actions | 在 Ubuntu 檢查前端、後端與 Docker 編譯器 |
 | 套件管理 | npm、pip、Python venv | 安裝固定的前端與後端套件 |
@@ -273,7 +273,7 @@ systemd 管理三個服務：
 - `code-tutor-api.service`
 - `code-tutor-worker.service`
 
-它負責開機自動啟動、程式失敗後重啟、服務帳號、環境變數、檔案權限與 journal 日誌。Nginx 另外由 Ubuntu 內建的 Nginx service 管理。
+它負責開機自動啟動、程式失敗後重啟、服務帳號、環境變數、檔案權限與 journal 日誌。Nginx 另外由 Debian 套件提供的 Nginx service 管理。
 
 API 和 Worker 使用 `/var/lib/code-tutor` 當暫存路徑。它不能改成 systemd `PrivateTmp=true`，因為主機 Docker daemon 必須看得到被掛載的原始碼路徑。
 
@@ -353,7 +353,7 @@ API 和 Worker 使用 `/var/lib/code-tutor` 當暫存路徑。它不能改成 sy
 ## 17. 相關文件
 
 - [`plan/vps-deployment.md`](../plan/vps-deployment.md)：部署計畫與進度。
-- [`docs/vps-deployment-runbook.md`](vps-deployment-runbook.md)：Ubuntu VPS 實際操作步驟。
+- [`docs/vps-deployment-runbook.md`](vps-deployment-runbook.md)：Debian 13 VPS 實際操作步驟。
 - [`docs/vps-judge-worker.md`](vps-judge-worker.md)：Judge Worker 安全邊界。
 - [`deploy/`](../deploy/)：Nginx、systemd、環境變數與部署腳本。
 - [`supabase/migrations/`](../supabase/migrations/)：資料庫結構與 RLS 來源。

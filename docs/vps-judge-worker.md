@@ -14,7 +14,7 @@
 
 ## 手動步驟
 
-1. 安裝 Docker Engine、Python 3.12、Nginx 與 Git。
+1. 在 Debian 13 安裝或確認 Docker Engine、Python 3.13、Nginx 與 Git。
    - 意義：Docker 隔離使用者程式，Nginx 提供 HTTPS，Python 執行兩個後端服務。
 2. 建立 `code-tutor-web` 與 `code-tutor-worker` 兩個無登入權限的系統帳號。
    - 意義：即使其中一個服務出問題，也不會直接取得另一個服務的權限。
@@ -29,7 +29,7 @@
 
 - 設定 `Restart=on-failure`、`RestartSec=3`、`NoNewPrivileges=true`、`PrivateTmp=true`。
 - Web 與 Worker 的 EnvironmentFile 權限設為 `600`。
-- Worker 的 `CODE_TUTOR_MAX_CONCURRENT_RUNS` 從 `2` 開始，觀察 CPU/RAM 後再調整。
+- 目前 Hostinger VPS 只有 1 vCPU，Worker 的 `CODE_TUTOR_MAX_CONCURRENT_RUNS` 從 `1` 開始；升級 CPU 並觀察 CPU/RAM 後才能提高。
 - Nginx 不得代理 `/internal/` 或 Worker 的 8010 埠。
 - 防火牆只開 22、80、443；8010 不對外開放。
 

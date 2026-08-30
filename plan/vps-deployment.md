@@ -37,7 +37,7 @@
 - [x] 提供 Nginx 反向代理設定，包含 HTTPS 後的 WebSocket 支援。
 - [x] 提供 Next.js、FastAPI、Judge Worker 的 systemd 服務。
 - [x] 提供可重複執行的 Linux 部署與健康檢查腳本。
-- [ ] 將 Ubuntu 操作手冊調整並驗證為 Debian 13 首次安裝與正式更新流程。
+- [x] 將操作手冊調整並驗證為 Debian 13 首次安裝與正式更新流程。
 - [x] 新增 Ubuntu GitHub Actions，持續驗證 Linux build、後端測試與 Docker 編譯器。
 - [x] 通過前端 lint、正式 build、Linux Bash 語法與完整後端 Docker 測試。
 - [x] 修正首次 Ubuntu CI 的後端測試失敗，並加入不洩漏秘密的公開錯誤 annotation；提交 `17e853c` 已在 GitHub Actions 通過。
@@ -96,8 +96,8 @@ FastAPI --------------------------HTTPS--------> Groq
 
 - [x] 在 Hostinger hPanel 與 VPS 確認 Debian 13.6、公開 IP、1 vCPU、4 GB RAM 與 50 GB 磁碟。
 - [x] 從本機透過 SSH 登入 Hostinger VPS，完成第一輪唯讀環境檢查。
-- [ ] 將 Code Tutor 專用 SSH 公鑰加入 VPS，確認 key 登入後停止使用 root 密碼部署。
-- [ ] 建立非 root 的部署帳號並設定 SSH key。
+- [x] 將 Code Tutor 專用 SSH 公鑰加入 VPS，並確認 key 登入不會退回密碼。
+- [x] 沿用 Hostinger 既有的 `debian` 非 root 帳號，確認專用 SSH key 與非互動 sudo 可用。
 - [ ] 更新系統套件。
 - [x] 確認 Git 2.47.3、Python 3.13.5 與 Docker Engine 29.7.2 已存在。
 - [ ] 安裝 Nginx、Node.js 22、Python venv 與其他必要套件。
@@ -225,7 +225,9 @@ FastAPI --------------------------HTTPS--------> Groq
 - 1 vCPU、3.8 GiB 可用記憶體、無 Swap；根目錄 50 GB，已使用 3.3 GB。
 - 對外監聽只有 SSH 22；3000、8000、8010、80、443 尚未開放。
 - Docker 29.7.2、Git 2.47.3、Python 3.13.5 已安裝；Node.js 與 Nginx 尚未安裝。
-- `systemctl --failed` 為 0；Code Tutor 專用 SSH 公鑰尚未加入。
+- `systemctl --failed` 為 0；Code Tutor 專用 SSH 公鑰已加入 root 與 `debian`，日常部署改用 `debian`。
+- `debian` 帳號的 `.ssh` 為 `700`、`authorized_keys` 為 `600`，公鑰只有一筆，非互動 sudo 驗證通過。
+- 兩份部署 Bash 腳本已透過標準輸入在實際 Debian 13 執行 `bash -n`，語法檢查通過且未在 VPS 建立檔案。
 
 ## GitHub Ubuntu CI 紀錄（2026-08-30）
 
