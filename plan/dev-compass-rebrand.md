@@ -2,13 +2,13 @@
 
 ## 目標
 
-將網站對使用者顯示的品牌名稱由 **Code Tutor** 改成 **Dev Compass**，同步更新首頁、導覽列、登入與設定相關文字、網頁標題及說明。預定正式網域為 `dev-compass.com`，但只有在確認網域控制權且 DNS 指向本 VPS 後才會套用部署設定。
+將網站對使用者顯示的品牌名稱由 **Code Tutor** 改成 **Dev Compass**，同步更新首頁、導覽列、登入與設定相關文字、網頁標題及說明。正式網域候選改為 `devcompasslab.com`，但只有在使用者完成購買且 DNS 指向本 VPS 後才會套用正式部署設定。
 
 ## 目前狀態
 
 - [x] 完成網站品牌文字與首頁的唯讀盤點。
-- [x] 查詢 `dev-compass.com` 的 DNS 與 `.com` 註冊局 RDAP 資料。
-- [ ] 確認使用者是否擁有並能管理 `dev-compass.com`。
+- [x] 查詢 `devcompasslab.com` 的 DNS 與 `.com` 註冊局 RDAP 資料；目前兩個 RDAP 來源皆為 404 且沒有 DNS。
+- [ ] 使用者購買 `devcompasslab.com`，並確認可以管理 DNS。
 - [x] 將使用者介面品牌改為 Dev Compass。
 - [x] 更新首頁的品牌標題、說明與示範輸出。
 - [x] 執行前端 lint 與 production build；目前 `package.json` 沒有額外 test script。
@@ -42,7 +42,7 @@
 
 ### 4. 正式網域
 
-- 確認 `dev-compass.com` 位於使用者的網域管理帳號中。
+- 購買 `devcompasslab.com`，並確認它位於使用者的網域管理帳號中。
 - 將根網域 A record 指向 `72.62.254.246`，並處理 `www` 是否使用。
 - DNS 生效後才更新 Nginx、後端 allowed origin、Supabase URL Configuration 與 Certbot HTTPS。
 
@@ -59,8 +59,8 @@
 
 ## 需要使用者手動操作
 
-- 登入網域註冊商或 Hostinger，確認是否能管理 `dev-compass.com` 的 DNS。
-- 若不擁有此網域，必須購買另一個可用網域；不要只用大小寫變化，因為網域不分大小寫。
+- 登入 Hostinger 購買 `devcompasslab.com`，並確認可以管理它的 DNS。
+- 購買前再次確認結帳頁顯示可以註冊；RDAP 404 只能代表查詢當下沒有註冊紀錄。
 - 網域確認後，在 Supabase Authentication → URL Configuration 更新 Site URL 與 Redirect URL。
 
 ## 實際驗證紀錄（2026-08-30）
@@ -69,4 +69,4 @@
 - `npm.cmd run build`：Next.js 16.3 編譯、TypeScript、page data 與 6 個頁面產生全部通過。
 - production build 產物可以找到 Dev Compass，找不到公開的 Code Tutor 舊品牌字樣。
 - VPS 已同步到 commit `231dc78` 並重新執行 lint 與 production build；正式產物中有 23 個檔案包含 Dev Compass，舊品牌檔案為 0，服務仍維持未啟動。
-- `dev-compass.com` 的 RDAP 狀態為已註冊，DNS 目前指向 `91.134.91.131`，不是本專案 VPS `72.62.254.246`；在確認控制權前不修改 Nginx 或 HTTPS。
+- `devcompasslab.com` 在 2026-08-30 的 Verisign RDAP 與 RDAP.org 查詢均為 404，且沒有 A/AAAA 紀錄；在完成購買並確認控制權前不修改 Nginx 或 HTTPS。

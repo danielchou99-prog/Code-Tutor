@@ -1,8 +1,8 @@
-# Code Tutor VPS 正式部署計畫
+# Dev Compass VPS 正式部署計畫
 
 ## 目標
 
-將 Code Tutor 部署到 Hostinger VPS，使用 Debian 13 作業系統，讓其他裝置能透過正式網域與 HTTPS 使用網站，同時保留目前的 Next.js 前端、FastAPI API、Supabase 帳號與資料庫，以及 Docker 隔離編譯功能。
+將 Dev Compass 部署到 Hostinger VPS，使用 Debian 13 作業系統，讓其他裝置能透過正式網域與 HTTPS 使用網站，同時保留目前的 Next.js 前端、FastAPI API、Supabase 帳號與資料庫，以及 Docker 隔離編譯功能。
 
 ## 已確認的部署環境
 
@@ -11,7 +11,7 @@
 - [x] Hostinger VPS 規格：1 vCPU、4 GB RAM、50 GB 磁碟。
 - [x] VPS 公開 IP：`72.62.254.246`。
 - [x] 初始 SSH：`root@72.62.254.246:22`；正式部署前改用非 root 帳號與專用 SSH key。
-- [ ] 正式網域：待確認。
+- [ ] 正式網域：已選定 `devcompasslab.com`，待使用者購買並將 DNS 指向 VPS。
 
 簡易說明：Hostinger 提供實際執行網站的 VPS，Debian 13 是 VPS 裡面的 Linux 作業系統。Supabase 仍然維持雲端服務，不會搬進 Hostinger；Next.js、FastAPI、Judge Worker、Nginx 與 Docker 編譯器會安裝在這台 Hostinger VPS。
 
@@ -24,7 +24,7 @@
 - [x] 已有 Judge Worker 的安全邊界設計文件。
 - [ ] 完成尚未套用的 Supabase migration，並再次驗收題目管理功能。
 - [x] 已選定 Hostinger VPS 與 Debian 13。
-- [x] 已取得 Hostinger VPS 公開 IP、初始 SSH 登入方式與實際規格；正式網域仍待確認。
+- [x] 已取得 Hostinger VPS 公開 IP、初始 SSH 登入方式與實際規格；正式網域候選已選定，仍待購買與 DNS 設定。
 - [x] 已完成 Linux 相容性盤點，正式環境不依賴 Docker Desktop 或 Windows 路徑。
 - [x] 已建立 Linux 正式部署設定與操作手冊。
 - [ ] 在實際 Debian 13 VPS 完成首次部署與外部驗收。
