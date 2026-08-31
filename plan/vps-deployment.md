@@ -28,6 +28,7 @@
 - [x] 已完成 Linux 相容性盤點，正式環境不依賴 Docker Desktop 或 Windows 路徑。
 - [x] 已建立 Linux 正式部署設定與操作手冊。
 - [ ] 在實際 Debian 13 VPS 完成首次部署與外部驗收。
+- [x] 先以 `http://72.62.254.246` 提供暫時前端預覽；正式網域與 HTTPS 完成後移除 IP 預覽設定。
 
 ## Linux 穩定性改良
 
@@ -138,6 +139,16 @@ FastAPI --------------------------HTTPS--------> Groq
 - [ ] 驗證三個本機服務的 health 與啟動狀態。
 
 簡易說明：systemd 會在 VPS 重新開機後自動啟動網站，程式意外停止時也能重新啟動。
+
+### 階段 4.1：暫時 IP 前端預覽
+
+- [x] 只安裝並啟動 Next.js frontend systemd service，綁定 `127.0.0.1:3000`（已驗證 systemd active、HTTP 200 與 Dev Compass 品牌）。
+- [x] 建立只匹配 `72.62.254.246` 的暫時 Nginx site，反向代理到前端。
+- [x] 先以 VPS 本機 curl 驗證 Nginx 與 Dev Compass 品牌，再開放 UFW HTTP 80（已驗證 HTTP 200）。
+- [x] 從開發電腦外部驗證 `http://72.62.254.246` 回傳 200，頁面標題為 Dev Compass。
+- [x] 已確認並記錄此階段沒有 HTTPS，API、管理員驗證、編譯器、Judge 與 AI 尚未啟動；`/api/` 目前會回傳 502。
+
+簡易說明：這個階段只是讓使用者先查看首頁與介面。3000 不直接對外開放，外部流量仍只經過 Nginx 80；正式上線前必須改用網域與 HTTPS。
 
 ### 階段 5：網域、Nginx 與 HTTPS
 
