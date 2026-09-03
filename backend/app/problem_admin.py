@@ -24,16 +24,13 @@ class ProblemAdminUnavailable(RuntimeError):
 
 
 class LocalizedText(BaseModel):
-    zh: str = Field(min_length=1, max_length=4_000)
-    en: str = Field(min_length=1, max_length=4_000)
+    zh: str = Field(max_length=4_000)
+    en: str = Field(max_length=4_000)
 
     @field_validator("zh", "en")
     @classmethod
     def strip_text(cls, value: str) -> str:
-        stripped = value.strip()
-        if not stripped:
-            raise ValueError("Localized text cannot be blank.")
-        return stripped
+        return value.strip()
 
 
 class AdminTag(BaseModel):
@@ -95,13 +92,13 @@ class AdminProblem(BaseModel):
     description: list[LocalizedText] = Field(min_length=1, max_length=30)
     input_format: LocalizedText
     output_format: LocalizedText
-    constraints: list[LocalizedText] = Field(min_length=1, max_length=30)
+    constraints: list[LocalizedText] = Field(max_length=30)
     starter_code: AdminStarterCode
     difficulty: Literal["easy", "medium", "hard"]
     time_limit_ms: int = Field(ge=100, le=10_000)
     memory_limit_mb: int = Field(ge=16, le=1_024)
     published: bool = False
-    tags: list[AdminTag] = Field(min_length=1, max_length=8)
+    tags: list[AdminTag] = Field(max_length=8)
     samples: list[AdminSample] = Field(min_length=1, max_length=20)
     test_groups: list[AdminTestGroup] = Field(min_length=1, max_length=20)
 
@@ -112,6 +109,23 @@ class AdminProblem(BaseModel):
         tag_slugs = [tag.slug for tag in self.tags]
         if len(tag_slugs) != len(set(tag_slugs)):
             raise ValueError("Tag slugs must be unique.")
+        public_text_is_complete = (
+            bool(self.title.zh and self.title.en)
+            and bool(self.summary.zh and self.summary.en)
+            and any(item.zh and item.en for item in self.description)
+            and bool(self.input_format.zh and self.input_format.en)
+            and bool(self.output_format.zh and self.output_format.en)
+            and bool(self.tags)
+            and all(
+                group.name.zh
+                and group.name.en
+                and group.condition.zh
+                and group.condition.en
+                for group in self.test_groups
+            )
+        )
+        if self.published and not public_text_is_complete:
+            self.published = False
         return self
 
 
@@ -291,24 +305,26 @@ class SupabaseProblemAdminStore:
             json=[problem_row],
             prefer="resolution=merge-duplicates,return=minimal",
         )
-        self._request(
-            "POST",
-            "problem_tags?on_conflict=slug",
-            json=[tag.model_dump() for tag in problem.tags],
-            prefer="resolution=merge-duplicates,return=minimal",
-        )
+        if problem.tags:
+            self._request(
+                "POST",
+                "problem_tags?on_conflict=slug",
+                json=[tag.model_dump() for tag in problem.tags],
+                prefer="resolution=merge-duplicates,return=minimal",
+            )
 
         encoded_id = quote(problem.id, safe="")
         self._request("DELETE", f"problem_tag_links?problem_id=eq.{encoded_id}")
         self._request("DELETE", f"problem_samples?problem_id=eq.{encoded_id}")
         self._request("DELETE", f"problem_test_groups?problem_id=eq.{encoded_id}")
 
-        self._request(
-            "POST",
-            "problem_tag_links",
-            json=[{"problem_id": problem.id, "tag_slug": tag.slug} for tag in problem.tags],
-            prefer="return=minimal",
-        )
+        if problem.tags:
+            self._request(
+                "POST",
+                "problem_tag_links",
+                json=[{"problem_id": problem.id, "tag_slug": tag.slug} for tag in problem.tags],
+                prefer="return=minimal",
+            )
         self._request(
             "POST",
             "problem_samples",

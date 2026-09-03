@@ -131,7 +131,7 @@ export function saveAdminProblem(problem: AdminProblem): Promise<AdminProblem> {
 }
 
 export async function translateAdminProblem(problem: AdminProblem): Promise<AdminProblem> {
-  const items: Array<{ id: string; text: string }> = [
+  const allItems: Array<{ id: string; text: string }> = [
     { id: "title", text: problem.title.zh },
     { id: "summary", text: problem.summary.zh },
     { id: "input-format", text: problem.input_format.zh },
@@ -147,34 +147,38 @@ export async function translateAdminProblem(problem: AdminProblem): Promise<Admi
       ? [{ id: `sample.${index}.explanation`, text: sample.explanation.zh }]
       : []),
   ];
-  const response = await adminRequest<{ items: Array<{ id: string; text: string }> }>("/api/admin/problem-translations", {
-    method: "POST",
-    body: JSON.stringify({ items }),
-  });
+  const items = allItems.filter((item) => item.text.trim().length > 0);
+  const response = items.length > 0
+    ? await adminRequest<{ items: Array<{ id: string; text: string }> }>("/api/admin/problem-translations", {
+        method: "POST",
+        body: JSON.stringify({ items }),
+      })
+    : { items: [] };
   const translated = new Map(response.items.map((item) => [item.id, item.text]));
-  const english = (id: string) => {
+  const english = (id: string, chinese: string) => {
+    if (!chinese.trim()) return "";
     const value = translated.get(id);
     if (!value) throw new ProblemAdminApiError(`Missing translation: ${id}`, 502);
     return value;
   };
   return {
     ...problem,
-    title: { ...problem.title, en: english("title") },
-    summary: { ...problem.summary, en: english("summary") },
-    input_format: { ...problem.input_format, en: english("input-format") },
-    output_format: { ...problem.output_format, en: english("output-format") },
-    description: problem.description.map((item, index) => ({ ...item, en: english(`description.${index}`) })),
-    constraints: problem.constraints.map((item, index) => ({ ...item, en: english(`constraint.${index}`) })),
-    tags: problem.tags.map((item, index) => ({ ...item, label_en: english(`tag.${index}`) })),
+    title: { ...problem.title, en: english("title", problem.title.zh) },
+    summary: { ...problem.summary, en: english("summary", problem.summary.zh) },
+    input_format: { ...problem.input_format, en: english("input-format", problem.input_format.zh) },
+    output_format: { ...problem.output_format, en: english("output-format", problem.output_format.zh) },
+    description: problem.description.map((item, index) => ({ ...item, en: english(`description.${index}`, item.zh) })),
+    constraints: problem.constraints.map((item, index) => ({ ...item, en: english(`constraint.${index}`, item.zh) })),
+    tags: problem.tags.map((item, index) => ({ ...item, label_en: english(`tag.${index}`, item.label_zh) })),
     test_groups: problem.test_groups.map((group, index) => ({
       ...group,
-      name: { ...group.name, en: english(`group.${index}.name`) },
-      condition: { ...group.condition, en: english(`group.${index}.condition`) },
+      name: { ...group.name, en: english(`group.${index}.name`, group.name.zh) },
+      condition: { ...group.condition, en: english(`group.${index}.condition`, group.condition.zh) },
     })),
     samples: problem.samples.map((sample, index) => ({
       ...sample,
       explanation: sample.explanation
-        ? { ...sample.explanation, en: english(`sample.${index}.explanation`) }
+        ? { ...sample.explanation, en: english(`sample.${index}.explanation`, sample.explanation.zh) }
         : null,
     })),
   };

@@ -18,6 +18,7 @@ import {
 } from "@/lib/interactive-api";
 import { useLanguage } from "@/lib/language-context";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
+import { scoringGroupLabel } from "@/lib/scoring-group-label";
 import {
   clearLocalProblemCodeDraft,
   loadLocalProblemCodeDraft,
@@ -566,21 +567,17 @@ function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey:
       <StatementSection title={zh ? "範例" : "Examples"}>
         {problem.samples.map((sample, index) => <div key={`${sample.input}-${index}`} className="mt-3 overflow-hidden rounded-xl border border-white/8 bg-[#070b11]"><SampleBlock label={`${zh ? "範例輸入" : "Sample Input"} ${index + 1}`} value={sample.input} /><SampleBlock label={`${zh ? "範例輸出" : "Sample Output"} ${index + 1}`} value={sample.output} bordered />{sample.explanation ? <p className="border-t border-white/8 px-4 py-3 text-[11px] text-slate-500">{sample.explanation[textKey]}</p> : null}</div>)}
       </StatementSection>
-      <StatementSection title={zh ? "限制" : "Constraints"}>
-        <ul className="space-y-1 font-mono text-[11px]">{problem.constraints.map((constraint) => <li key={constraint[textKey]}>• {constraint[textKey]}</li>)}</ul>
-        <TestGroupList problem={problem} textKey={textKey} zh={zh} />
-        <div className="mt-4 grid grid-cols-2 gap-2"><LimitCard label="Time Limit" value={`${problem.timeLimitMs / 1000} sec`} /><LimitCard label="Memory Limit" value={`${problem.memoryLimitMb} MB`} /></div>
-      </StatementSection>
       <StatementSection title={zh ? "測資與計分" : "Tests and scoring"}>
         <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2"><span>{zh ? "正式測資總數" : "Total judge cases"}</span><strong className="font-mono text-cyan-200">{totalCases}</strong></div>
         <TestGroupList problem={problem} textKey={textKey} zh={zh} />
+        <div className="mt-4 grid grid-cols-2 gap-2"><LimitCard label={zh ? "執行時間限制" : "Time Limit"} value={`${problem.timeLimitMs / 1000} sec`} /><LimitCard label={zh ? "記憶體限制" : "Memory Limit"} value={`${problem.memoryLimitMb} MB`} /></div>
       </StatementSection>
     </article>
   );
 }
 
 function StatementSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mt-8"><h2 className="text-xs font-semibold text-white">{title}</h2><div className="mt-3 space-y-3 text-xs leading-6 text-slate-400">{children}</div></section>; }
-function TestGroupList({ problem, textKey, zh }: { problem: Problem; textKey: "zh" | "en"; zh: boolean }) { return <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={`${group.name[textKey]}-${index}`} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-3"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold text-slate-300">{zh ? `子任務 ${index + 1}` : `Subtask ${index + 1}`}</span><strong className="font-mono text-[11px] text-cyan-200">{group.scorePercent}%</strong></div><p className="mt-2 text-[11px] leading-5 text-slate-300">{group.condition[textKey]}</p><p className="mt-1 font-mono text-[9px] text-slate-600">{group.testCaseCount} {zh ? "筆測資" : "judge cases"}</p></div>)}</div>; }
+function TestGroupList({ problem, textKey, zh }: { problem: Problem; textKey: "zh" | "en"; zh: boolean }) { return <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={`${group.name[textKey]}-${index}`} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-3"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold text-slate-300">{scoringGroupLabel(index, zh)}</span><strong className="font-mono text-[11px] text-cyan-200">{group.scorePercent}%</strong></div><p className="mt-2 text-[11px] leading-5 text-slate-300">{group.condition[textKey]}</p><p className="mt-1 font-mono text-[9px] text-slate-600">{group.testCaseCount} {zh ? "筆測資" : "judge cases"}</p></div>)}</div>; }
 function SampleBlock({ label, value, bordered = false }: { label: string; value: string; bordered?: boolean }) { return <div className={bordered ? "border-t border-white/8" : ""}><div className="px-4 py-2 text-[9px] font-semibold uppercase tracking-wider text-slate-600">{label}</div><pre className="overflow-x-auto px-4 pb-3 font-mono text-xs text-slate-300">{value}</pre></div>; }
 function LimitCard({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-600">{label}</span><strong className="mt-1 block font-mono text-[11px] text-slate-300">{value}</strong></div>; }
 

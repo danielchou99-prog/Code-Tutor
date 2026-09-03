@@ -21,6 +21,7 @@ import {
   translateAdminProblem,
 } from "@/lib/problem-admin-api";
 import { clearPageState, loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
+import { scoringGroupLabel } from "@/lib/scoring-group-label";
 
 const inputClass = "mt-2 h-10 w-full rounded-xl border border-white/8 bg-[#090f18] px-3 text-xs text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-300/30";
 const textareaClass = "mt-2 min-h-24 w-full resize-y rounded-xl border border-white/8 bg-[#090f18] p-3 font-mono text-[11px] leading-5 text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-300/30";
@@ -36,7 +37,7 @@ function blankProblem(): AdminProblem {
     description: [blankLocalized()],
     input_format: blankLocalized(),
     output_format: blankLocalized(),
-    constraints: [blankLocalized()],
+    constraints: [],
     starter_code: {
       cpp: "#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << \"Hello, World!\" << '\\n';\n    return 0;\n}\n",
       python: "print(\"Hello, World!\")\n",
@@ -67,6 +68,10 @@ function withoutHiddenTests(problem: AdminProblem): Omit<AdminProblem, "test_gro
   return safeProblem as Omit<AdminProblem, "test_groups">;
 }
 
+function isCompleteTag(tag: AdminProblem["tags"][number]) {
+  return Boolean(tag.slug.trim() && tag.label_zh.trim());
+}
+
 function isSafeAdminProblemDraft(value: unknown): value is SafeAdminProblemDraft {
   if (!value || typeof value !== "object") return false;
   const stored = value as Partial<SafeAdminProblemDraft>;
@@ -91,8 +96,8 @@ function isSafeAdminProblemDraft(value: unknown): value is SafeAdminProblemDraft
 export function ProblemAdminSettings({ zh }: { zh: boolean }) {
   const { user } = useAuth();
   const [problems, setProblems] = useState<AdminProblemSummary[]>([]);
-  const [draft, setDraft] = useState<AdminProblem | null>(null);
-  const [existingId, setExistingId] = useState<string | null>(null);
+  const [draft, setDraftState] = useState<AdminProblem | null>(null);
+  const [existingId, setExistingIdState] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -101,6 +106,14 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
   const latestDraftRef = useRef<AdminProblem | null>(draft);
   const latestExistingIdRef = useRef<string | null>(existingId);
   const hydratedDraftStateKeyRef = useRef<string | null>(hydratedDraftStateKey);
+  const setDraft = (nextDraft: AdminProblem | null) => {
+    latestDraftRef.current = nextDraft;
+    setDraftState(nextDraft);
+  };
+  const setExistingId = (nextId: string | null) => {
+    latestExistingIdRef.current = nextId;
+    setExistingIdState(nextId);
+  };
 
   useLayoutEffect(() => {
     latestDraftRef.current = draft;
@@ -154,13 +167,23 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
   }, [draft, draftStateKey, existingId, hydratedDraftStateKey]);
 
   useEffect(() => {
-    return () => {
+    const saveLatestDraft = () => {
       const latestDraft = latestDraftRef.current;
       if (hydratedDraftStateKeyRef.current !== draftStateKey || !latestDraft) return;
       savePageState(draftStateKey, {
         existingId: latestExistingIdRef.current,
         problem: withoutHiddenTests(latestDraft),
       });
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") saveLatestDraft();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", saveLatestDraft);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", saveLatestDraft);
+      saveLatestDraft();
     };
   }, [draftStateKey]);
 
@@ -201,12 +224,21 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
     if (totalScore !== 100) { setError(zh ? `配分目前合計 ${totalScore}%，必須等於 100%。` : `Scores currently add up to ${totalScore}%. They must equal 100%.`); return; }
     setBusy(true); setError(""); setMessage("");
     try {
-      const translated = await translateAdminProblem(draft);
+      const problemForSave = { ...draft, constraints: [], tags: draft.tags.filter(isCompleteTag) };
+      const translated = await translateAdminProblem(problemForSave);
       const saved = await saveAdminProblem(translated);
-      setDraft(saved);
+      const translatedTags = new Map(translated.tags.map((tag) => [tag.slug, tag]));
+      setDraft({
+        ...translated,
+        published: saved.published,
+        tags: draft.tags.map((tag) => translatedTags.get(tag.slug) ?? tag),
+      });
       setExistingId(saved.id);
       await refreshList();
-      setMessage(zh ? "題目已儲存。一般題庫重新整理後會載入最新內容。" : "Problem saved. The public library will load the latest content after refresh.");
+      const keptAsDraft = draft.published && !saved.published;
+      setMessage(keptAsDraft
+        ? (zh ? "題目已儲存；內容尚未完整，因此維持未發布。" : "Problem saved as unpublished because its public content is incomplete.")
+        : (zh ? "題目已儲存。一般題庫重新整理後會載入最新內容。" : "Problem saved. The public library will load the latest content after refresh."));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : (zh ? "無法儲存題目。" : "Could not save the problem."));
     } finally { setBusy(false); }
@@ -258,8 +290,6 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
           <LocalizedListEditor zh={zh} label={zh ? "題目描述段落" : "Description paragraphs"} values={draft.description} onChange={(description) => setDraft({ ...draft, description })} />
           <LocalizedEditor label={zh ? "輸入格式" : "Input format"} value={draft.input_format} onChange={(input_format) => setDraft({ ...draft, input_format })} multiline />
           <LocalizedEditor label={zh ? "輸出格式" : "Output format"} value={draft.output_format} onChange={(output_format) => setDraft({ ...draft, output_format })} multiline />
-          <LocalizedListEditor zh={zh} label={zh ? "限制條件" : "Constraints"} values={draft.constraints} onChange={(constraints) => setDraft({ ...draft, constraints })} />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2"><Field label={zh ? "時間限制（毫秒）" : "Time limit (ms)"}><input className={inputClass} type="number" min="100" max="10000" value={draft.time_limit_ms} onChange={(event) => setDraft({ ...draft, time_limit_ms: Number(event.target.value) })} /></Field><Field label={zh ? "記憶體限制（MB）" : "Memory limit (MB)"}><input className={inputClass} type="number" min="16" max="1024" value={draft.memory_limit_mb} onChange={(event) => setDraft({ ...draft, memory_limit_mb: Number(event.target.value) })} /></Field></div>
         </section>
 
         <TagEditor draft={draft} setDraft={setDraft} zh={zh} />
@@ -447,7 +477,7 @@ function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps 
           description: draft.description.map((item) => item.zh),
           input_format: draft.input_format.zh,
           output_format: draft.output_format.zh,
-          constraints: draft.constraints.map((item) => item.zh),
+          constraints: draft.test_groups.map((group) => group.condition.zh).filter(Boolean),
         }),
         language: zh ? "zh-Hant" : "en",
         programmingLanguage: "cpp",
@@ -462,7 +492,7 @@ function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps 
     {!existingId ? <p className="mt-3 text-[10px] text-amber-200">{zh ? "先儲存未發布題目，才能建立機密版本。" : "Save the unpublished problem before creating a private version."}</p> : null}
     <div className="mt-4 grid gap-4 sm:grid-cols-3">
       <Field label={zh ? "版本名稱" : "Version"}><input className={inputClass} value={version} maxLength={40} onChange={(event) => setVersion(event.target.value.replace(/[^a-zA-Z0-9._-]/gu, ""))} /></Field>
-      <Field label={zh ? "目標配分群組" : "Target scoring group"}><select className={inputClass} value={safeTargetGroup} onChange={(event) => setTargetGroup(Number(event.target.value))}>{draft.test_groups.map((group, index) => <option key={index} value={index}>{index + 1}. {group.name[zh ? "zh" : "en"] || `Group ${index + 1}`}</option>)}</select></Field>
+      <Field label={zh ? "目標配分群組" : "Target scoring group"}><select className={inputClass} value={safeTargetGroup} onChange={(event) => setTargetGroup(Number(event.target.value))}>{draft.test_groups.map((_, index) => <option key={index} value={index}>{scoringGroupLabel(index, zh)}</option>)}</select></Field>
       <Field label={zh ? "已儲存版本" : "Stored versions"}><select className={inputClass} value={version} onChange={(event) => setVersion(event.target.value)}><option value={version}>{version}</option>{versions.filter((item) => item.version !== version).map((item) => <option key={item.version} value={item.version}>{item.version}{item.has_validator ? " + Validator" : ""}</option>)}</select></Field>
     </div>
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -490,5 +520,64 @@ function ProgramField({ title, language, setLanguage, source, setSource, placeho
 
 function TestGroupEditor({ draft, setDraft, zh }: DraftProps) {
   const totalScore = draft.test_groups.reduce((sum, group) => sum + Number(group.score_percent), 0);
-  return <section className={panelClass}><SectionTitle title={zh ? "配分群組與隱藏測資" : "Scoring groups and hidden cases"} detail={zh ? "此區只有管理員可讀取。每組全數通過才取得該組分數，總分必須為 100%。" : "Only admins can read this section. A group awards points only when every case passes. Total score must be 100%."} /><div className={`mt-3 text-xs font-semibold ${totalScore === 100 ? "text-emerald-300" : "text-rose-300"}`}>{zh ? "目前總分" : "Current total"}：{totalScore}%</div><button type="button" onClick={() => setDraft({ ...draft, test_groups: [...draft.test_groups, { name: blankLocalized(), condition: blankLocalized(), score_percent: 0, cases: [{ input: "", expected_output: "" }] }] })} className="mt-3 text-[10px] text-cyan-300">＋ {zh ? "新增配分群組" : "Add scoring group"}</button><div className="mt-4 space-y-5">{draft.test_groups.map((group, groupIndex) => <div key={groupIndex} className="rounded-2xl border border-violet-300/10 bg-violet-300/[0.02] p-4"><div className="flex items-center justify-between"><strong className="text-xs text-violet-200">{zh ? `配分群組 ${groupIndex + 1}` : `Scoring group ${groupIndex + 1}`}</strong><button type="button" disabled={draft.test_groups.length === 1} onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.filter((_, index) => index !== groupIndex) })} className="text-[9px] text-rose-300 disabled:opacity-25">{zh ? "移除群組" : "Remove group"}</button></div><LocalizedEditor zh={zh} label={zh ? "群組名稱" : "Group name"} value={group.name} onChange={(name) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, name } : item) })} /><LocalizedEditor zh={zh} label={zh ? "得分條件" : "Scoring condition"} value={group.condition} onChange={(condition) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, condition } : item) })} multiline /><Field label={zh ? "占分百分比" : "Score percent"}><input className={`${inputClass} max-w-40`} type="number" min="1" max="100" value={group.score_percent} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, score_percent: Number(event.target.value) } : item) })} /></Field><div className="mt-5 flex items-center justify-between"><p className="text-[10px] font-semibold text-slate-300">{zh ? `隱藏測資：${group.cases.length} 筆` : `Hidden cases: ${group.cases.length}`}</p><button type="button" onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: [...item.cases, { input: "", expected_output: "" }] } : item) })} className="text-[10px] text-cyan-300">＋ {zh ? "新增測資" : "Add case"}</button></div><div className="mt-2 space-y-3">{group.cases.map((testCase, caseIndex) => <div key={caseIndex} className="grid gap-3 rounded-xl border border-white/6 p-3 sm:grid-cols-[1fr_1fr_auto]"><Field label={zh ? `輸入 ${caseIndex + 1}` : `Input ${caseIndex + 1}`}><textarea className={textareaClass} value={testCase.input} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, input: event.target.value } : caseItem) } : item) })} /></Field><Field label={zh ? `預期輸出 ${caseIndex + 1}` : `Expected output ${caseIndex + 1}`}><textarea className={textareaClass} value={testCase.expected_output} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, expected_output: event.target.value } : caseItem) } : item) })} /></Field><button type="button" disabled={group.cases.length === 1} onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.filter((_, indexOfCase) => indexOfCase !== caseIndex) } : item) })} className="self-end pb-3 text-[9px] text-rose-300 disabled:opacity-25">{zh ? "移除" : "Remove"}</button></div>)}</div></div>)}</div></section>;
+  return (
+    <section className={panelClass}>
+      <SectionTitle
+        title={zh ? "配分群組與隱藏測資" : "Scoring groups and hidden cases"}
+        detail={zh ? "此區只有管理員可讀取。每組全數通過才取得該組分數，總分必須為 100%。" : "Only admins can read this section. A group awards points only when every case passes. Total score must be 100%."}
+      />
+      <div className={`mt-3 text-xs font-semibold ${totalScore === 100 ? "text-emerald-300" : "text-rose-300"}`}>
+        {zh ? "目前總分" : "Current total"}：{totalScore}%
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <Field label={zh ? "執行時間限制（毫秒）" : "Time limit (ms)"}>
+          <input className={inputClass} type="number" min="100" max="10000" value={draft.time_limit_ms} onChange={(event) => setDraft({ ...draft, time_limit_ms: Number(event.target.value) })} />
+        </Field>
+        <Field label={zh ? "記憶體限制（MB）" : "Memory limit (MB)"}>
+          <input className={inputClass} type="number" min="16" max="1024" value={draft.memory_limit_mb} onChange={(event) => setDraft({ ...draft, memory_limit_mb: Number(event.target.value) })} />
+        </Field>
+      </div>
+      <button type="button" onClick={() => setDraft({ ...draft, test_groups: [...draft.test_groups, { name: blankLocalized(), condition: blankLocalized(), score_percent: 0, cases: [{ input: "", expected_output: "" }] }] })} className="mt-3 text-[10px] text-cyan-300">
+        ＋ {zh ? "新增配分群組" : "Add scoring group"}
+      </button>
+      <div className="mt-4 space-y-5">
+        {draft.test_groups.map((group, groupIndex) => (
+          <div key={groupIndex} className="rounded-2xl border border-violet-300/10 bg-violet-300/[0.02] p-4">
+            <div className="flex items-center justify-between">
+              <strong className="text-xs text-violet-200">{scoringGroupLabel(groupIndex, zh)}</strong>
+              <button type="button" disabled={draft.test_groups.length === 1} onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.filter((_, index) => index !== groupIndex) })} className="text-[9px] text-rose-300 disabled:opacity-25">
+                {zh ? "移除群組" : "Remove group"}
+              </button>
+            </div>
+            <LocalizedEditor zh={zh} label={zh ? "群組名稱" : "Group name"} value={group.name} onChange={(name) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, name } : item) })} />
+            <LocalizedEditor zh={zh} label={zh ? "得分條件" : "Scoring condition"} value={group.condition} onChange={(condition) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, condition } : item) })} multiline />
+            <Field label={zh ? "占分百分比" : "Score percent"}>
+              <input className={`${inputClass} max-w-40`} type="number" min="1" max="100" value={group.score_percent} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, score_percent: Number(event.target.value) } : item) })} />
+            </Field>
+            <div className="mt-5 flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-300">{zh ? `隱藏測資：${group.cases.length} 筆` : `Hidden cases: ${group.cases.length}`}</p>
+              <button type="button" onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: [...item.cases, { input: "", expected_output: "" }] } : item) })} className="text-[10px] text-cyan-300">
+                ＋ {zh ? "新增測資" : "Add case"}
+              </button>
+            </div>
+            <div className="mt-2 space-y-3">
+              {group.cases.map((testCase, caseIndex) => (
+                <div key={caseIndex} className="grid gap-3 rounded-xl border border-white/6 p-3 sm:grid-cols-[1fr_1fr_auto]">
+                  <Field label={zh ? `輸入 ${caseIndex + 1}` : `Input ${caseIndex + 1}`}>
+                    <textarea className={textareaClass} value={testCase.input} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, input: event.target.value } : caseItem) } : item) })} />
+                  </Field>
+                  <Field label={zh ? `預期輸出 ${caseIndex + 1}` : `Expected output ${caseIndex + 1}`}>
+                    <textarea className={textareaClass} value={testCase.expected_output} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, expected_output: event.target.value } : caseItem) } : item) })} />
+                  </Field>
+                  <button type="button" disabled={group.cases.length === 1} onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.filter((_, indexOfCase) => indexOfCase !== caseIndex) } : item) })} className="self-end pb-3 text-[9px] text-rose-300 disabled:opacity-25">
+                    {zh ? "移除" : "Remove"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

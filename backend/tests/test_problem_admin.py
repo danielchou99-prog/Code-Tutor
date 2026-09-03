@@ -93,6 +93,69 @@ def test_problem_id_accepts_zerojudge_style_id() -> None:
     assert AdminProblem.model_validate(payload).id == "a001"
 
 
+def test_incomplete_public_content_can_be_saved_as_unpublished() -> None:
+    payload = problem_payload()
+    payload.update(
+        {
+            "title": {"zh": "", "en": ""},
+            "summary": {"zh": "", "en": ""},
+            "description": [{"zh": "", "en": ""}],
+            "input_format": {"zh": "", "en": ""},
+            "output_format": {"zh": "", "en": ""},
+            "constraints": [{"zh": "", "en": ""}],
+            "published": True,
+            "tags": [],
+        }
+    )
+    payload["test_groups"][0]["name"] = {"zh": "", "en": ""}  # type: ignore[index]
+    payload["test_groups"][0]["condition"] = {"zh": "", "en": ""}  # type: ignore[index]
+
+    problem = AdminProblem.model_validate(payload)
+
+    assert problem.title.zh == ""
+    assert problem.tags == []
+    assert problem.published is False
+
+
+def test_admin_api_accepts_incomplete_problem_update() -> None:
+    store = FakeAdminStore()
+    app.dependency_overrides[require_problem_admin] = lambda: admin
+    app.dependency_overrides[get_problem_admin_store] = lambda: store
+    payload = problem_payload()
+    payload["title"] = {"zh": "", "en": ""}
+    payload["description"] = [{"zh": "", "en": ""}]
+    payload["tags"] = []
+    payload["published"] = True
+
+    response = TestClient(app).put("/api/admin/problems/2001", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["title"] == {"zh": "", "en": ""}
+    assert response.json()["tags"] == []
+    assert response.json()["published"] is False
+
+
+def test_problem_with_missing_english_translation_stays_unpublished() -> None:
+    payload = problem_payload()
+    payload["title"] = {"zh": "完整中文題名", "en": ""}
+    payload["published"] = True
+
+    problem = AdminProblem.model_validate(payload)
+
+    assert problem.published is False
+
+
+def test_complete_problem_can_publish_without_legacy_constraints() -> None:
+    payload = problem_payload()
+    payload["constraints"] = []
+    payload["published"] = True
+
+    problem = AdminProblem.model_validate(payload)
+
+    assert problem.constraints == []
+    assert problem.published is True
+
+
 @pytest.mark.parametrize("invalid_id", ["A001", "a01", "aa001", "a001-x", "abc"])
 def test_problem_id_rejects_invalid_external_formats(invalid_id: str) -> None:
     payload = problem_payload()

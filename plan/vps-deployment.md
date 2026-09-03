@@ -132,8 +132,8 @@ FastAPI --------------------------HTTPS--------> Groq
 
 ### 階段 4：建立常駐服務
 
-- [ ] 建立 Next.js systemd service，綁定 `127.0.0.1:3000`。
-- [ ] 建立 FastAPI systemd service，綁定 `127.0.0.1:8000`。
+- [x] 建立 Next.js systemd service，綁定 `127.0.0.1:3000`。
+- [x] 建立 FastAPI systemd service，綁定 `127.0.0.1:8000`。
 - [ ] 建立 Judge Worker systemd service，綁定 `127.0.0.1:8010`，先使用 1 個 worker。
 - [ ] 設定服務自動重啟、開機啟動與集中日誌。
 - [ ] 驗證三個本機服務的 health 與啟動狀態。
@@ -149,6 +149,17 @@ FastAPI --------------------------HTTPS--------> Groq
 - [x] 已確認並記錄此階段沒有 HTTPS，API、管理員驗證、編譯器、Judge 與 AI 尚未啟動；`/api/` 目前會回傳 502。
 
 簡易說明：這個階段只是讓使用者先查看首頁與介面。3000 不直接對外開放，外部流量仍只經過 Nginx 80；正式上線前必須改用網域與 HTTPS。
+
+### 階段 4.2：暫時 IP FastAPI 部署
+
+- [x] 從本機被 Git 忽略的設定安全建立 VPS `/etc/code-tutor/backend.env`，允許來源設為 `http://72.62.254.246`；已驗證權限為 `root:code-tutor 0640`，且未輸出任何 Secret。
+- [x] 安裝並啟動 FastAPI systemd service，只綁定 `127.0.0.1:8000`；已確認 enabled、active 與開機自動啟動。
+- [x] 以 VPS 本機驗證 `/health` 回傳 200 且編譯器可用，未登入的管理員 API 已回傳 JSON 401 而不是 Nginx HTML 502。
+- [x] 從外部驗證 `/api/` 已回傳 FastAPI JSON、CORS 允許暫時 IP，且 8000 無法直接對外連線。
+- [ ] 由使用者重新登入並驗收原帳號的管理員身分。
+- [x] 本階段不啟動 Judge Worker；題目 Submit 與隱藏測資留待後續階段。
+
+簡易說明：這個階段先恢復帳號驗證、管理員 API、一般編譯與 AI 後端連線。所有 Secret 只保存在 VPS 權限受限的環境檔，外部流量仍只經過 Nginx。
 
 ### 階段 5：網域、Nginx 與 HTTPS
 

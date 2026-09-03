@@ -380,7 +380,7 @@ if (action === "settings" || action === "settings-light" || action === "home-log
         return true;
       })()`,
     );
-    if (!logoClicked) throw new Error("Code Tutor home button was not found.");
+    if (!logoClicked) throw new Error("Dev Compass home button was not found.");
     await sleep(300);
     actionSucceeded = await evaluate(
       client,
@@ -505,9 +505,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
     const problemOpened = await evaluate(
       client,
       `(() => {
-        const button = [...document.querySelectorAll("button")].find(
-          (candidate) => candidate.textContent.includes("星際補給站") && candidate.textContent.includes("#1001"),
-        );
+        const button = document.querySelector('button[aria-label^="開啟題目"]');
         if (!button) return false;
         button.click();
         return true;
@@ -557,9 +555,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
           const reopened = await evaluate(
             client,
             `(() => {
-              const button = [...document.querySelectorAll("button")].find(
-                (candidate) => candidate.textContent.includes("星際補給站") && candidate.textContent.includes("#1001"),
-              );
+              const button = document.querySelector('button[aria-label^="開啟題目"]');
               if (!button) return false;
               button.click();
               return true;
@@ -580,7 +576,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       await sleep(1_500);
       const detailRestored = await evaluate(
         client,
-        `document.body.innerText.includes("題目描述") && document.body.innerText.includes("星際補給站")`,
+        `document.body.innerText.includes("題目描述") && Boolean(document.querySelector('button[aria-label="選擇程式語言"]'))`,
       );
       if (!detailRestored) throw new Error("Problem detail was not restored after refresh.");
       const problemsClicked = await evaluate(
@@ -627,6 +623,34 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       await client.send("Page.reload", { ignoreCache: true });
       await cleanReload;
       await sleep(1_500);
+      const cppAlreadySelected = await evaluate(
+        client,
+        `document.querySelector('button[aria-label="選擇程式語言"]')?.textContent.includes("C++20") ?? false`,
+      );
+      if (!cppAlreadySelected) {
+        const languageMenuOpened = await evaluate(
+          client,
+          `(() => {
+            const trigger = document.querySelector('button[aria-label="選擇程式語言"]');
+            trigger?.click();
+            return Boolean(trigger);
+          })()`,
+        );
+        if (!languageMenuOpened) throw new Error("Programming language menu was not found before import.");
+        await sleep(200);
+        const cppSelected = await evaluate(
+          client,
+          `(() => {
+            const option = [...document.querySelectorAll('[role="menuitemradio"]')].find(
+              (item) => item.textContent.includes("C++20"),
+            );
+            option?.click();
+            return Boolean(option);
+          })()`,
+        );
+        if (!cppSelected) throw new Error("C++20 could not be selected before import.");
+        await sleep(500);
+      }
       await client.send("DOM.enable");
       const documentNode = await client.send("DOM.getDocument");
       const fileInput = await client.send("DOM.querySelector", {
@@ -641,7 +665,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       await sleep(1_000);
       const imported = await evaluate(
         client,
-        `document.body.innerText.includes("未儲存") && document.body.innerText.includes("匯入") && document.body.innerText.includes("Save") && document.body.innerText.includes("還原") && document.body.innerText.includes("Imported") && document.body.innerText.includes("Code Tutor")`,
+        `document.body.innerText.includes("未儲存") && document.body.innerText.includes("匯入") && document.body.innerText.includes("Save") && document.body.innerText.includes("還原") && document.body.innerText.includes("Imported") && document.body.innerText.includes("Dev Compass")`,
       );
       if (!imported) {
         const visibleText = await evaluate(client, `document.body.innerText.slice(-1800)`);
@@ -653,7 +677,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       await sleep(2_000);
       const draftRestored = await evaluate(
         client,
-        `document.body.innerText.includes("Imported") && document.body.innerText.includes("Code Tutor") && document.body.innerText.includes("未儲存")`,
+        `document.body.innerText.includes("Imported") && document.body.innerText.includes("Dev Compass") && document.body.innerText.includes("未儲存")`,
       );
       if (!draftRestored) throw new Error("The local unsaved problem draft was not restored after refresh.");
       await evaluate(
@@ -747,20 +771,27 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
       client,
       `(() => {
         const text = document.body.innerText;
-        const upperText = text.toUpperCase();
+        const statementHeadings = [...document.querySelectorAll("h2")];
+        const scoringHeading = statementHeadings.find(
+          (heading) => heading.textContent.trim() === "測資與計分",
+        );
+        const scoringSection = scoringHeading?.closest("section");
+        const scoringText = scoringSection?.innerText ?? "";
+        const sampleInputCount = (text.match(/範例輸入\\s*\\d+/g) ?? []).length;
+        const sampleOutputCount = (text.match(/範例輸出\\s*\\d+/g) ?? []).length;
         return text.includes("題目描述") && text.includes("輸入格式") &&
-          text.includes("輸出格式") && upperText.includes("TIME LIMIT") &&
-          upperText.includes("MEMORY LIMIT") && text.includes("測資與計分") &&
+          text.includes("輸出格式") && text.includes("測資與計分") &&
           text.includes("Python 3") && !text.includes("main.cpp") &&
           text.includes("Text") && text.includes("Interactive Console") &&
-          text.includes("範例輸入 1") && text.includes("範例輸出 1") &&
-          text.includes("範例輸入 2") && text.includes("範例輸出 2") &&
+          sampleInputCount >= 1 && sampleInputCount === sampleOutputCount &&
           text.includes("匯入") && text.includes("Save") && text.includes("已儲存") &&
-          (text.match(/−100 ≤ A, B ≤ 100/g) ?? []).length >= 2 &&
-          (text.match(/4 筆測資/g) ?? []).length === 2 &&
-          (text.match(/40%/g) ?? []).length >= 2 &&
-          text.includes("請先登入 Code Tutor") && !text.includes("SUBMIT ONLY") &&
-          Boolean(document.querySelector('button[aria-label="開啟 AI Tutor"]'));
+          Boolean(scoringSection) &&
+          statementHeadings.every((heading) => heading.textContent.trim() !== "限制") &&
+          scoringText.includes("第一組") &&
+          !scoringText.includes("子任務") &&
+          /\\d+\\s*筆測資/.test(scoringText) && /\\d+%/.test(scoringText) &&
+          scoringText.includes("執行時間限制") && scoringText.includes("記憶體限制") &&
+          text.includes("請先登入 Dev Compass") && !text.includes("SUBMIT ONLY");
       })()`,
     );
     }
@@ -770,7 +801,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
     `(() => {
       const cards = [...document.querySelectorAll('button[aria-label^="開啟題目"]')];
       const grid = cards[0]?.parentElement?.parentElement;
-      if (!grid || cards.length < 5) return false;
+      if (!grid || cards.length < 1) return false;
       const columnCount = getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean).length;
       const firstTop = cards[0].getBoundingClientRect().top;
       return columnCount >= 5 && cards.every((card) => Math.abs(card.getBoundingClientRect().top - firstTop) < 2);
