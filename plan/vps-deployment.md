@@ -134,9 +134,9 @@ FastAPI --------------------------HTTPS--------> Groq
 
 - [x] 建立 Next.js systemd service，綁定 `127.0.0.1:3000`。
 - [x] 建立 FastAPI systemd service，綁定 `127.0.0.1:8000`。
-- [ ] 建立 Judge Worker systemd service，綁定 `127.0.0.1:8010`，先使用 1 個 worker。
-- [ ] 設定服務自動重啟、開機啟動與集中日誌。
-- [ ] 驗證三個本機服務的 health 與啟動狀態。
+- [x] 建立 Judge Worker systemd service，綁定 `127.0.0.1:8010`，先使用 1 個 worker。
+- [x] 設定服務自動重啟、開機啟動與集中日誌。
+- [x] 驗證三個本機服務的 health 與啟動狀態。
 
 簡易說明：systemd 會在 VPS 重新開機後自動啟動網站，程式意外停止時也能重新啟動。
 
@@ -157,7 +157,8 @@ FastAPI --------------------------HTTPS--------> Groq
 - [x] 以 VPS 本機驗證 `/health` 回傳 200 且編譯器可用，未登入的管理員 API 已回傳 JSON 401 而不是 Nginx HTML 502。
 - [x] 從外部驗證 `/api/` 已回傳 FastAPI JSON、CORS 允許暫時 IP，且 8000 無法直接對外連線。
 - [ ] 由使用者重新登入並驗收原帳號的管理員身分。
-- [x] 本階段不啟動 Judge Worker；題目 Submit 與隱藏測資留待後續階段。
+- [x] 2026-09-03 補上 Judge Worker，確認 URL、token 與 Supabase server secret 已配置但未輸出其內容；8010 只綁定 `127.0.0.1`。
+- [x] Frontend、FastAPI、Judge Worker、Nginx 與 Docker 均為 active；Frontend/API/Worker health check 全部通過。
 
 簡易說明：這個階段先恢復帳號驗證、管理員 API、一般編譯與 AI 後端連線。所有 Secret 只保存在 VPS 權限受限的環境檔，外部流量仍只經過 Nginx。
 
