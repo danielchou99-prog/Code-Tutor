@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import time
 from typing import Protocol, Sequence
+from uuid import uuid4
 
 from .config import Settings
 from .models import ProjectSourceFile, RunResponse
@@ -38,6 +39,17 @@ class CompilerService(Protocol):
         time_limit_ms: int | None = None,
         memory_limit_mb: int | None = None,
     ) -> RunResponse: ...
+
+    def run_many(
+        self,
+        code: str,
+        stdins: Sequence[str],
+        language: str = "cpp",
+        files: Sequence[ProjectSourceFile] | None = None,
+        *,
+        time_limit_ms: int | None = None,
+        memory_limit_mb: int | None = None,
+    ) -> list[RunResponse]: ...
 
 
 @dataclass
@@ -76,18 +88,31 @@ class DockerCompiler:
             )
 
         started_at = time.perf_counter()
+        container_name = self._new_container_name("run")
+        run_timeout = max(
+            0.1,
+            (time_limit_ms / 1000)
+            if time_limit_ms is not None
+            else self.settings.run_timeout_seconds,
+        )
         with tempfile.TemporaryDirectory(prefix="code-tutor-") as temp_directory:
             source_directory = Path(temp_directory)
             source_files = (
                 list(files)
                 if files
-                else [ProjectSourceFile(name="main.py" if language == "python" else "main.cpp", content=code)]
+                else [
+                    ProjectSourceFile(
+                        name="main.py" if language == "python" else "main.cpp",
+                        content=code,
+                    )
+                ]
             )
             self._write_source_files(source_directory, source_files)
 
             command = self._docker_command(
                 source_directory,
                 language,
+                container_name=container_name,
                 time_limit_ms=time_limit_ms,
                 memory_limit_mb=memory_limit_mb,
             )
@@ -102,15 +127,17 @@ class DockerCompiler:
                     errors="replace",
                     timeout=(
                         self.settings.compile_timeout_seconds
-                        + self.settings.run_timeout_seconds
+                        + run_timeout
                         + 7
                     ),
                 )
             except subprocess.TimeoutExpired as error:
+                self._force_remove_container(container_name)
                 raise CompilerUnavailable(
                     "The Docker compiler did not respond within the service timeout."
                 ) from error
             except OSError as error:
+                self._force_remove_container(container_name)
                 raise CompilerUnavailable("Unable to start Docker.") from error
 
         duration_ms = round((time.perf_counter() - started_at) * 1000)
@@ -121,6 +148,10 @@ class DockerCompiler:
         code: str,
         stdins: Sequence[str],
         language: str = "cpp",
+        files: Sequence[ProjectSourceFile] | None = None,
+        *,
+        time_limit_ms: int | None = None,
+        memory_limit_mb: int | None = None,
     ) -> list[RunResponse]:
         """Compile once, then execute one isolated process for every stdin value."""
         if not stdins:
@@ -133,12 +164,17 @@ class DockerCompiler:
             )
 
         started_at = time.perf_counter()
+        container_name = self._new_container_name("batch")
         with tempfile.TemporaryDirectory(prefix="code-tutor-batch-") as temp_directory:
             source_directory = Path(temp_directory)
-            source_name = "main.py" if language == "python" else "main.cpp"
+            source_files = (
+                list(files)
+                if files
+                else [ProjectSourceFile(name="main.py" if language == "python" else "main.cpp", content=code)]
+            )
             self._write_source_files(
                 source_directory,
-                [ProjectSourceFile(name=source_name, content=code)],
+                source_files,
             )
             input_directory = source_directory / ".batch-inputs"
             input_directory.mkdir()
@@ -151,7 +187,19 @@ class DockerCompiler:
                 for input_file in input_directory.iterdir():
                     input_file.chmod(0o644)
 
-            command = self._docker_batch_command(source_directory, language)
+            command = self._docker_batch_command(
+                source_directory,
+                language,
+                container_name=container_name,
+                time_limit_ms=time_limit_ms,
+                memory_limit_mb=memory_limit_mb,
+            )
+            run_timeout = max(
+                0.1,
+                (time_limit_ms / 1000)
+                if time_limit_ms is not None
+                else self.settings.run_timeout_seconds,
+            )
             try:
                 completed = subprocess.run(
                     command,
@@ -162,15 +210,17 @@ class DockerCompiler:
                     errors="replace",
                     timeout=(
                         self.settings.compile_timeout_seconds
-                        + self.settings.run_timeout_seconds * len(stdins)
+                        + run_timeout * len(stdins)
                         + 10
                     ),
                 )
             except subprocess.TimeoutExpired as error:
+                self._force_remove_container(container_name)
                 raise CompilerUnavailable(
                     "The Docker batch compiler did not respond within the service timeout."
                 ) from error
             except OSError as error:
+                self._force_remove_container(container_name)
                 raise CompilerUnavailable("Unable to start Docker.") from error
 
         duration_ms = round((time.perf_counter() - started_at) * 1000)
@@ -181,30 +231,39 @@ class DockerCompiler:
         source_directory: Path,
         language: str = "cpp",
         *,
+        container_name: str | None = None,
         time_limit_ms: int | None = None,
         memory_limit_mb: int | None = None,
     ) -> list[str]:
         output_limit = self.settings.max_output_bytes
         run_timeout = max(
             0.1,
-            (time_limit_ms / 1000) if time_limit_ms is not None else self.settings.run_timeout_seconds,
+            (time_limit_ms / 1000)
+            if time_limit_ms is not None
+            else self.settings.run_timeout_seconds,
         )
         memory_limit = max(16, memory_limit_mb or 512)
         prepare_and_run = (
-            """PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile /source/*.py 2>/tmp/compile.err
+            """timeout --signal=KILL {compile_timeout}s env PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile /source/*.py 2>/tmp/compile.err
 compile_status=$?
 if [ "$compile_status" -ne 0 ]; then
   echo {compile_error_marker} >&2
+  if [ "$compile_status" -eq 124 ] || [ "$compile_status" -eq 137 ]; then
+    echo "Compilation exceeded the time limit." >&2
+  fi
   head -c {output_limit} /tmp/compile.err >&2
   exit 1
 fi
 
 timeout --signal=TERM --kill-after=1s {run_timeout}s /usr/bin/time -f %M -o /tmp/memory_kb python3 -B /source/main.py > /tmp/stdout 2>/tmp/stderr"""
             if language == "python"
-            else """g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
+            else """timeout --signal=KILL {compile_timeout}s g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
 compile_status=$?
 if [ "$compile_status" -ne 0 ]; then
   echo {compile_error_marker} >&2
+  if [ "$compile_status" -eq 124 ] || [ "$compile_status" -eq 137 ]; then
+    echo "Compilation exceeded the time limit." >&2
+  fi
   head -c {output_limit} /tmp/compile.err >&2
   exit 1
 fi
@@ -212,6 +271,7 @@ fi
 timeout --signal=TERM --kill-after=1s {run_timeout}s /usr/bin/time -f %M -o /tmp/memory_kb /tmp/program > /tmp/stdout 2>/tmp/stderr"""
         ).format(
             compile_error_marker=COMPILE_ERROR_MARKER,
+            compile_timeout=self.settings.compile_timeout_seconds,
             output_limit=output_limit,
             run_timeout=run_timeout,
         )
@@ -229,7 +289,9 @@ fi
 head -c {output_limit} /tmp/stdout
 head -c {output_limit} /tmp/stderr >&2
 
-printf '\n{PEAK_MEMORY_MARKER}%s\n' "$(cat /tmp/memory_kb 2>/dev/null || echo 0)" >&2
+peak_memory_kb=$(tail -n 1 /tmp/memory_kb 2>/dev/null | tr -cd '0-9')
+if [ -z "$peak_memory_kb" ]; then peak_memory_kb=0; fi
+printf '\n{PEAK_MEMORY_MARKER}%s\n' "$peak_memory_kb" >&2
 if [ "$run_status" -eq 124 ] || [ "$run_status" -eq 137 ]; then
   if [ "$run_status" -eq 124 ]; then
     echo {TIMEOUT_MARKER} >&2
@@ -241,14 +303,17 @@ fi
 exit "$run_status"
 """.strip()
 
-        return [
+        command = [
             self.settings.docker_binary,
             "run",
             "--rm",
+            "--init",
             "-i",
             "--network",
             "none",
             "--memory",
+            f"{memory_limit}m",
+            "--memory-swap",
             f"{memory_limit}m",
             "--cpus",
             "0.5",
@@ -270,16 +335,31 @@ exit "$run_status"
             "-lc",
             script,
         ]
+        if container_name:
+            command[3:3] = ["--name", container_name]
+        return command
 
-    def _docker_batch_command(self, source_directory: Path, language: str) -> list[str]:
+    def _docker_batch_command(
+        self,
+        source_directory: Path,
+        language: str,
+        *,
+        container_name: str | None = None,
+        time_limit_ms: int | None = None,
+        memory_limit_mb: int | None = None,
+    ) -> list[str]:
         output_limit = self.settings.max_output_bytes
-        run_timeout = self.settings.run_timeout_seconds
+        run_timeout = max(
+            0.1,
+            (time_limit_ms / 1000) if time_limit_ms is not None else self.settings.run_timeout_seconds,
+        )
+        memory_limit = max(16, memory_limit_mb or 512)
         if language == "python":
-            compile_script = '''PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile /source/main.py 2>/tmp/compile.err
+            compile_script = f'''timeout --signal=KILL {self.settings.compile_timeout_seconds}s env PYTHONPYCACHEPREFIX=/tmp/pycache python3 -m py_compile /source/*.py 2>/tmp/compile.err
 compile_status=$?
 runner="python3 -B /source/main.py"'''
         else:
-            compile_script = '''g++ /source/main.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
+            compile_script = f'''timeout --signal=KILL {self.settings.compile_timeout_seconds}s g++ /source/*.cpp -std=c++20 -O2 -pipe -Wall -Wextra -o /tmp/program 2>/tmp/compile.err
 compile_status=$?
 runner="/tmp/program"'''
         script = f"""
@@ -287,12 +367,15 @@ set -u
 {compile_script}
 if [ "$compile_status" -ne 0 ]; then
   echo {COMPILE_ERROR_MARKER} >&2
+  if [ "$compile_status" -eq 124 ] || [ "$compile_status" -eq 137 ]; then
+    echo "Compilation exceeded the time limit." >&2
+  fi
   head -c {output_limit} /tmp/compile.err >&2
   exit 1
 fi
 
 for input_file in /source/.batch-inputs/*.txt; do
-  timeout --signal=TERM --kill-after=1s {run_timeout}s bash -lc "$runner" < "$input_file" > /tmp/stdout 2>/tmp/stderr
+  timeout --signal=TERM --kill-after=1s {run_timeout}s /usr/bin/time -f %M -o /tmp/memory_kb bash -lc "$runner" < "$input_file" > /tmp/stdout 2>/tmp/stderr
   run_status=$?
   stdout_size=$(wc -c < /tmp/stdout)
   stderr_size=$(wc -c < /tmp/stderr)
@@ -300,8 +383,10 @@ for input_file in /source/.batch-inputs/*.txt; do
   if [ "$stdout_size" -gt {output_limit} ] || [ "$stderr_size" -gt {output_limit} ]; then
     truncated=1
   fi
-  if [ "$run_status" -eq 124 ] || [ "$run_status" -eq 137 ]; then
+  if [ "$run_status" -eq 124 ]; then
     result_status=timeout
+  elif [ "$run_status" -eq 137 ]; then
+    result_status=memory_limit
   elif [ "$truncated" -eq 1 ]; then
     result_status=output_limit
   elif [ "$run_status" -eq 0 ]; then
@@ -311,17 +396,22 @@ for input_file in /source/.batch-inputs/*.txt; do
   fi
   stdout_b64=$(head -c {output_limit} /tmp/stdout | base64 -w 0)
   stderr_b64=$(head -c {output_limit} /tmp/stderr | base64 -w 0)
-  printf '%s\\t%s\\t%s\\t%s\\t%s\\n' "$result_status" "$run_status" "$truncated" "$stdout_b64" "$stderr_b64"
+  peak_memory_kb=$(tail -n 1 /tmp/memory_kb 2>/dev/null | tr -cd '0-9')
+  if [ -z "$peak_memory_kb" ]; then peak_memory_kb=0; fi
+  printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$result_status" "$run_status" "$truncated" "$peak_memory_kb" "$stdout_b64" "$stderr_b64"
 done
 """.strip()
-        return [
+        command = [
             self.settings.docker_binary,
             "run",
             "--rm",
+            "--init",
             "--network",
             "none",
             "--memory",
-            "512m",
+            f"{memory_limit}m",
+            "--memory-swap",
+            f"{memory_limit}m",
             "--cpus",
             "0.5",
             "--pids-limit",
@@ -342,6 +432,25 @@ done
             "-lc",
             script,
         ]
+        if container_name:
+            command[3:3] = ["--name", container_name]
+        return command
+
+    @staticmethod
+    def _new_container_name(kind: str) -> str:
+        return f"code-tutor-{kind}-{uuid4().hex}"
+
+    def _force_remove_container(self, container_name: str) -> None:
+        try:
+            subprocess.run(
+                [self.settings.docker_binary, "rm", "-f", container_name],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError):
+            pass
 
     @staticmethod
     def _write_source_files(
@@ -460,15 +569,24 @@ done
         responses: list[RunResponse] = []
         for row in rows:
             parts = row.split("\t")
-            if len(parts) != 5:
+            if len(parts) != 6:
                 raise CompilerUnavailable("The Docker batch compiler returned invalid data.")
-            run_status, exit_code, truncated, stdout_b64, stderr_b64 = parts
-            if run_status not in {"accepted", "runtime_error", "timeout", "output_limit"}:
-                raise CompilerUnavailable("The Docker batch compiler returned an unknown status.")
+            run_status, exit_code, truncated, peak_memory, stdout_b64, stderr_b64 = parts
+            if run_status not in {
+                "accepted",
+                "runtime_error",
+                "timeout",
+                "memory_limit",
+                "output_limit",
+            }:
+                raise CompilerUnavailable(
+                    "The Docker batch compiler returned an unknown status."
+                )
             try:
                 stdout = base64.b64decode(stdout_b64).decode("utf-8", errors="replace")
                 run_stderr = base64.b64decode(stderr_b64).decode("utf-8", errors="replace")
-            except ValueError as error:
+                peak_memory_kb = max(0, int(peak_memory))
+            except (ValueError, TypeError) as error:
                 raise CompilerUnavailable("The Docker batch compiler returned corrupt output.") from error
             responses.append(
                 RunResponse(
@@ -478,6 +596,7 @@ done
                     exit_code=None if run_status == "timeout" else int(exit_code),
                     duration_ms=average_duration,
                     truncated=truncated == "1",
+                    peak_memory_kb=peak_memory_kb,
                 )
             )
         return responses

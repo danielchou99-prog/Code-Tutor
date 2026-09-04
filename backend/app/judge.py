@@ -9,7 +9,7 @@ import httpx
 from .ai_connections import secure_http_request
 from .auth import AuthenticatedUser
 from .compiler import CompilerService, CompilerUnavailable
-from .models import JudgeGroupResult, SubmitRequest, SubmitResponse
+from .models import JudgeGroupResult, RunResponse, SubmitRequest, SubmitResponse
 
 
 class JudgeStorageUnavailable(RuntimeError):
@@ -212,8 +212,28 @@ class JudgeService:
         request: SubmitRequest,
     ) -> SubmitResponse:
         problem = self.store.get_problem(problem_id)
+        all_cases = [case for group in problem.groups for case in group.cases]
+        batch_results: list[RunResponse] | None = None
+        batch_unavailable = False
+        batch_runner = getattr(self.compiler, "run_many", None)
+        if callable(batch_runner):
+            try:
+                batch_results = batch_runner(
+                    request.code,
+                    [case.input for case in all_cases],
+                    language=request.language,
+                    files=request.files or None,
+                    time_limit_ms=problem.time_limit_ms,
+                    memory_limit_mb=problem.memory_limit_mb,
+                )
+                if len(batch_results) != len(all_cases):
+                    batch_unavailable = True
+            except CompilerUnavailable:
+                batch_unavailable = True
+
         groups: list[JudgeGroupResult] = []
         passed_cases = 0
+        result_index = 0
         duration_ms = 0
         peak_memory_kb = 0
         fatal_status: str | None = None
@@ -222,19 +242,27 @@ class JudgeService:
         for group_index, group in enumerate(problem.groups):
             group_passed = 0
             for case in group.cases:
-                try:
-                    run_result = self.compiler.run(
-                        request.code,
-                        case.input,
-                        request.files or None,
-                        request.language,
-                        time_limit_ms=problem.time_limit_ms,
-                        memory_limit_mb=problem.memory_limit_mb,
-                    )
-                except CompilerUnavailable:
+                if batch_unavailable:
                     fatal_status = "system_error"
                     fatal_message = "The isolated compiler is unavailable."
                     break
+                if batch_results is not None:
+                    run_result = batch_results[result_index]
+                    result_index += 1
+                else:
+                    try:
+                        run_result = self.compiler.run(
+                            request.code,
+                            case.input,
+                            request.files or None,
+                            request.language,
+                            time_limit_ms=problem.time_limit_ms,
+                            memory_limit_mb=problem.memory_limit_mb,
+                        )
+                    except CompilerUnavailable:
+                        fatal_status = "system_error"
+                        fatal_message = "The isolated compiler is unavailable."
+                        break
 
                 duration_ms += run_result.duration_ms
                 peak_memory_kb = max(peak_memory_kb, run_result.peak_memory_kb)

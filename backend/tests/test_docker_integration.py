@@ -66,6 +66,42 @@ def test_docker_compiler_runs_python_batch_in_order() -> None:
     assert [result.stdout for result in results] == ["1\n", "10\n"]
 
 
+def test_docker_compiler_batch_builds_multiple_cpp_files_once() -> None:
+    files = [
+        ProjectSourceFile(
+            name="main.cpp",
+            content='#include <iostream>\n#include "double.hpp"\nint main() { int value; std::cin >> value; std::cout << twice(value) << "\\n"; }',
+        ),
+        ProjectSourceFile(name="double.hpp", content="int twice(int value);"),
+        ProjectSourceFile(name="double.cpp", content="int twice(int value) { return value * 2; }"),
+    ]
+
+    results = compiler.run_many(
+        files[0].content,
+        ["1\n", "21\n"],
+        language="cpp",
+        files=files,
+        time_limit_ms=1000,
+        memory_limit_mb=96,
+    )
+
+    assert [result.status for result in results] == ["accepted", "accepted"]
+    assert [result.stdout for result in results] == ["2\n", "42\n"]
+    assert all(result.peak_memory_kb > 0 for result in results)
+
+
+def test_docker_compiler_batch_applies_time_limit_per_case() -> None:
+    results = compiler.run_many(
+        "while True:\n    pass\n",
+        ["", ""],
+        language="python",
+        time_limit_ms=150,
+        memory_limit_mb=64,
+    )
+
+    assert [result.status for result in results] == ["timeout", "timeout"]
+
+
 def test_docker_compiler_reports_python_syntax_error() -> None:
     result = compiler.run("print(", "", language="python")
 

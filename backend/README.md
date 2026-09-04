@@ -24,6 +24,11 @@ Open `http://localhost:8000/docs` for the generated API documentation.
 - `WS /api/run/interactive`: keeps an isolated C++ or Python process alive for streamed output and multi-round stdin.
 - `POST /api/problems/{problem_id}/submit`: requires login, runs private Judge cases, saves the trusted score, and never returns hidden inputs or expected outputs.
 
+The Judge compiles each submitted C++ or Python project once, then runs the compiled
+program against the hidden cases in order. Every case uses the problem's configured
+time and memory limits and records its execution status and peak memory without
+exposing private test data to the browser.
+
 ## Security boundary
 
 User code is never executed directly on the host. Both batch and interactive runners require Docker and apply network, memory, CPU, process, filesystem, timeout, output, rate, and concurrency limits. Interactive containers are force-removed when the WebSocket closes. If Docker is unavailable, the HTTP API returns 503 and the WebSocket returns a structured error.

@@ -84,6 +84,45 @@ class UnavailableCompiler(AnsweringCompiler):
         raise CompilerUnavailable("Docker unavailable")
 
 
+class BatchAnsweringCompiler(AnsweringCompiler):
+    def __init__(self, answers: dict[str, str]) -> None:
+        super().__init__(answers)
+        self.batch_calls: list[dict[str, object]] = []
+
+    def run(self, *args, **kwargs) -> RunResponse:
+        raise AssertionError("Judge should use the compile-once batch runner")
+
+    def run_many(
+        self,
+        code: str,
+        stdins: list[str],
+        language: str = "cpp",
+        files: list[ProjectSourceFile] | None = None,
+        *,
+        time_limit_ms: int | None = None,
+        memory_limit_mb: int | None = None,
+    ) -> list[RunResponse]:
+        self.batch_calls.append(
+            {
+                "code": code,
+                "stdins": stdins,
+                "files": files,
+                "language": language,
+                "time_limit_ms": time_limit_ms,
+                "memory_limit_mb": memory_limit_mb,
+            }
+        )
+        return [
+            RunResponse(
+                status="accepted",
+                stdout=self.answers.get(stdin, "wrong"),
+                duration_ms=4,
+                peak_memory_kb=1024 + index,
+            )
+            for index, stdin in enumerate(stdins)
+        ]
+
+
 user = AuthenticatedUser(user_id="student-1", email="student@example.com")
 
 
@@ -117,6 +156,33 @@ def test_judge_accepts_normalized_output_and_awards_all_groups() -> None:
     assert result.submission_id == "submission-123"
     assert [group.earned_score for group in result.groups] == [40, 60]
     assert compiler.limits == [(3000, 512)] * 3
+
+
+def test_judge_compiles_once_and_passes_files_and_problem_limits() -> None:
+    store = FakeJudgeStore()
+    compiler = BatchAnsweringCompiler({"1 2": "3", "-5 12": "7", "20 22": "42"})
+    files = [
+        ProjectSourceFile(name="main.cpp", content='#include "sum.hpp"\nint main() {}'),
+        ProjectSourceFile(name="sum.hpp", content="long long sum(long long, long long);"),
+    ]
+
+    result = JudgeService(store, compiler).submit(
+        user,
+        "1001",
+        SubmitRequest(code="", files=files, language="cpp"),
+    )
+
+    assert result.status == "accepted"
+    assert result.peak_memory_kb == 1026
+    assert len(compiler.batch_calls) == 1
+    assert compiler.batch_calls[0] == {
+        "code": "",
+        "stdins": ["1 2", "-5 12", "20 22"],
+        "files": files,
+        "language": "cpp",
+        "time_limit_ms": 3000,
+        "memory_limit_mb": 512,
+    }
 
 
 def test_judge_persists_peak_memory_and_memory_limit_status() -> None:
