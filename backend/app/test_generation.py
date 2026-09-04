@@ -63,6 +63,7 @@ class GenerateCasesRequest(BaseModel):
     version: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,39}$")
     count: int = Field(ge=1, le=100)
     first_seed: int = Field(default=1, ge=0, le=2_147_483_647)
+    group_order: int = Field(default=1, ge=1, le=20)
     strategy_allocations: list[GenerationStrategyAllocation] = Field(
         default_factory=list, max_length=7
     )
@@ -164,7 +165,10 @@ class HiddenTestGenerationService:
         generated_inputs = self._run_program_batch(
             "Generator",
             version.generator_source,
-            [f"{seed}\n{strategy}\n" for seed, strategy in candidate_specs],
+            [
+                f"{seed}\n{strategy}\n{request.group_order}\n"
+                for seed, strategy in candidate_specs
+            ],
             version.metadata.generator_language,
             seeds,
         )

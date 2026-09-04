@@ -9,12 +9,14 @@ import {
   type AdminProblem,
   type AdminProblemCreate,
   type AdminProblemSummary,
+  type AiGeneratedTestsResponse,
   type GeneratedCasesResponse,
   type GenerationStrategy,
   type GenerationVersionMetadata,
   applyGenerationBatch,
   createAdminProblem,
   generateHiddenTests,
+  generateHiddenTestsWithAi,
   getAdminProblem,
   listGenerationVersions,
   listAdminProblems,
@@ -373,6 +375,71 @@ function strategyAllocations(count: number, selected: GenerationStrategy[]) {
 }
 
 function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & { existingId: string | null }) {
+  const [casesPerGroup, setCasesPerGroup] = useState(10);
+  const [firstSeed, setFirstSeed] = useState(1);
+  const [replaceCases, setReplaceCases] = useState(true);
+  const [result, setResult] = useState<AiGeneratedTestsResponse | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const generate = async () => {
+    if (!existingId) {
+      setError(zh ? "請先儲存題目，AI 才能分析最新內容。" : "Save the problem before AI analysis.");
+      return;
+    }
+    setBusy(true); setError(""); setMessage(""); setResult(null);
+    try {
+      const generated = await generateHiddenTestsWithAi(existingId, {
+        cases_per_group: casesPerGroup,
+        first_seed: firstSeed,
+        replace_existing: replaceCases,
+      });
+      setResult(generated);
+      setMessage(zh
+        ? `AI 版本 ${generated.version} 已通過公開範例、Docker 與邊界檢查。確認摘要後再套用。`
+        : `AI version ${generated.version} passed sample, Docker, and boundary checks. Review before applying.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : (zh ? "AI 無法產生測資。" : "AI could not generate tests."));
+    } finally { setBusy(false); }
+  };
+
+  const applyAll = async () => {
+    if (!existingId || !result) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      for (const group of result.groups) {
+        await applyGenerationBatch(group.batch_id, {
+          group_order: group.group_order,
+          replace_existing: result.replace_existing,
+        });
+      }
+      setDraft(await getAdminProblem(existingId));
+      setMessage(zh ? "所有群組的 AI 測資已套用。" : "AI tests were applied to every group.");
+      setResult(null);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : (zh ? "無法套用全部測資。" : "Could not apply all tests."));
+    } finally { setBusy(false); }
+  };
+
+  return <>
+    <section className={panelClass}>
+      <SectionTitle title={zh ? "AI 自動產生隱藏測資" : "AI hidden-test generation"} detail={zh ? "AI 會分析已儲存的完整題意、範例與每組得分條件；每組至少建立一筆經後端確認的邊界測資。" : "AI analyzes the saved statement, samples, and every scoring condition. Every group must include a server-verified boundary case."} />
+      {!existingId ? <p className="mt-3 text-[10px] text-amber-200">{zh ? "請先儲存題目。" : "Save the problem first."}</p> : <p className="mt-3 text-[10px] text-slate-500">{zh ? "若剛修改題意或配分條件，請先按頁面底部的「翻譯並儲存題目」。" : "Save recent statement or scoring edits before generation."}</p>}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <Field label={zh ? "每組測資數量" : "Cases per group"}><input className={inputClass} type="number" min="2" max="50" value={casesPerGroup} onChange={(event) => setCasesPerGroup(Number(event.target.value))} /></Field>
+        <Field label={zh ? "套用方式" : "Apply mode"}><select className={inputClass} value={replaceCases ? "replace" : "append"} onChange={(event) => setReplaceCases(event.target.value === "replace")}><option value="replace">{zh ? "取代各組現有測資" : "Replace group cases"}</option><option value="append">{zh ? "附加到各組末尾" : "Append to group cases"}</option></select></Field>
+      </div>
+      <details className="mt-4 rounded-xl border border-white/6 px-3 py-2 text-[10px] text-slate-500"><summary className="cursor-pointer font-semibold text-slate-400">{zh ? "進階設定" : "Advanced settings"}</summary><div className="mt-3 max-w-xs"><Field label={zh ? "起始 seed（一般不需調整）" : "First seed"}><input className={inputClass} type="number" min="0" max="2147400000" value={firstSeed} onChange={(event) => setFirstSeed(Number(event.target.value))} /></Field></div></details>
+      <div className="mt-4 flex justify-end"><button type="button" disabled={busy || !existingId} onClick={() => void generate()} className="rounded-xl bg-violet-400 px-5 py-3 text-[11px] font-bold text-slate-950 disabled:opacity-40">{busy ? (zh ? "AI 分析與驗證中…" : "Analyzing and validating…") : (zh ? "AI 分析並產生測資" : "Analyze and generate with AI")}</button></div>
+      {result ? <div className="mt-5 space-y-3"><div className="flex items-center justify-between gap-3"><strong className="text-xs text-violet-200">{zh ? "待套用的測資摘要" : "Test draft summary"}</strong><span className="font-mono text-[9px] text-slate-600">{result.version}</span></div>{result.groups.map((group) => <div key={group.group_order} className="rounded-xl border border-white/8 bg-white/[0.02] p-3"><div className="flex items-center justify-between text-[11px]"><strong className="text-slate-200">{scoringGroupLabel(group.group_order - 1, zh)}</strong><span className="text-cyan-300">{group.accepted} {zh ? "筆" : "cases"}</span></div><p className="mt-2 text-[10px] text-slate-400">{zh ? "邊界證據" : "Boundary evidence"}：{group.boundary.actual_value} ≈ {group.boundary.target_value}</p><p className="mt-1 text-[9px] text-slate-600">seed {group.boundary.generator_seed} · {zh ? `嘗試 ${group.attempted}，捨棄非法 ${group.discarded_invalid}、重複 ${group.discarded_duplicate}` : `attempted ${group.attempted}; invalid ${group.discarded_invalid}; duplicates ${group.discarded_duplicate}`}</p></div>)}<div className="flex justify-end"><button type="button" disabled={busy} onClick={() => void applyAll()} className="rounded-xl bg-cyan-400 px-5 py-3 text-[11px] font-bold text-slate-950 disabled:opacity-40">{zh ? "套用全部測資" : "Apply all tests"}</button></div></div> : null}
+      {error ? <Feedback tone="error" text={error} /> : null}{message ? <Feedback tone="success" text={message} /> : null}
+    </section>
+    <details className="rounded-2xl border border-white/8 bg-[#0d141f] p-4 sm:p-5"><summary className="cursor-pointer text-xs font-semibold text-slate-400">{zh ? "進階手動生成模式" : "Advanced manual generation"}</summary><div className="mt-4"><ManualTestGenerator existingId={existingId} draft={draft} setDraft={setDraft} zh={zh} /></div></details>
+  </>;
+}
+
+function ManualTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & { existingId: string | null }) {
   const [versions, setVersions] = useState<GenerationVersionMetadata[]>([]);
   const [version, setVersion] = useState("v1");
   const [targetGroup, setTargetGroup] = useState(0);
@@ -498,7 +565,7 @@ function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps 
   };
 
   return <section className={panelClass}>
-    <SectionTitle title={zh ? "自動產生隱藏測資" : "Automatic hidden-test generation"} detail={zh ? "Generator 從 stdin 第一行讀取固定 seed、第二行讀取策略名稱，再輸出一筆完整測資。產生結果先留在伺服器草稿，瀏覽器只取得雜湊與大小摘要。" : "The Generator reads a fixed seed on stdin line 1 and a strategy name on line 2. Results stay in a server draft; the browser receives only hashes and size metadata."} />
+    <SectionTitle title={zh ? "自動產生隱藏測資" : "Automatic hidden-test generation"} detail={zh ? "Generator 從 stdin 依序讀取固定 seed、策略名稱與群組編號，再輸出一筆完整測資。產生結果先留在伺服器草稿，瀏覽器只取得雜湊與大小摘要。" : "The Generator reads a fixed seed, strategy name, and group order from stdin. Results stay in a server draft; the browser receives only hashes and size metadata."} />
     {!existingId ? <p className="mt-3 text-[10px] text-amber-200">{zh ? "先儲存未發布題目，才能建立機密版本。" : "Save the unpublished problem before creating a private version."}</p> : null}
     <div className="mt-4 grid gap-4 sm:grid-cols-3">
       <Field label={zh ? "版本名稱" : "Version"}><input className={inputClass} value={version} maxLength={40} onChange={(event) => setVersion(event.target.value.replace(/[^a-zA-Z0-9._-]/gu, ""))} /></Field>

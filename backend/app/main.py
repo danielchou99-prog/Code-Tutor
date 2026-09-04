@@ -25,6 +25,13 @@ from .ai_tutor import (
     GroqTutorProvider,
     TutorPrompt,
 )
+from .ai_test_generation import (
+    AiAutoGenerateRequest,
+    AiAutoGenerateResponse,
+    AiHiddenTestError,
+    AiHiddenTestGenerationService,
+    GroqAiBlueprintProvider,
+)
 from .compiler import CompilerService, CompilerUnavailable, DockerCompiler
 from .config import settings
 from .interactive import DockerInteractiveCompiler, InteractiveCompilerService, READY_MARKER
@@ -335,6 +342,42 @@ def get_problem_translation_service(request: Request) -> ProblemTranslationServi
     return service
 
 
+def get_ai_hidden_test_generation_service(
+    store: SupabaseProblemAdminStore = Depends(get_problem_admin_store),
+    compiler: CompilerService = Depends(get_compiler),
+) -> AiHiddenTestGenerationService:
+    if not (
+        settings.supabase_url
+        and settings.supabase_publishable_key
+        and settings.ai_encryption_key
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI hidden-test generation is not configured on the server.",
+        )
+    try:
+        cipher = FernetKeyCipher(settings.ai_encryption_key)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI hidden-test generation is not configured on the server.",
+        ) from error
+    return AiHiddenTestGenerationService(
+        key_store=SupabaseAiConnectionStore(
+            settings.supabase_url,
+            settings.supabase_publishable_key,
+            settings.ai_request_timeout_seconds,
+        ),
+        cipher=cipher,
+        provider=GroqAiBlueprintProvider(
+            model=settings.ai_model,
+            timeout_seconds=max(settings.ai_tutor_timeout_seconds, 90),
+        ),
+        store=store,
+        compiler=compiler,
+    )
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health(compiler: CompilerService = Depends(get_compiler)) -> HealthResponse:
     compiler_available = await run_in_threadpool(compiler.is_available)
@@ -461,6 +504,62 @@ async def save_generation_version(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(error),
         ) from error
+
+
+@app.post(
+    "/api/admin/problems/{problem_id}/generate-tests/ai",
+    response_model=AiAutoGenerateResponse,
+)
+async def generate_hidden_tests_with_ai(
+    problem_id: str,
+    payload: AiAutoGenerateRequest,
+    user: AuthenticatedUser = Depends(require_problem_admin),
+    store: SupabaseProblemAdminStore = Depends(get_problem_admin_store),
+    service: AiHiddenTestGenerationService = Depends(get_ai_hidden_test_generation_service),
+    gate: ExecutionGate = Depends(get_execution_gate),
+) -> AiAutoGenerateResponse:
+    if not gate.try_enter():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The compiler queue is full. Try generation again shortly.",
+        )
+    has_execution_slot = False
+    try:
+        has_execution_slot = await run_in_threadpool(gate.wait_for_execution)
+        if not has_execution_slot:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The compiler queue wait timed out.",
+            )
+        problem = await run_in_threadpool(store.get_problem, problem_id)
+        return await run_in_threadpool(service.generate, user, problem, payload)
+    except AiConnectionRequired as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except InvalidProviderKey as error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+    except AiProviderAccessDenied as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+    except AiProviderRateLimited as error:
+        headers = {"Retry-After": str(error.retry_after_seconds)} if error.retry_after_seconds else None
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Groq rate limit reached. Try again later.",
+            headers=headers,
+        ) from error
+    except (AiProviderUnavailable, AiStorageUnavailable) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI hidden-test generation is temporarily unavailable.",
+        ) from error
+    except (ProblemAdminUnavailable, AiHiddenTestError, TestGenerationError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+    finally:
+        if has_execution_slot:
+            gate.leave_execution()
+        gate.leave()
 
 
 @app.post(

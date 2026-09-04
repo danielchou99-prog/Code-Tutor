@@ -82,6 +82,26 @@ export type GeneratedCasesResponse = {
     strategy_counts: Record<string, number>;
   };
 };
+export type AiGeneratedTestsResponse = {
+  version: string;
+  replace_existing: boolean;
+  groups: Array<{
+    group_order: number;
+    batch_id: string;
+    requested: number;
+    accepted: number;
+    attempted: number;
+    discarded_invalid: number;
+    discarded_duplicate: number;
+    strategy_counts: Record<string, number>;
+    boundary: {
+      target_value: number;
+      actual_value: number;
+      tolerance: number;
+      generator_seed: number;
+    };
+  }>;
+};
 
 export class ProblemAdminApiError extends Error {
   constructor(message: string, readonly statusCode: number) {
@@ -206,6 +226,13 @@ export function saveGenerationVersion(problemId: string, payload: GenerationVers
 
 export function generateHiddenTests(problemId: string, payload: { version: string; count: number; first_seed: number; strategy_allocations: Array<{ strategy: GenerationStrategy; count: number }> }): Promise<GeneratedCasesResponse> {
   return adminRequest(`/api/admin/problems/${encodeURIComponent(problemId)}/generate-tests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function generateHiddenTestsWithAi(problemId: string, payload: { cases_per_group: number; first_seed: number; replace_existing: boolean }): Promise<AiGeneratedTestsResponse> {
+  return adminRequest(`/api/admin/problems/${encodeURIComponent(problemId)}/generate-tests/ai`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
