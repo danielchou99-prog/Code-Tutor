@@ -1,6 +1,6 @@
 # 隨機題目編號計畫
 
-- 文件狀態：程式與 migration 檔案完成，等待 Supabase 與部署前核可
+- 文件狀態：相容程式已部署，等待使用者手動執行 Supabase migration
 - 建立日期：2026-09-03
 - 格式：一個小寫英文字母加三位數字，例如 `q482`、`a007`
 
@@ -36,6 +36,10 @@
   - 簡易說明：執行 Backend、Frontend lint、TypeScript 與 production build。
 - [x] 9. 提供 migration 與部署前唯讀報告。
   - 簡易說明：使用者核可前，不執行 Supabase migration、不提交、不部署。
+- [x] 10. 先部署相容舊題號與新題號的應用程式。
+  - 簡易說明：先讓正式站台具備過渡相容性，再由使用者更新資料庫。
+- [ ] 11. 執行並驗證 Supabase migration。
+  - 簡易說明：使用者在 SQL Editor 執行後，確認既有題目、關聯資料與舊題號對照完整。
 
 ## 驗收方式
 
@@ -50,7 +54,7 @@
 
 - 核可 migration 唯讀內容後，在 Supabase SQL Editor 執行 migration。
 - 執行後確認五個既有題目的新題號與內容。
-- 核可 Git 提交、推送與 VPS 部署。
+- 在 Supabase SQL Editor 執行 migration 後通知開發端驗證。
 
 ## 2026-09-03 驗證紀錄
 
@@ -60,3 +64,9 @@
 - migration 尚未執行；Supabase 正式資料仍維持原題號。
 - 最終唯讀查詢確認公開題目仍為 `1001`、`1002`、`1003`、`1004`、`j607`，共 5 題。
 - pytest 隔離暫存已安全清除，沒有刪除正式資料。
+
+## 2026-09-04 部署紀錄
+
+- GitHub 與 VPS 已更新至 `f210d69`，相容程式已正式運行。
+- 公開首頁、C++／Python Run、管理 API 未登入防護與服務健康狀態皆通過。
+- Supabase migration 尚未執行，正式題號目前不會被更動。
