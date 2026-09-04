@@ -12,6 +12,7 @@ WorkingDirectory=/srv/code-tutor/backend
 EnvironmentFile=/etc/code-tutor/backend.env
 Environment=PYTHONUNBUFFERED=1
 Environment=TMPDIR=/var/lib/code-tutor
+Environment=DOCKER_CONFIG=/var/lib/code-tutor
 ExecStart=/srv/code-tutor/backend/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers --forwarded-allow-ips=127.0.0.1
 Restart=on-failure
 RestartSec=3

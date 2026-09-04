@@ -274,3 +274,22 @@ FastAPI --------------------------HTTPS--------> Groq
 - 根因是 `test_writes_all_project_sources` 寫死 Windows `C:/project-sources`；正式 Linux 程式的 `chmod` 正確，但測試提供了不存在的路徑。
 - 已將測試改為跨平台 `tmp_path`，並驗證 Linux 資料夾 `755` 與檔案 `644` 權限。
 - 修正提交 `17e853c` 已推送至 GitHub `main`；Linux CI 執行 `33296500898` 的 `verify` 工作完成且結果為 `success`。
+
+## Docker 設定警告修正（2026-09-04）
+
+目標：移除編譯完成後出現的 `/home/code-tutor/.docker/config.json: permission denied`，同時保留 systemd 的 `ProtectHome=true` 安全隔離。
+
+目前狀態：唯讀檢查確認 `/home/code-tutor` 權限正確且沒有 `config.json`；警告來自 API／Worker 的 systemd 服務無法在 `ProtectHome=true` 下讀取家目錄。服務外以相同帳號執行 Docker 正常。
+
+- [x] 唯讀確認服務帳號、家目錄權限、Docker 存取與 systemd 安全參數。
+- [x] 在 API 與 Judge Worker 範本指定 `DOCKER_CONFIG=/var/lib/code-tutor`。
+- [x] 執行本機差異、格式與 systemd 範本檢查。
+- [ ] 提交並部署兩個 systemd unit，執行 `daemon-reload` 後重啟 API／Worker。
+- [ ] 從公開 IP 執行 C++ 與 Python，確認結果不再包含 Docker config 警告。
+- [ ] 確認服務 active、沒有 error 日誌且沒有殘留 Compiler container。
+
+簡易說明：`StateDirectory=code-tutor` 已提供服務可讀寫的 `/var/lib/code-tutor`。讓 Docker CLI 從該處尋找選用設定檔，便不必開放受保護的家目錄，也不必建立假的 Docker 認證檔。
+
+驗收方式：C++ 與 Python 公開 API 均回傳 accepted 和正確輸出；stdout、stderr 與 journal 不出現 `Error loading config file`；API／Worker 維持 active；Compiler container 殘留數為 0。
+
+需要使用者手動操作：無。若未來使用私人 Compiler image registry，應另行設計 root-only credential helper，不把 registry 密碼寫入目前的共用狀態目錄。
