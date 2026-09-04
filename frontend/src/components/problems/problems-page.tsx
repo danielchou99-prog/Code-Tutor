@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
+import { migrateLocalProblemCodeDraft } from "@/lib/problem-code-drafts";
 import { loadProblems } from "@/lib/problem-repository";
 
 import { getProblemTagLabel, type Problem, type ProblemDifficulty, type ProblemStatus, type ProblemTag, problems } from "./problem-data";
@@ -69,8 +70,18 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
     let cancelled = false;
     void loadProblems().then((result) => {
       if (cancelled) return;
+      const storedProblemId = window.localStorage.getItem(selectedProblemStorageKey);
+      const replacementId = storedProblemId ? result.idAliases[storedProblemId] : undefined;
+      if (storedProblemId && replacementId) {
+        migrateLocalProblemCodeDraft(storedProblemId, replacementId);
+        window.localStorage.setItem(selectedProblemStorageKey, replacementId);
+      }
       setAvailableProblems(result.problems);
-      setSelectedProblem((current) => current ? result.problems.find((problem) => problem.id === current.id) ?? current : current);
+      setSelectedProblem((current) => {
+        if (!current) return current;
+        const currentId = result.idAliases[current.id] ?? current.id;
+        return result.problems.find((problem) => problem.id === currentId) ?? current;
+      });
     });
     return () => { cancelled = true; };
   }, [user?.id]);

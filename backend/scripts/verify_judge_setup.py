@@ -37,7 +37,14 @@ def main() -> int:
         return 1
 
     store = SupabaseJudgeStore(settings.supabase_url, settings.supabase_server_key)
-    problem = store.get_problem("1001")
+    problem_rows = store._request(
+        "GET",
+        "problems?published=eq.true&select=id&order=id.asc&limit=1",
+    ).json()
+    if not isinstance(problem_rows, list) or not problem_rows:
+        print(json.dumps({"ready": False, "reason": "published_problem_missing"}))
+        return 1
+    problem = store.get_problem(str(problem_rows[0]["id"]))
     if not problem.groups or not problem.groups[0].cases:
         print(json.dumps({"ready": False, "reason": "judge_cases_missing"}))
         return 1

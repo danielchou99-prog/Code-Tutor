@@ -60,6 +60,22 @@ export function clearLocalProblemCodeDraft(problemId: string, language: Programm
   }
 }
 
+export function migrateLocalProblemCodeDraft(oldProblemId: string, newProblemId: string) {
+  try {
+    for (const language of ["cpp", "python"] as const) {
+      const oldKey = localDraftKey(oldProblemId, language);
+      const newKey = localDraftKey(newProblemId, language);
+      const oldDraft = window.localStorage.getItem(oldKey);
+      if (oldDraft && !window.localStorage.getItem(newKey)) {
+        window.localStorage.setItem(newKey, oldDraft);
+      }
+      window.localStorage.removeItem(oldKey);
+    }
+  } catch {
+    // A blocked or full localStorage must not prevent the problem list from loading.
+  }
+}
+
 export async function loadSavedProblemCode(problemId: string, language: ProgrammingLanguage): Promise<SavedProblemCode | null> {
   const supabase = getSupabaseBrowserClient();
   const { data: authData } = await supabase.auth.getUser();

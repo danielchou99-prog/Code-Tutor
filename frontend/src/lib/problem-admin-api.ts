@@ -39,6 +39,8 @@ export type AdminProblem = {
   test_groups: AdminTestGroup[];
 };
 
+export type AdminProblemCreate = Omit<AdminProblem, "id">;
+
 export type AdminProblemSummary = Pick<AdminProblem, "id" | "title" | "difficulty" | "published"> & {
   updated_at: string;
 };
@@ -121,6 +123,13 @@ export function listAdminProblems(): Promise<AdminProblemSummary[]> {
 
 export function getAdminProblem(problemId: string): Promise<AdminProblem> {
   return adminRequest(`/api/admin/problems/${encodeURIComponent(problemId)}`);
+}
+
+export function createAdminProblem(problem: AdminProblemCreate): Promise<AdminProblem> {
+  return adminRequest("/api/admin/problems", {
+    method: "POST",
+    body: JSON.stringify(problem),
+  });
 }
 
 export function saveAdminProblem(problem: AdminProblem): Promise<AdminProblem> {

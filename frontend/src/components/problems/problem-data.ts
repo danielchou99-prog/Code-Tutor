@@ -74,7 +74,7 @@ export function getProblemTagLabel(tag: ProblemTag): LocalizedText {
 
 export const problems: Problem[] = [
   {
-    id: "1001",
+    id: "a101",
     title: { zh: "星際補給站", en: "Orbital Supply Depot" },
     summary: { zh: "合併兩批送達太空站的補給數量。", en: "Combine two supply shipments delivered to an orbital station." },
     difficulty: "easy",
@@ -99,7 +99,7 @@ export const problems: Problem[] = [
     starterCode: helloWorldStarterCode,
   },
   {
-    id: "1002",
+    id: "b202",
     title: { zh: "古老書庫", en: "The Ancient Archive" },
     summary: { zh: "在依編號排列的書架中找出指定古籍最早的位置。", en: "Find the earliest shelf position of a requested volume in a sorted archive." },
     difficulty: "medium",
@@ -128,7 +128,7 @@ export const problems: Problem[] = [
     starterCode: helloWorldStarterCode,
   },
   {
-    id: "1003",
+    id: "c303",
     title: { zh: "迷霧森林", en: "Forest of Mist" },
     summary: { zh: "找出旅人穿越森林抵達出口所需的最少步數。", en: "Find the fewest steps needed for a traveler to reach the forest exit." },
     difficulty: "medium",
@@ -153,7 +153,7 @@ export const problems: Problem[] = [
     starterCode: helloWorldStarterCode,
   },
   {
-    id: "1004",
+    id: "d404",
     title: { zh: "彗星撞擊", en: "Comet Impact" },
     summary: { zh: "從連續觀測紀錄中找出能量最強的一段撞擊期。", en: "Find the strongest impact period in a sequence of energy observations." },
     difficulty: "hard",

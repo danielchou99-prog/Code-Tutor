@@ -56,6 +56,7 @@ from .models import (
 from .protection import ExecutionGate, InMemoryRateLimiter, RateLimitExceeded
 from .problem_admin import (
     AdminProblem,
+    AdminProblemCreate,
     AdminProblemSummary,
     AdminStatusResponse,
     ProblemAdminUnavailable,
@@ -359,6 +360,21 @@ async def list_admin_problems(
 ) -> list[AdminProblemSummary]:
     try:
         return await run_in_threadpool(store.list_problems)
+    except ProblemAdminUnavailable as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+
+@app.post("/api/admin/problems", response_model=AdminProblem, status_code=status.HTTP_201_CREATED)
+async def create_admin_problem(
+    payload: AdminProblemCreate,
+    _user: AuthenticatedUser = Depends(require_problem_admin),
+    store: SupabaseProblemAdminStore = Depends(get_problem_admin_store),
+) -> AdminProblem:
+    try:
+        return await run_in_threadpool(store.create_problem, payload)
     except ProblemAdminUnavailable as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

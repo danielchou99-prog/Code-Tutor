@@ -36,10 +36,12 @@ type GroupRow = {
   score_percent: number;
 };
 type SubmissionRow = { problem_id: string; status: string; score: number };
+type ProblemIdAliasRow = { old_id: string; new_id: string };
 
 export type ProblemLoadResult = {
   problems: Problem[];
   source: "supabase" | "fallback";
+  idAliases: Record<string, string>;
 };
 
 function statusByProblem(submissions: SubmissionRow[]): Map<string, ProblemStatus> {
@@ -52,7 +54,7 @@ function statusByProblem(submissions: SubmissionRow[]): Map<string, ProblemStatu
 }
 
 export async function loadProblems(): Promise<ProblemLoadResult> {
-  if (!isSupabaseConfigured()) return { problems: fallbackProblems, source: "fallback" };
+  if (!isSupabaseConfigured()) return { problems: fallbackProblems, source: "fallback", idAliases: {} };
 
   try {
     const supabase = getSupabaseBrowserClient();
@@ -72,6 +74,12 @@ export async function loadProblems(): Promise<ProblemLoadResult> {
       const submissionResult = await supabase.from("submissions").select("problem_id,status,score");
       if (!submissionResult.error) submissions = submissionResult.data as SubmissionRow[];
     }
+    const aliasResult = await supabase.from("problem_id_aliases").select("old_id,new_id");
+    const idAliases = aliasResult.error
+      ? {}
+      : Object.fromEntries(
+          (aliasResult.data as ProblemIdAliasRow[]).map((alias) => [alias.old_id, alias.new_id]),
+        );
 
     const tagRows = tagResult.data as TagRow[];
     registerProblemTagLabels(Object.fromEntries(tagRows.map((tag) => [tag.slug, { zh: tag.label_zh, en: tag.label_en }])));
@@ -82,6 +90,7 @@ export async function loadProblems(): Promise<ProblemLoadResult> {
 
     return {
       source: "supabase",
+      idAliases,
       problems: (problemResult.data as ProblemRow[]).map((problem) => ({
         id: problem.id,
         title: problem.title,
@@ -110,6 +119,6 @@ export async function loadProblems(): Promise<ProblemLoadResult> {
       })),
     };
   } catch {
-    return { problems: fallbackProblems, source: "fallback" };
+    return { problems: fallbackProblems, source: "fallback", idAliases: {} };
   }
 }

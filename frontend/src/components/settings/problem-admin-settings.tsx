@@ -7,11 +7,13 @@ import { streamAiTutor } from "@/lib/ai-tutor-api";
 import {
   type AdminLocalizedText,
   type AdminProblem,
+  type AdminProblemCreate,
   type AdminProblemSummary,
   type GeneratedCasesResponse,
   type GenerationStrategy,
   type GenerationVersionMetadata,
   applyGenerationBatch,
+  createAdminProblem,
   generateHiddenTests,
   getAdminProblem,
   listGenerationVersions,
@@ -66,6 +68,12 @@ function withoutHiddenTests(problem: AdminProblem): Omit<AdminProblem, "test_gro
   const safeProblem = { ...problem } as Partial<AdminProblem>;
   delete safeProblem.test_groups;
   return safeProblem as Omit<AdminProblem, "test_groups">;
+}
+
+function withoutProblemId(problem: AdminProblem): AdminProblemCreate {
+  const newProblem = { ...problem } as Partial<AdminProblem>;
+  delete newProblem.id;
+  return newProblem as AdminProblemCreate;
 }
 
 function isCompleteTag(tag: AdminProblem["tags"][number]) {
@@ -219,17 +227,19 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
 
   const save = async () => {
     if (!draft || busy) return;
-    if (!/^(?:\d{4,12}|[a-z]\d{3,11})$/u.test(draft.id)) { setError(zh ? "題號必須是 4–12 位數字，或一個小寫英文字母加 3–11 位數字（例如 a001）。" : "Use 4–12 digits, or one lowercase letter followed by 3–11 digits (for example, a001)."); return; }
     const totalScore = draft.test_groups.reduce((sum, group) => sum + Number(group.score_percent), 0);
     if (totalScore !== 100) { setError(zh ? `配分目前合計 ${totalScore}%，必須等於 100%。` : `Scores currently add up to ${totalScore}%. They must equal 100%.`); return; }
     setBusy(true); setError(""); setMessage("");
     try {
       const problemForSave = { ...draft, constraints: [], tags: draft.tags.filter(isCompleteTag) };
       const translated = await translateAdminProblem(problemForSave);
-      const saved = await saveAdminProblem(translated);
+      const saved = existingId
+        ? await saveAdminProblem(translated)
+        : await createAdminProblem(withoutProblemId(translated));
       const translatedTags = new Map(translated.tags.map((tag) => [tag.slug, tag]));
       setDraft({
         ...translated,
+        id: saved.id,
         published: saved.published,
         tags: draft.tags.map((tag) => translatedTags.get(tag.slug) ?? tag),
       });
@@ -277,7 +287,7 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
         <section className={panelClass}>
           <SectionTitle title={zh ? "基本資料" : "Basic information"} />
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <Field label={zh ? "題號" : "Problem ID"}><input className={inputClass} value={draft.id} disabled={Boolean(existingId)} placeholder="a001" onChange={(event) => setDraft({ ...draft, id: event.target.value.toLowerCase().replace(/[^a-z0-9]/gu, "").slice(0, 12) })} /></Field>
+            <Field label={zh ? "題號" : "Problem ID"}><div className={`${inputClass} flex items-center font-mono`}>{existingId ? `#${existingId}` : (zh ? "首次儲存時自動產生" : "Generated on first save")}</div></Field>
             <Field label={zh ? "難度" : "Difficulty"}><select className={inputClass} value={draft.difficulty} onChange={(event) => setDraft({ ...draft, difficulty: event.target.value as AdminProblem["difficulty"] })}><option value="easy">{zh ? "簡單" : "Easy"}</option><option value="medium">{zh ? "中等" : "Medium"}</option><option value="hard">{zh ? "困難" : "Hard"}</option></select></Field>
             <Field label={zh ? "發布狀態" : "Publication"}><button type="button" role="switch" aria-checked={draft.published} onClick={() => setDraft({ ...draft, published: !draft.published })} className={`mt-2 flex h-10 w-full items-center justify-between rounded-xl border px-3 text-xs ${draft.published ? "border-emerald-300/25 bg-emerald-300/[0.06] text-emerald-300" : "border-white/8 bg-[#090f18] text-slate-500"}`}><span>{draft.published ? (zh ? "已發布" : "Published") : (zh ? "未發布" : "Draft")}</span><span>{draft.published ? "●" : "○"}</span></button></Field>
           </div>

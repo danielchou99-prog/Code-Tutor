@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 import hashlib
+import secrets
+import string
 from typing import Any, Literal
 from urllib.parse import quote
 
@@ -21,6 +23,14 @@ from .test_generation import (
 
 class ProblemAdminUnavailable(RuntimeError):
     """Raised when the trusted problem administration store cannot be used."""
+
+
+class ProblemIdCollision(RuntimeError):
+    """Raised when a generated ID is already assigned to another problem."""
+
+
+def generate_problem_id() -> str:
+    return f"{secrets.choice(string.ascii_lowercase)}{secrets.randbelow(1000):03d}"
 
 
 class LocalizedText(BaseModel):
@@ -85,8 +95,7 @@ class AdminStarterCode(BaseModel):
     python: str = Field(max_length=65_536)
 
 
-class AdminProblem(BaseModel):
-    id: str = Field(pattern=r"^(?:[0-9]{4,12}|[a-z][0-9]{3,11})$")
+class AdminProblemContent(BaseModel):
     title: LocalizedText
     summary: LocalizedText
     description: list[LocalizedText] = Field(min_length=1, max_length=30)
@@ -103,7 +112,7 @@ class AdminProblem(BaseModel):
     test_groups: list[AdminTestGroup] = Field(min_length=1, max_length=20)
 
     @model_validator(mode="after")
-    def validate_problem(self) -> "AdminProblem":
+    def validate_problem(self) -> "AdminProblemContent":
         if sum(group.score_percent for group in self.test_groups) != 100:
             raise ValueError("Test group scores must add up to 100.")
         tag_slugs = [tag.slug for tag in self.tags]
@@ -127,6 +136,17 @@ class AdminProblem(BaseModel):
         if self.published and not public_text_is_complete:
             self.published = False
         return self
+
+
+class AdminProblemCreate(AdminProblemContent):
+    pass
+
+
+class AdminProblem(AdminProblemContent):
+    # Legacy IDs remain readable during the deployment-to-migration window.
+    # Create always allocates the exact four-character format, and the database
+    # migration ultimately enforces it for every stored problem.
+    id: str = Field(pattern=r"^(?:[0-9]{4,12}|[a-z][0-9]{3,11})$")
 
 
 class AdminProblemSummary(BaseModel):
@@ -187,9 +207,11 @@ class SupabaseProblemAdminStore:
                 )
             if error_code == "23514" and "problems_id_check" in error_message:
                 raise ProblemAdminUnavailable(
-                    "Supabase still accepts numeric problem IDs only. Run "
-                    "202608250005_repair_problem_id_constraint.sql, then save again."
+                    "Supabase is missing the random problem ID schema. Run the latest "
+                    "random problem ID migration, then save again."
                 )
+            if error_code == "23505" and "problems_pkey" in error_message:
+                raise ProblemIdCollision("The generated problem ID already exists.")
             raise ProblemAdminUnavailable("The problem database rejected the admin request.")
         return response
 
@@ -281,7 +303,19 @@ class SupabaseProblemAdminStore:
             }
         )
 
+    def create_problem(self, content: AdminProblemCreate) -> AdminProblem:
+        for _ in range(128):
+            problem = AdminProblem(id=generate_problem_id(), **content.model_dump())
+            try:
+                return self._save_problem(problem, create_only=True)
+            except ProblemIdCollision:
+                continue
+        raise ProblemAdminUnavailable("No unused problem ID could be allocated.")
+
     def save_problem(self, problem: AdminProblem) -> AdminProblem:
+        return self._save_problem(problem, create_only=False)
+
+    def _save_problem(self, problem: AdminProblem, *, create_only: bool) -> AdminProblem:
         desired_published = problem.published
         problem_row = {
             "id": problem.id,
@@ -299,12 +333,23 @@ class SupabaseProblemAdminStore:
             # following child-table requests fail. Publishing is the final step.
             "published": False,
         }
-        self._request(
-            "POST",
-            "problems?on_conflict=id",
-            json=[problem_row],
-            prefer="resolution=merge-duplicates,return=minimal",
-        )
+        encoded_id = quote(problem.id, safe="")
+        if create_only:
+            self._request(
+                "POST",
+                "problems",
+                json=[problem_row],
+                prefer="return=minimal",
+            )
+        else:
+            updated_rows = self._request(
+                "PATCH",
+                f"problems?id=eq.{encoded_id}",
+                json=problem_row,
+                prefer="return=representation",
+            ).json()
+            if not isinstance(updated_rows, list) or not updated_rows:
+                raise ProblemAdminUnavailable("The requested problem does not exist.")
         if problem.tags:
             self._request(
                 "POST",
@@ -313,7 +358,6 @@ class SupabaseProblemAdminStore:
                 prefer="resolution=merge-duplicates,return=minimal",
             )
 
-        encoded_id = quote(problem.id, safe="")
         self._request("DELETE", f"problem_tag_links?problem_id=eq.{encoded_id}")
         self._request("DELETE", f"problem_samples?problem_id=eq.{encoded_id}")
         self._request("DELETE", f"problem_test_groups?problem_id=eq.{encoded_id}")

@@ -618,7 +618,7 @@ if (action === "problems" || action === "problem-grid" || action === "problem-na
         })()`,
       );
     } else if (action === "problem-code-tools") {
-      await evaluate(client, `window.localStorage.removeItem("code-tutor:problem-code-draft:1001:cpp")`);
+      await evaluate(client, `Object.keys(window.localStorage).filter((key) => key.startsWith("code-tutor:problem-code-draft:")).forEach((key) => window.localStorage.removeItem(key))`);
       const cleanReload = client.waitFor("Page.loadEventFired");
       await client.send("Page.reload", { ignoreCache: true });
       await cleanReload;
