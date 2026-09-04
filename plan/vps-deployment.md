@@ -284,12 +284,14 @@ FastAPI --------------------------HTTPS--------> Groq
 - [x] 唯讀確認服務帳號、家目錄權限、Docker 存取與 systemd 安全參數。
 - [x] 在 API 與 Judge Worker 範本指定 `DOCKER_CONFIG=/var/lib/code-tutor`。
 - [x] 執行本機差異、格式與 systemd 範本檢查。
-- [ ] 提交並部署兩個 systemd unit，執行 `daemon-reload` 後重啟 API／Worker。
-- [ ] 從公開 IP 執行 C++ 與 Python，確認結果不再包含 Docker config 警告。
-- [ ] 確認服務 active、沒有 error 日誌且沒有殘留 Compiler container。
+- [x] 提交並部署兩個 systemd unit，執行 `daemon-reload` 後重啟 API／Worker。
+- [x] 從公開 IP 執行 C++ 與 Python，確認結果不再包含 Docker config 警告。
+- [x] 確認服務 active、沒有 error 日誌且沒有殘留 Compiler container。
 
 簡易說明：`StateDirectory=code-tutor` 已提供服務可讀寫的 `/var/lib/code-tutor`。讓 Docker CLI 從該處尋找選用設定檔，便不必開放受保護的家目錄，也不必建立假的 Docker 認證檔。
 
 驗收方式：C++ 與 Python 公開 API 均回傳 accepted 和正確輸出；stdout、stderr 與 journal 不出現 `Error loading config file`；API／Worker 維持 active；Compiler container 殘留數為 0。
 
 需要使用者手動操作：無。若未來使用私人 Compiler image registry，應另行設計 root-only credential helper，不把 registry 密碼寫入目前的共用狀態目錄。
+
+完成紀錄：修正提交 `870125e` 已部署。公開 C++ 與 Python 測試皆為 accepted、stderr 為空且未偵測到 Docker config 警告；Frontend、API、Worker、Nginx、Docker 與三項 health check 全部正常，Compiler container 殘留數為 0。
