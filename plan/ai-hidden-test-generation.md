@@ -1,6 +1,6 @@
 # AI 一鍵隱藏測資生成計畫
 
-- 文件狀態：核心實作完成，進行完整回歸與部署前唯讀審查
+- 文件狀態：已部署至 VPS，等待管理員使用真實 Groq 連線完成最終驗收
 - 建立日期：2026-09-04
 - 範圍：題目管理介面、AI 結構化分析、逐組測資生成、邊界覆蓋驗證、伺服器草稿、說明文件與部署
 
@@ -36,8 +36,10 @@
   - 簡易說明：重寫 `docs/隱藏測資生成器使用說明.md`，逐格說明簡化介面並提供完整範例。
 - [x] 9. 執行完整測試與正式建置。
   - 簡易說明：驗證後端、Frontend lint、TypeScript、Next.js build、Docker 生成與既有 Judge 回歸。
-- [ ] 10. 提供部署前唯讀報告並等待核可。
+- [x] 10. 提供部署前唯讀報告並等待核可。
   - 簡易說明：不直接套用 migration 或部署；先列出差異、測試、風險與使用者手動步驟。
+- [x] 11. 部署至 VPS 並完成公開服務健康檢查。
+  - 簡易說明：以 fast-forward 更新正式主機，完成 production build、後端編譯與 Docker 映像建置後才重啟服務。
 
 ## 驗收方式
 
@@ -52,7 +54,7 @@
 
 ## 需要使用者手動操作
 
-- 功能完成後核可 Supabase migration，再到 SQL Editor 執行。
+- 本功能沿用現有資料表，不需要執行新的 Supabase migration。
 - 使用管理員帳號以一題含明確最大值及多個配分群組的題目驗收。
 - 確認 AI 產生摘要後，再決定是否按「套用全部測資」。
 - 部署前核可唯讀差異與測試結果。
@@ -71,4 +73,12 @@
 - Frontend ESLint、TypeScript `tsc --noEmit` 與 Next.js production build 通過。
 - Python compileall 與 `git diff --check` 通過。
 - 沿用既有 server-only generation version／batch 資料表，本功能不新增 Supabase migration。
-- 尚待部署前核可，以及 VPS 上使用真實 Groq 與 Docker 的管理員驗收。
+- 部署前唯讀報告已核可，版本 `e3d4497` 已部署至 VPS。
+
+## 2026-09-04 VPS 部署紀錄
+
+- VPS production build、Python compileall 與隔離編譯器映像建置通過。
+- Next.js、FastAPI、Judge Worker、Nginx 與 Docker 服務皆為 active。
+- 公開首頁回應 HTTP 200；AI 管理路由未登入時回應 HTTP 401，確認路由已上線且權限保護有效。
+- 重啟後服務沒有 error 等級日誌，也沒有殘留的編譯器容器。
+- 最後待辦：由管理員登入後，用已連線的真實 Groq 金鑰產生一批測資，確認摘要後再決定是否套用。
