@@ -31,10 +31,10 @@ import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { useSettings } from "@/lib/settings-context";
 
 function EditorLoading() {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   return (
     <div className="grid h-full place-items-center bg-[#0c111b] font-mono text-xs text-slate-600">
-      {language === "zh-Hant" ? "正在載入程式碼編輯器…" : "Loading editor…"}
+      {t("loadingEditor")}
     </div>
   );
 }
@@ -84,9 +84,8 @@ export function CodeEditorPanel({
   requestedFileId,
 }: CodeEditorPanelProps) {
   const { user } = useAuth();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const { settings } = useSettings();
-  const zh = language === "zh-Hant";
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
   const [activeFile, setActiveFile] = useState<ProjectFile | null>(null);
@@ -151,7 +150,7 @@ export function CodeEditorPanel({
       setCode("");
       setSavedCode("");
       setSaveStatus("failed");
-      setFileError(zh ? "無法載入這個檔案。" : "This file could not be loaded.");
+      setFileError(t("thisFileCouldNotBe"));
     } else {
       const persistedCode = typeof data?.content === "string" ? data.content : "";
       const restoredDraft = loadProjectDraft(project.id, file.id);
@@ -163,7 +162,7 @@ export function CodeEditorPanel({
     }
     hasLoadedCodeRef.current = true;
     setHasLoadedCode(true);
-  }, [onDirtyChange, project.id, zh]);
+  }, [onDirtyChange, project.id, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,8 +172,8 @@ export function CodeEditorPanel({
         if (error) {
           setFileError(
             error.code === "PGRST205"
-              ? (zh ? "Project 檔案資料表尚未建立，請先執行 migration。" : "The project file table is not ready. Run the migration first.")
-              : (zh ? "無法載入 Project 檔案。" : "Project files could not be loaded."),
+              ? (t("theProjectFileTableIs"))
+              : (t("projectFilesCouldNotBe")),
           );
           return;
         }
@@ -208,7 +207,7 @@ export function CodeEditorPanel({
       cancelled = true;
       window.clearTimeout(restoreTimer);
     };
-  }, [loadFile, onDirtyChange, project.id, project.language, tabsStateKey, zh]);
+  }, [loadFile, onDirtyChange, project.id, project.language, tabsStateKey, t]);
 
   useEffect(() => {
     if (hydratedTabsStateKey === tabsStateKey) savePageState(tabsStateKey, openFileIds);
@@ -314,12 +313,12 @@ export function CodeEditorPanel({
     const normalizedName = completeProjectFileName(newFileName, project.language);
     if (!isValidProjectFileName(normalizedName, project.language)) {
       setCreateError(project.language === "python"
-        ? (zh ? "請使用安全檔名；未輸入副檔名時會自動補上 .py。" : "Use a safe file name. .py is added when no extension is entered.")
-        : (zh ? "請使用安全檔名；未輸入副檔名時會自動補上 .cpp，也可自行使用 .h 或 .hpp。" : "Use a safe file name. .cpp is added when no extension is entered; .h and .hpp are also supported."));
+        ? (t("useASafeFileName"))
+        : (t("useASafeFileName2")));
       return;
     }
     if (files.some((file) => file.name.toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
-      setCreateError(zh ? "這個 Project 已有相同檔名。" : "This project already contains that file name.");
+      setCreateError(t("thisProjectAlreadyContainsThat"));
       return;
     }
     setCreating(true);
@@ -331,7 +330,7 @@ export function CodeEditorPanel({
     });
     setCreating(false);
     if (error || !data) {
-      setCreateError(zh ? "無法新增檔案，請稍後再試。" : "The file could not be created. Try again.");
+      setCreateError(t("theFileCouldNotBe2"));
       return;
     }
     const createdFile = data as ProjectFile;
@@ -351,7 +350,7 @@ export function CodeEditorPanel({
     const { error } = await deleteProjectFile(target.id);
     setDeleting(false);
     if (error) {
-      setFileError(zh ? "無法刪除這個檔案。" : "This file could not be deleted.");
+      setFileError(t("thisFileCouldNotBe2"));
       setDeleteTarget(null);
       return;
     }
@@ -453,7 +452,7 @@ export function CodeEditorPanel({
       const { error: saveError } = await saveProjectFileContent(activeFile.id, code);
       if (saveError) {
         setSaveStatus("failed");
-        setRunError(zh ? "Run 前儲存失敗，已取消執行。" : "Save before Run failed, so the run was cancelled.");
+        setRunError(t("saveBeforeRunFailedSo"));
         setPreparingRun(false);
         return;
       }
@@ -463,7 +462,7 @@ export function CodeEditorPanel({
     }
     const { data, error } = await listProjectFileSources(project.id);
     if (error || !data) {
-      setRunError(zh ? "無法讀取 Project 檔案，請稍後再試。" : "Project files could not be read. Try again.");
+      setRunError(t("projectFilesCouldNotBe2"));
       setPreparingRun(false);
       return;
     }
@@ -482,7 +481,7 @@ export function CodeEditorPanel({
 
   const statusLabel = {
     saved: t("saved"),
-    unsaved: zh ? "尚未儲存" : "Unsaved",
+    unsaved: t("unsaved2"),
     saving: t("saving"),
     failed: t("saveFailed"),
   }[displayedSaveStatus];
@@ -521,7 +520,7 @@ export function CodeEditorPanel({
                       closeFile(file);
                     }}
                     className="mx-1 grid size-6 place-items-center rounded text-sm text-slate-700 hover:bg-white/5 hover:text-slate-300"
-                    aria-label={`${zh ? "關閉" : "Close"} ${file.name}`}
+                    aria-label={`${t("close")} ${file.name}`}
                   >
                     ×
                   </button>
@@ -538,8 +537,8 @@ export function CodeEditorPanel({
               setCreateError(null);
             }}
             className="grid h-full w-9 shrink-0 place-items-center border-r border-white/8 text-base text-slate-500 hover:bg-white/[0.025] hover:text-cyan-200"
-            aria-label={zh ? "新增檔案" : "New file"}
-            title={zh ? "新增檔案" : "New file"}
+            aria-label={t("newFile")}
+            title={t("newFile")}
           >
             +
           </button>
@@ -549,8 +548,8 @@ export function CodeEditorPanel({
               type="button"
               onClick={() => setFilesMenuOpen((open) => !open)}
               className="grid h-full w-9 place-items-center border-r border-white/8 text-slate-600 hover:bg-white/[0.025] hover:text-slate-300"
-              aria-label={zh ? "開啟 Project 檔案" : "Open project file"}
-              title={zh ? "開啟檔案" : "Open file"}
+              aria-label={t("openProjectFile")}
+              title={t("openFile")}
             >
               <FilesIcon />
             </button>
@@ -567,7 +566,7 @@ export function CodeEditorPanel({
                     {openFileIds.includes(file.id) ? <span className="text-[9px] text-cyan-300">open</span> : null}
                   </button>
                 )) : (
-                  <p className="px-3 py-2 text-[10px] text-slate-600">{zh ? "尚無檔案" : "No files yet"}</p>
+                  <p className="px-3 py-2 text-[10px] text-slate-600">{t("noFilesYet")}</p>
                 )}
               </div>
             ) : null}
@@ -578,8 +577,8 @@ export function CodeEditorPanel({
             onClick={() => activeFile && setDeleteTarget(activeFile)}
             disabled={!activeFile}
             className="grid h-full w-9 shrink-0 place-items-center border-r border-white/8 text-slate-600 hover:bg-rose-400/[0.05] hover:text-rose-300 disabled:cursor-default disabled:text-slate-800"
-            aria-label={zh ? "刪除目前檔案" : "Delete current file"}
-            title={zh ? "刪除目前檔案" : "Delete current file"}
+            aria-label={t("deleteCurrentFile")}
+            title={t("deleteCurrentFile")}
           >
             <TrashIcon />
           </button>
@@ -587,7 +586,7 @@ export function CodeEditorPanel({
 
         <div className="ml-2 flex shrink-0 items-center gap-2">
           <span className={`hidden text-[9px] sm:inline ${displayedSaveStatus === "failed" ? "text-rose-400" : "text-slate-600"}`} role="status">
-            {activeFile ? statusLabel : (zh ? "未開啟檔案" : "No file open")}
+            {activeFile ? statusLabel : (t("noFileOpen"))}
           </span>
           <button
             type="button"
@@ -609,7 +608,7 @@ export function CodeEditorPanel({
             type="button"
             onClick={() => void runProject()}
             disabled={isRunning || preparingRun || !canRun}
-            title={!canRun && activeFile ? (zh ? `Project 必須保留 ${entryFileName}` : `The project needs ${entryFileName}`) : undefined}
+            title={!canRun && activeFile ? (t("theProjectNeeds", { file: entryFileName })) : undefined}
             className="flex h-7 items-center gap-2 rounded-lg bg-cyan-400 px-3 text-[11px] font-bold text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.12)] transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
           >
             <span aria-hidden="true">▶</span>
@@ -641,7 +640,7 @@ export function CodeEditorPanel({
             theme={settings.theme === "light" ? "code-tutor-light" : "code-tutor-dark"}
             options={{
               accessibilitySupport: "auto",
-              ariaLabel: `${activeFile.name} ${project.language === "python" ? "Python" : "C++"} ${zh ? "程式碼編輯器" : "code editor"}`,
+              ariaLabel: `${activeFile.name} ${project.language === "python" ? "Python" : "C++"} ${t("codeEditor2")}`,
               automaticLayout: true,
               bracketPairColorization: { enabled: true },
               cursorBlinking: "smooth",
@@ -667,8 +666,8 @@ export function CodeEditorPanel({
       ) : (
         <div className="grid min-h-0 flex-1 place-items-center p-6 text-center">
           <div>
-            <p className="text-xs text-slate-500">{zh ? "目前沒有開啟的檔案" : "No file is currently open"}</p>
-            <p className="mt-2 text-[10px] text-slate-700">{zh ? "使用 + 新增檔案，或使用資料夾按鈕開啟既有檔案。" : "Use + to create a file, or the folder button to open an existing file."}</p>
+            <p className="text-xs text-slate-500">{t("noFileIsCurrentlyOpen")}</p>
+            <p className="mt-2 text-[10px] text-slate-700">{t("useToCreateAFile")}</p>
           </div>
         </div>
       )}
@@ -686,9 +685,9 @@ export function CodeEditorPanel({
               onSubmit={(event) => { event.preventDefault(); void submitNewFile(); }}
               className="pointer-events-auto w-full max-w-sm rounded-2xl border border-white/10 bg-[#111824] p-5 shadow-2xl shadow-black/60"
             >
-              <h2 className="text-sm font-semibold text-white">{zh ? "新增 Project 檔案" : "New project file"}</h2>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500">{project.language === "python" ? (zh ? "支援 .py，每個 Project 最多 50 個檔案。" : "Supports .py, up to 50 files per project.") : (zh ? "支援 .cpp、.h 與 .hpp，每個 Project 最多 50 個檔案。" : "Supports .cpp, .h, and .hpp, up to 50 files per project.")}</p>
-              <label className="mt-4 block text-[11px] text-slate-400" htmlFor="new-project-file-name">{zh ? "檔名" : "File name"}</label>
+              <h2 className="text-sm font-semibold text-white">{t("newProjectFile")}</h2>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">{project.language === "python" ? (t("supportsPyUpTo50")) : (t("supportsCppHAndHpp"))}</p>
+              <label className="mt-4 block text-[11px] text-slate-400" htmlFor="new-project-file-name">{t("fileName")}</label>
               <input
                 id="new-project-file-name"
                 autoFocus
@@ -705,14 +704,14 @@ export function CodeEditorPanel({
               />
               {newFileName.trim() && !createError ? (
                 <p className="mt-2 text-[10px] text-slate-500">
-                  {zh ? "將建立：" : "Will create: "}
+                  {t("willCreate")}
                   <span className="font-mono text-cyan-200/75">{completeProjectFileName(newFileName, project.language)}</span>
                 </p>
               ) : null}
               {createError ? <p className="mt-2 text-[11px] leading-5 text-rose-400" role="alert">{createError}</p> : null}
               <div className="mt-5 flex justify-end gap-2">
                 <button type="button" onClick={() => setCreateDialogOpen(false)} disabled={creating} className="h-10 rounded-xl border border-white/10 px-4 text-xs text-slate-400">{t("cancel")}</button>
-                <button type="submit" disabled={creating || !newFileName.trim()} className="h-10 rounded-xl bg-cyan-400 px-4 text-xs font-semibold text-slate-950 disabled:opacity-50">{creating ? (zh ? "新增中…" : "Creating…") : (zh ? "新增" : "Create")}</button>
+                <button type="submit" disabled={creating || !newFileName.trim()} className="h-10 rounded-xl bg-cyan-400 px-4 text-xs font-semibold text-slate-950 disabled:opacity-50">{creating ? (t("creating")) : (t("create2"))}</button>
               </div>
             </form>
           </div>
@@ -721,9 +720,9 @@ export function CodeEditorPanel({
 
       <ConfirmDialog
         open={pendingFileAction !== null}
-        title={zh ? "尚未儲存的變更" : "Unsaved changes"}
-        description={zh ? `如果繼續，${activeFile?.name ?? "目前檔案"} 尚未儲存的變更會遺失。` : `Unsaved changes to ${activeFile?.name ?? "the current file"} will be lost.`}
-        confirmLabel={zh ? "不儲存並繼續" : "Continue without saving"}
+        title={t("unsavedChanges2")}
+        description={t("unsavedChangesToWillBe", { name: activeFile?.name ?? t("currentFile") })}
+        confirmLabel={t("continueWithoutSaving")}
         cancelLabel={t("cancel")}
         closeLabel={t("closeDialog")}
         tone="danger"
@@ -740,11 +739,9 @@ export function CodeEditorPanel({
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title={zh ? "刪除檔案" : "Delete file"}
-        description={zh
-          ? `確定永久刪除 ${deleteTarget?.name ?? "這個檔案"}？${isDirty ? "尚未儲存的變更也會遺失。" : ""}此動作無法復原。`
-          : `Permanently delete ${deleteTarget?.name ?? "this file"}? ${isDirty ? "Unsaved changes will also be lost. " : ""}This action cannot be undone.`}
-        confirmLabel={deleting ? (zh ? "刪除中…" : "Deleting…") : t("confirmDelete")}
+        title={t("deleteFile")}
+        description={t("deleteFileConfirm", { name: deleteTarget?.name ?? t("thisFile"), unsaved: isDirty ? t("unsavedAlsoLost") : "" })}
+        confirmLabel={deleting ? (t("deleting")) : t("confirmDelete")}
         cancelLabel={t("cancel")}
         closeLabel={t("closeDialog")}
         tone="danger"

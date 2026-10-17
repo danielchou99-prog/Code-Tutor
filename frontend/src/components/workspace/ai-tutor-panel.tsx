@@ -87,9 +87,9 @@ export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, 
     analyze: { title: t("analyzeCode"), detail: t("analyzeCodeDetail") },
     explain_error: { title: t("explainError"), detail: t("explainErrorDetail") },
     hint: { title: t("giveHint"), detail: t("giveHintDetail") },
-    common_errors: { title: zh ? "分析常見錯誤" : "Analyze common errors", detail: zh ? "根據分數與群組結果找出可能問題" : "Use score and group results to identify likely issues" },
-    test_strategy: { title: zh ? "建議測資策略" : "Suggest test strategy", detail: zh ? "僅使用公開題目內容" : "Uses public problem content only" },
-    ask: { title: zh ? "詢問 AI" : "Ask AI", detail: "" },
+    common_errors: { title: t("analyzeCommonErrors"), detail: t("useScoreAndGroupResults") },
+    test_strategy: { title: t("suggestTestStrategy"), detail: t("usesPublicProblemContentOnly") },
+    ask: { title: t("askAi"), detail: "" },
   };
 
   const send = async (action: AiTutorAction, customQuestion = "") => {
@@ -134,10 +134,10 @@ export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, 
     } catch (requestError) {
       const stopped = requestError instanceof Error && requestError.name === "AbortError";
       const message = stopped
-        ? (zh ? "已停止這次回答。" : "This response was stopped.")
+        ? (t("thisResponseWasStopped"))
         : requestError instanceof Error
           ? requestError.message
-          : (zh ? "AI Tutor 暫時無法使用。" : "AI Tutor is temporarily unavailable.");
+          : (t("aiTutorIsTemporarilyUnavailable"));
       setMessages((current) => current.map((item) =>
         item.id === assistantId && !item.content ? { ...item, content: message } : item,
       ));
@@ -169,8 +169,8 @@ export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, 
             <button
               type="button"
               onClick={onClose}
-              aria-label={zh ? "關閉 AI Tutor" : "Close AI Tutor"}
-              title={zh ? "關閉 AI Tutor" : "Close AI Tutor"}
+              aria-label={t("closeAiTutor")}
+              title={t("closeAiTutor")}
               className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/20 bg-slate-800/80 text-xl font-medium leading-none text-white shadow-sm transition-colors hover:border-rose-300/40 hover:bg-rose-300/15 hover:text-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
             >
               <span aria-hidden="true">×</span>
@@ -195,7 +195,7 @@ export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, 
                     : "mr-3 rounded-tl-md border-white/8 bg-white/[0.035] text-slate-300"
                 }`}
               >
-                {message.content || (zh ? "正在思考…" : "Thinking…")}
+                {message.content || (t("thinking"))}
               </div>
             ))}
           </div>
@@ -260,7 +260,7 @@ export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, 
               onClick={() => abortRef.current?.abort()}
               className="h-8 shrink-0 rounded-lg border border-rose-400/25 px-2 text-[10px] font-semibold text-rose-300"
             >
-              {zh ? "停止" : "Stop"}
+              {t("stop")}
             </button>
           ) : (
             <button
@@ -274,7 +274,7 @@ export function AiTutorPanel({ code, errorOutput, judgeSummary = null, onClose, 
           )}
         </div>
         <p className="mt-1.5 px-1 text-[9px] text-slate-700">
-          {zh ? "Enter 送出，Shift + Enter 換行。AI 不會自動修改檔案。" : "Enter to send, Shift + Enter for a new line. AI never edits files automatically."}
+          {t("enterToSendShiftEnter")}
         </p>
       </form>
     </aside>

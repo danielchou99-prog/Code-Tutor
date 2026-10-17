@@ -32,7 +32,7 @@ function isProblemListState(value: unknown): value is ProblemListState {
 }
 
 export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: number }) {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { user } = useAuth();
   const zh = language === "zh-Hant";
   const textKey = zh ? "zh" : "en";
@@ -157,13 +157,13 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div className="max-w-2xl">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/70">{zh ? "題庫" : "Problem library"}</p>
-            <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">{zh ? "找到下一道練習題" : "Find your next problem"}</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-500">{zh ? "搜尋題目並依難度、標籤與作答狀態篩選，點擊題目後可以直接閱讀與寫程式。" : "Search and filter by difficulty, tag, or progress, then open a problem to read and code in one workspace."}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300/70">{t("problemLibrary")}</p>
+            <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">{t("findYourNextProblem")}</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-500">{t("searchAndFilterByDifficulty")}</p>
           </div>
           <div className="flex gap-6 text-center">
-            <Metric value={String(availableProblems.length)} label={zh ? "目前題目" : "Problems"} />
-            <Metric value={String(availableProblems.filter((problem) => problem.status === "solved").length)} label={zh ? "已通過" : "Solved"} />
+            <Metric value={String(availableProblems.length)} label={t("problems2")} />
+            <Metric value={String(availableProblems.filter((problem) => problem.status === "solved").length)} label={t("solved")} />
           </div>
         </div>
 
@@ -171,14 +171,14 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
             <label className="flex h-11 items-center gap-3 rounded-xl border border-white/10 bg-[#090e16] px-4 focus-within:border-cyan-300/30">
               <SearchIcon />
-              <span className="sr-only">{zh ? "搜尋題目或標籤" : "Search problems or tags"}</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={zh ? "搜尋題號、名稱或輸入 #二分搜尋 #陣列…" : "Search ID, title, #BinarySearch #Array…"} className="min-w-0 flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-600" />
+              <span className="sr-only">{t("problemSearchLabel")}</span>
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("searchIdTitleBinarysearchArray")} className="min-w-0 flex-1 bg-transparent text-xs text-slate-200 outline-none placeholder:text-slate-600" />
             </label>
-            <FilterSelect label={zh ? "難度" : "Difficulty"} value={difficulty} onChange={(value) => setDifficulty(value as ProblemDifficulty | "all")} options={[
-              ["all", zh ? "所有難度" : "All difficulties"], ["easy", zh ? "簡單" : "Easy"], ["medium", zh ? "中等" : "Medium"], ["hard", zh ? "困難" : "Hard"],
+            <FilterSelect label={t("difficulty")} value={difficulty} onChange={(value) => setDifficulty(value as ProblemDifficulty | "all")} options={[
+              ["all", t("allDifficulties")], ["easy", t("easy")], ["medium", t("medium")], ["hard", t("hard")],
             ]} />
-            <FilterSelect label={zh ? "狀態" : "Status"} value={status} onChange={(value) => setStatus(value as ProblemStatus | "all")} options={[
-              ["all", zh ? "所有狀態" : "All statuses"], ["solved", zh ? "已通過" : "Solved"], ["attempted", zh ? "嘗試過" : "Attempted"], ["unsolved", zh ? "未作答" : "Unsolved"],
+            <FilterSelect label={t("status")} value={status} onChange={(value) => setStatus(value as ProblemStatus | "all")} options={[
+              ["all", t("allStatuses")], ["solved", t("solved")], ["attempted", t("attempted")], ["unsolved", t("unsolved")],
             ]} />
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -187,27 +187,27 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
               const active = selectedTags.includes(tag);
               return <button key={tag} type="button" aria-pressed={active} onClick={() => setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])} className={`rounded-full border px-3 py-1.5 text-[10px] transition-colors ${active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-white/8 bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300"}`}>#{getProblemTagLabel(tag)[textKey]}</button>;
             })}
-            {(query || difficulty !== "all" || status !== "all" || selectedTags.length > 0) ? <button type="button" onClick={clearFilters} className="ml-auto px-2 py-1 text-[10px] text-slate-600 hover:text-cyan-300">{zh ? "清除篩選" : "Clear filters"}</button> : null}
+            {(query || difficulty !== "all" || status !== "all" || selectedTags.length > 0) ? <button type="button" onClick={clearFilters} className="ml-auto px-2 py-1 text-[10px] text-slate-600 hover:text-cyan-300">{t("clearFilters2")}</button> : null}
           </div>
         </div>
 
         <div className="mt-8 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">{zh ? "題目列表" : "Problem list"}</h2>
-          <span className="text-[10px] text-slate-600">{zh ? `找到 ${filteredProblems.length} 題` : `${filteredProblems.length} found`}</span>
+          <h2 className="text-sm font-semibold text-white">{t("problemList")}</h2>
+          <span className="text-[10px] text-slate-600">{t("found", { count: filteredProblems.length })}</span>
         </div>
 
         {filteredProblems.length ? (
           <div className="mt-4 grid grid-cols-1 gap-x-3 gap-y-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-            {filteredProblems.map((problem) => <ProblemCard key={problem.id} problem={problem} textKey={textKey} zh={zh} onOpen={() => {
+            {filteredProblems.map((problem) => <ProblemCard key={problem.id} problem={problem} textKey={textKey} onOpen={() => {
               window.localStorage.setItem(selectedProblemStorageKey, problem.id);
               setSelectedProblem(problem);
             }} />)}
           </div>
         ) : (
           <div className="mt-3 rounded-2xl border border-dashed border-white/10 py-16 text-center">
-            <p className="text-sm font-semibold text-slate-300">{zh ? "找不到符合條件的題目" : "No problems match your filters"}</p>
-            <p className="mt-2 text-xs text-slate-600">{zh ? "可以減少標籤數量或清除篩選後再試一次。" : "Try removing some tags or clearing the filters."}</p>
-            <button type="button" onClick={clearFilters} className="mt-4 text-xs text-cyan-300 hover:text-cyan-200">{zh ? "清除篩選" : "Clear filters"}</button>
+            <p className="text-sm font-semibold text-slate-300">{t("noProblems")}</p>
+            <p className="mt-2 text-xs text-slate-600">{t("tryRemovingSomeTagsOr")}</p>
+            <button type="button" onClick={clearFilters} className="mt-4 text-xs text-cyan-300 hover:text-cyan-200">{t("clearFilters2")}</button>
           </div>
         )}
       </div>
@@ -215,15 +215,16 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   );
 }
 
-function ProblemCard({ problem, textKey, zh, onOpen }: { problem: Problem; textKey: "zh" | "en"; zh: boolean; onOpen: () => void }) {
-  const difficultyLabel = { easy: zh ? "簡單" : "Easy", medium: zh ? "中等" : "Medium", hard: zh ? "困難" : "Hard" }[problem.difficulty];
-  const statusLabel = { solved: zh ? "已通過" : "Solved", attempted: zh ? "嘗試過" : "Attempted", unsolved: zh ? "未作答" : "Unsolved" }[problem.status];
+function ProblemCard({ problem, textKey, onOpen }: { problem: Problem; textKey: "zh" | "en"; onOpen: () => void }) {
+  const { t } = useLanguage();
+  const difficultyLabel = { easy: t("easy"), medium: t("medium"), hard: t("hard") }[problem.difficulty];
+  const statusLabel = { solved: t("solved"), attempted: t("attempted"), unsolved: t("unsolved") }[problem.status];
   return (
     <article className="min-w-0">
       <button
         type="button"
         onClick={onOpen}
-        aria-label={`${zh ? "開啟題目" : "Open problem"} #${problem.id} ${problem.title[textKey]}`}
+        aria-label={`${t("openProblem")} #${problem.id} ${problem.title[textKey]}`}
         className="group aspect-[2/1] w-full rounded-2xl border border-white/9 bg-[#0d131d] p-3 text-left shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition-[border-color,background-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-cyan-300/30 hover:bg-[#101925] hover:shadow-[0_16px_34px_rgba(0,0,0,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50"
       >
         <span className="flex h-full min-h-0 w-full flex-col">

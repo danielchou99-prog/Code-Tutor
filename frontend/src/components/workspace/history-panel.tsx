@@ -14,7 +14,7 @@ export function HistoryPanel({
   onBack: () => void;
   onOpenFile: (fileId: string) => void;
 }) {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
 
   return (
     <aside className="hidden border-r border-white/6 bg-[#0b1018] p-4 lg:block lg:h-full lg:overflow-y-auto">
@@ -53,7 +53,7 @@ export function HistoryPanel({
             );
           }) : (
             <p className="px-1 text-[10px] leading-5 text-slate-700">
-              {language === "zh-Hant" ? "這個 Project 尚無檔案" : "This project has no files"}
+              {t("thisProjectHasNoFiles")}
             </p>
           )}
         </div>

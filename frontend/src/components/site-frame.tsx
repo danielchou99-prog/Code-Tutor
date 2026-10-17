@@ -43,7 +43,7 @@ export function useSiteFrame(): SiteFrameContextValue {
 }
 
 export function SiteFrame({ children }: { children: ReactNode }) {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const { settings } = useSettings();
   const { user } = useAuth();
   const router = useRouter();
@@ -137,9 +137,9 @@ export function SiteFrame({ children }: { children: ReactNode }) {
         {children}
         <ConfirmDialog
           open={pendingAction !== null}
-          title={language === "zh-Hant" ? "尚有未儲存的修改" : "Unsaved changes"}
-          description={language === "zh-Hant" ? "若現在離開，目前尚未儲存的程式碼修改將會遺失。" : "Your unsaved code changes will be lost if you leave now."}
-          confirmLabel={language === "zh-Hant" ? "不儲存並離開" : "Leave without saving"}
+          title={t("unsavedChanges")}
+          description={t("yourUnsavedCodeChangesWill")}
+          confirmLabel={t("leaveWithoutSaving")}
           cancelLabel={t("cancel")}
           closeLabel={t("closeDialog")}
           tone="danger"

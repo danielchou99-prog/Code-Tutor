@@ -142,7 +142,7 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onNavigate }: SiteH
           {languageMenuOpen && (
             <div
               role="menu"
-              aria-label={language === "zh-Hant" ? "選擇介面語言" : "Choose interface language"}
+              aria-label={t("chooseInterfaceLanguage")}
               className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-36 overflow-hidden rounded-xl border border-white/10 bg-[#111824] p-1.5 shadow-2xl shadow-black/40"
             >
               <button

@@ -84,7 +84,7 @@
 ### 階段 6：型別與 i18n
 
 - [x] 新增 `backend/scripts/export_openapi.py`、`frontend/scripts/generate-api-types.mjs`、`npm run gen:api`，由 FastAPI OpenAPI 產生 `frontend/src/lib/api-schema.ts`（`openapi-typescript@7.13.0`，devDependency）。`judge-api.ts` 的判題型別與 `problem-admin-api.ts` 的題目型別改為衍生自它；其餘手寫型別（AI 測資生成等）尚未遷移。
-- [ ] `zh ? :` 逐步改為 `t()`：全前端仍有約 237 處（problem-admin-settings 86、solver 46、settings 36、code-editor 34…），不一次性大改，改到哪個元件時順便遷移。
+- [x] `zh ? :` 改為 `t()`：已完成，見 `plan/i18n-migration.md`（390 處介面文字遷移，內容語言選擇的 `zh ?` 刻意保留）。
 - 驗收：後端欄位改名時前端 tsc 直接報錯。
 - 完成紀錄（2026-10-17）：暫時把後端 `max_score` 改名後重新產生，前端 `tsc` 立即報錯（`judge-result-panel.tsx` 找不到 `max_score`），還原後恢復；後端全部測試 162 項（含 Docker）通過、0 略過；前端 eslint、`tsc`、`next build` 通過。
 - 使用方式：修改後端請求／回應模型後，在 `frontend/` 執行 `npm run gen:api`，並提交更新後的 `api-schema.ts`。
