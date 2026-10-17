@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
 
 import { AccountControl } from "@/components/auth/account-control";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
+import { sectionPaths } from "@/lib/routes";
 import { useSettings } from "@/lib/settings-context";
 
 export type PrimarySection = "home" | "files" | "problems" | "quiz" | "settings";
@@ -23,10 +25,10 @@ const primaryItems: Array<{
 type SiteHeaderProps = {
   activeSection: PrimarySection;
   onBeforeSignOut: (signOut: () => Promise<void>) => void;
-  onSelect: (section: PrimarySection) => void;
+  onNavigate: (section: PrimarySection, event: ReactMouseEvent<HTMLAnchorElement>) => void;
 };
 
-export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHeaderProps) {
+export function SiteHeader({ activeSection, onBeforeSignOut, onNavigate }: SiteHeaderProps) {
   const { language, setLanguage, t } = useLanguage();
   const { settings } = useSettings();
   const accentColor = { cyan: "#67e8f9", violet: "#c4b5fd", emerald: "#6ee7b7" }[settings.accent];
@@ -60,15 +62,15 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
 
   return (
     <header className="grid w-full min-w-0 max-w-full shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center overflow-hidden border-b border-white/10 bg-[#0d121c] px-3 sm:px-4 md:min-h-16 md:grid-cols-[1fr_auto_1fr] md:overflow-visible md:px-6">
-      <button
-        type="button"
-        onClick={() => onSelect("home")}
+      <Link
+        href={sectionPaths.home}
+        onClick={(event) => onNavigate("home", event)}
         aria-label={t("navHome")}
         className="flex min-w-max items-center gap-2 py-4 text-left transition-opacity hover:opacity-80 focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/50 md:py-0"
       >
         <span className="size-2 rounded-full shadow-[0_0_10px_rgba(103,232,249,0.65)]" style={{ backgroundColor: accentColor }} />
         <span className="text-sm font-semibold tracking-wide text-white">Dev Compass</span>
-      </button>
+      </Link>
 
       <nav
         aria-label={t("mainNavigation")}
@@ -76,22 +78,16 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
       >
         {primaryItems.map((item) => {
           const active = activeSection === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => !item.comingSoon && onSelect(item.id)}
-              aria-current={active ? "page" : undefined}
-              aria-disabled={item.comingSoon || undefined}
-              style={active ? { color: accentColor } : undefined}
-              className={`relative flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs transition-colors lg:px-3 ${
-                active
-                  ? "text-cyan-200"
-                  : item.comingSoon
-                    ? "cursor-default text-slate-600"
-                    : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
+          const className = `relative flex h-full shrink-0 items-center gap-1.5 px-2.5 text-xs transition-colors lg:px-3 ${
+            active
+              ? "text-cyan-200"
+              : item.comingSoon
+                ? "cursor-default text-slate-600"
+                : "text-slate-400 hover:text-slate-200"
+          }`;
+          const style = active ? { color: accentColor } : undefined;
+          const label = (
+            <>
               {t(item.labelKey)}
               {item.comingSoon && (
                 <span className="hidden rounded-full border border-white/8 bg-white/[0.035] px-1.5 py-0.5 text-[8px] text-slate-600 xl:inline">
@@ -99,7 +95,26 @@ export function SiteHeader({ activeSection, onBeforeSignOut, onSelect }: SiteHea
                 </span>
               )}
               {active && <span className="absolute inset-x-2.5 bottom-0 h-px" style={{ backgroundColor: accentColor }} />}
-            </button>
+            </>
+          );
+          if (item.comingSoon) {
+            return (
+              <span key={item.id} aria-disabled="true" style={style} className={className}>
+                {label}
+              </span>
+            );
+          }
+          return (
+            <Link
+              key={item.id}
+              href={sectionPaths[item.id]}
+              onClick={(event) => onNavigate(item.id, event)}
+              aria-current={active ? "page" : undefined}
+              style={style}
+              className={className}
+            >
+              {label}
+            </Link>
           );
         })}
       </nav>

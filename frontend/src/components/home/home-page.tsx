@@ -1,11 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import type { PrimarySection } from "@/components/site-header";
 import { useLanguage } from "@/lib/language-context";
-
-type HomePageProps = {
-  onSelect: (section: PrimarySection) => void;
-};
+import { sectionPaths } from "@/lib/routes";
 
 function ArrowIcon() {
   return (
@@ -41,8 +40,10 @@ function SparkIcon() {
   );
 }
 
-export function HomePage({ onSelect }: HomePageProps) {
+export function HomePage() {
   const { t } = useLanguage();
+  const router = useRouter();
+  const onSelect = (section: PrimarySection) => router.push(sectionPaths[section]);
   const features = [
     { icon: <FolderIcon />, title: t("homeFilesFeatureTitle"), detail: t("homeFilesFeatureDetail") },
     { icon: <TerminalIcon />, title: t("homeCompilerFeatureTitle"), detail: t("homeCompilerFeatureDetail") },
