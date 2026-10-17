@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { bearerHeader, getAccessToken } from "@/lib/api-client";
 import type { Language } from "@/lib/language-context";
 import type { ProgrammingLanguage } from "@/lib/file-items";
 import { getApiUrl } from "@/lib/api-url";
@@ -30,14 +30,13 @@ export async function streamAiTutor(
   onChunk: (chunk: string) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const { data } = await getSupabaseBrowserClient().auth.getSession();
-  const accessToken = data.session?.access_token;
+  const accessToken = await getAccessToken();
   if (!accessToken) throw new Error("Sign in before using AI Tutor.");
 
   const response = await fetch(`${getApiUrl()}/api/ai/tutor`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      ...bearerHeader(accessToken),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

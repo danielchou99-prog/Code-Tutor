@@ -1,30 +1,12 @@
+import type { components } from "@/lib/api-schema";
 import type { ProgrammingLanguage } from "@/lib/file-items";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { bearerHeader, getAccessToken } from "@/lib/api-client";
 import { getApiUrl, type SourceFile } from "@/lib/compiler-api";
 
-export type JudgeStatus = "accepted" | "wrong_answer" | "compile_error" | "runtime_error" | "timeout" | "memory_limit" | "output_limit" | "service_unavailable" | "server_busy" | "system_error";
-
-export type JudgeGroupResult = {
-  group_order: number;
-  score_percent: number;
-  earned_score: number;
-  passed_cases: number;
-  total_cases: number;
-  status: "passed" | "failed" | "not_run";
-};
-
-export type JudgeResult = {
-  submission_id: string | null;
-  problem_id: string;
-  status: JudgeStatus;
-  score: number;
-  passed_cases: number;
-  total_cases: number;
-  duration_ms: number;
-  peak_memory_kb: number;
-  groups: JudgeGroupResult[];
-  message: string;
-};
+// Derived from the backend models; run `npm run gen:api` after changing them.
+export type JudgeResult = Required<components["schemas"]["SubmitResponse"]>;
+export type JudgeStatus = JudgeResult["status"];
+export type JudgeGroupResult = components["schemas"]["JudgeGroupResult"];
 
 export class JudgeApiError extends Error {
   constructor(message: string, readonly statusCode: number) {
@@ -33,8 +15,7 @@ export class JudgeApiError extends Error {
 }
 
 export async function submitProblem(problemId: string, files: SourceFile[], language: ProgrammingLanguage): Promise<JudgeResult> {
-  const sessionResult = await getSupabaseBrowserClient().auth.getSession();
-  const accessToken = sessionResult.data.session?.access_token;
+  const accessToken = await getAccessToken();
   if (!accessToken) throw new JudgeApiError("Authentication is required.", 401);
 
   const controller = new AbortController();
@@ -43,7 +24,7 @@ export async function submitProblem(problemId: string, files: SourceFile[], lang
     const response = await fetch(`${getApiUrl()}/api/problems/${encodeURIComponent(problemId)}/submit`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${accessToken}`,
+        ...bearerHeader(accessToken),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

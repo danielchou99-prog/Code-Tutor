@@ -1,5 +1,5 @@
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getApiUrl } from "@/lib/api-url";
+import { bearerHeader, getAccessToken } from "@/lib/api-client";
 
 export type AiConnectionStatus = {
   connected: boolean;
@@ -12,8 +12,7 @@ async function authenticatedRequest(
   method: "GET" | "PUT" | "DELETE",
   apiKey?: string,
 ): Promise<AiConnectionStatus> {
-  const { data } = await getSupabaseBrowserClient().auth.getSession();
-  const accessToken = data.session?.access_token;
+  const accessToken = await getAccessToken();
   if (!accessToken) throw new Error("Authentication is required.");
 
   const controller = new AbortController();
@@ -22,7 +21,7 @@ async function authenticatedRequest(
     const response = await fetch(`${getApiUrl()}/api/ai/connection`, {
       method,
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...bearerHeader(accessToken),
         ...(apiKey ? { "Content-Type": "application/json" } : {}),
       },
       body: apiKey ? JSON.stringify({ api_key: apiKey }) : undefined,

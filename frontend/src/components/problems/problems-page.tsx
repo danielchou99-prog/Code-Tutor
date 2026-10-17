@@ -139,7 +139,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
       window.localStorage.removeItem(selectedProblemStorageKey);
       setSelectedProblem(null);
     }} onSubmitted={(result) => {
-      const nextStatus: ProblemStatus = result.status === "accepted" || result.score === 100 ? "solved" : "attempted";
+      const nextStatus: ProblemStatus = result.status === "accepted" ? "solved" : "attempted";
       setAvailableProblems((current) => current.map((problem) => problem.id === result.problem_id ? { ...problem, status: nextStatus } : problem));
       setSelectedProblem((current) => current?.id === result.problem_id ? { ...current, status: nextStatus } : current);
     }} />;

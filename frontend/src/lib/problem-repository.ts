@@ -47,7 +47,7 @@ export type ProblemLoadResult = {
 function statusByProblem(submissions: SubmissionRow[]): Map<string, ProblemStatus> {
   const statuses = new Map<string, ProblemStatus>();
   for (const submission of submissions) {
-    const nextStatus: ProblemStatus = submission.status === "accepted" || submission.score === 100 ? "solved" : "attempted";
+    const nextStatus: ProblemStatus = submission.status === "accepted" ? "solved" : "attempted";
     if (statuses.get(submission.problem_id) !== "solved") statuses.set(submission.problem_id, nextStatus);
   }
   return statuses;

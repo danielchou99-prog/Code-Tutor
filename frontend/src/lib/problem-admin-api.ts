@@ -1,49 +1,22 @@
+import type { components } from "@/lib/api-schema";
 import { getApiUrl } from "@/lib/compiler-api";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { bearerHeader, getAccessToken } from "@/lib/api-client";
 
-export type AdminLocalizedText = { zh: string; en: string };
-export type AdminTag = { slug: string; label_zh: string; label_en: string };
-export type AdminSample = { input: string; output: string; explanation: AdminLocalizedText | null };
-export type AdminTestCase = {
-  input: string;
-  expected_output: string;
-  source_kind?: "manual" | "generated";
-  generator_version?: string | null;
-  generator_seed?: number | null;
-  input_sha256?: string | null;
-  generation_strategy?: "manual" | GenerationStrategy;
-};
-export type GenerationStrategy = "basic" | "boundary" | "extreme" | "special" | "duplicate" | "ordered" | "large_random";
-export type AdminTestGroup = {
-  name: AdminLocalizedText;
-  condition: AdminLocalizedText;
-  score_percent: number;
-  cases: AdminTestCase[];
-};
+// Derived from the backend models; run `npm run gen:api` after changing them.
+type Schemas = components["schemas"];
+type DefaultedCaseFields = "source_kind" | "generation_strategy";
 
-export type AdminProblem = {
-  id: string;
-  title: AdminLocalizedText;
-  summary: AdminLocalizedText;
-  description: AdminLocalizedText[];
-  input_format: AdminLocalizedText;
-  output_format: AdminLocalizedText;
-  constraints: AdminLocalizedText[];
-  starter_code: { cpp: string; python: string };
-  difficulty: "easy" | "medium" | "hard";
-  time_limit_ms: number;
-  memory_limit_mb: number;
-  published: boolean;
-  tags: AdminTag[];
-  samples: AdminSample[];
-  test_groups: AdminTestGroup[];
-};
-
+export type AdminLocalizedText = Schemas["LocalizedText"];
+export type AdminTag = Schemas["AdminTag"];
+export type AdminSample = Schemas["AdminSample"];
+export type GenerationStrategy = Exclude<Schemas["AdminTestCase"]["generation_strategy"], "manual">;
+// The server fills source_kind / generation_strategy when a draft omits them.
+export type AdminTestCase = Omit<Schemas["AdminTestCase"], DefaultedCaseFields> &
+  Partial<Pick<Schemas["AdminTestCase"], DefaultedCaseFields>>;
+export type AdminTestGroup = Omit<Schemas["AdminTestGroup"], "cases"> & { cases: AdminTestCase[] };
+export type AdminProblem = Omit<Schemas["AdminProblem"], "test_groups"> & { test_groups: AdminTestGroup[] };
 export type AdminProblemCreate = Omit<AdminProblem, "id">;
-
-export type AdminProblemSummary = Pick<AdminProblem, "id" | "title" | "difficulty" | "published"> & {
-  updated_at: string;
-};
+export type AdminProblemSummary = Schemas["AdminProblemSummary"];
 
 export type PrivateProgram = { language: "cpp" | "python"; source: string };
 export type GenerationVersionUpload = {
@@ -68,6 +41,7 @@ export type GeneratedCasesResponse = {
     input_sha256: string;
     input_bytes: number;
     output_bytes: number;
+    score_points: number;
   }>;
   report: {
     requested: number;
@@ -100,6 +74,7 @@ export type AiGeneratedTestsResponse = {
       tolerance: number;
       generator_seed: number;
     };
+    cases: GeneratedCasesResponse["cases"];
   }>;
 };
 
@@ -110,13 +85,12 @@ export class ProblemAdminApiError extends Error {
 }
 
 async function adminRequest<T extends object>(path: string, init?: RequestInit): Promise<T> {
-  const sessionResult = await getSupabaseBrowserClient().auth.getSession();
-  const accessToken = sessionResult.data.session?.access_token;
+  const accessToken = await getAccessToken();
   if (!accessToken) throw new ProblemAdminApiError("Authentication is required.", 401);
   const response = await fetch(`${getApiUrl()}${path}`, {
     ...init,
     headers: {
-      "Authorization": `Bearer ${accessToken}`,
+      ...bearerHeader(accessToken),
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
@@ -224,21 +198,21 @@ export function saveGenerationVersion(problemId: string, payload: GenerationVers
   });
 }
 
-export function generateHiddenTests(problemId: string, payload: { version: string; count: number; first_seed: number; strategy_allocations: Array<{ strategy: GenerationStrategy; count: number }> }): Promise<GeneratedCasesResponse> {
+export function generateHiddenTests(problemId: string, payload: { version: string; count: number; first_seed: number; default_points_per_case: number; group_order: number; strategy_allocations: Array<{ strategy: GenerationStrategy; count: number }> }): Promise<GeneratedCasesResponse> {
   return adminRequest(`/api/admin/problems/${encodeURIComponent(problemId)}/generate-tests`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export function generateHiddenTestsWithAi(problemId: string, payload: { cases_per_group: number; first_seed: number; replace_existing: boolean }): Promise<AiGeneratedTestsResponse> {
+export function generateHiddenTestsWithAi(problemId: string, payload: { groups: Array<{ group_order: number; count: number; default_points_per_case: number }>; first_seed: number; replace_existing: boolean }): Promise<AiGeneratedTestsResponse> {
   return adminRequest(`/api/admin/problems/${encodeURIComponent(problemId)}/generate-tests/ai`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
-export function applyGenerationBatch(batchId: string, payload: { group_order: number; replace_existing: boolean }): Promise<{ batch_id: string; applied_cases: number }> {
+export function applyGenerationBatch(batchId: string, payload: { group_order: number; replace_existing: boolean; case_scores: number[] }): Promise<{ batch_id: string; applied_cases: number }> {
   return adminRequest(`/api/admin/generation-batches/${encodeURIComponent(batchId)}/apply`, {
     method: "POST",
     body: JSON.stringify(payload),

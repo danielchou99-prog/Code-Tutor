@@ -56,7 +56,7 @@ function blankProblem(): AdminProblem {
       name: { zh: "完整測資", en: "Full tests" },
       condition: { zh: "無額外限制", en: "No additional constraints" },
       score_percent: 100,
-      cases: [{ input: "", expected_output: "" }],
+      cases: [{ input: "", expected_output: "", score_points: 100 }],
     }],
   };
 }
@@ -375,13 +375,14 @@ function strategyAllocations(count: number, selected: GenerationStrategy[]) {
 }
 
 function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & { existingId: string | null }) {
-  const [casesPerGroup, setCasesPerGroup] = useState(10);
+  const [groupSettings, setGroupSettings] = useState<Record<number, { count: number; points: number }>>({});
   const [firstSeed, setFirstSeed] = useState(1);
   const [replaceCases, setReplaceCases] = useState(true);
   const [result, setResult] = useState<AiGeneratedTestsResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const settingsFor = (groupOrder: number) => groupSettings[groupOrder] ?? { count: 10, points: 5 };
 
   const generate = async () => {
     if (!existingId) {
@@ -391,7 +392,11 @@ function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps 
     setBusy(true); setError(""); setMessage(""); setResult(null);
     try {
       const generated = await generateHiddenTestsWithAi(existingId, {
-        cases_per_group: casesPerGroup,
+        groups: draft.test_groups.map((_, index) => ({
+          group_order: index + 1,
+          count: settingsFor(index + 1).count,
+          default_points_per_case: settingsFor(index + 1).points,
+        })),
         first_seed: firstSeed,
         replace_existing: replaceCases,
       });
@@ -406,12 +411,21 @@ function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps 
 
   const applyAll = async () => {
     if (!existingId || !result) return;
+    const generatedScore = result.groups.reduce((sum, group) => sum + group.cases.reduce((caseSum, item) => caseSum + item.score_points, 0), 0);
+    const finalScore = result.replace_existing
+      ? generatedScore
+      : generatedScore + draft.test_groups.reduce((sum, group) => sum + group.score_percent, 0);
+    if (finalScore !== 100) {
+      setError(zh ? `套用後總分會是 ${finalScore} 分，請先將逐筆配分調整為 100 分。` : `The applied total would be ${finalScore}. Adjust case scores to 100 first.`);
+      return;
+    }
     setBusy(true); setError(""); setMessage("");
     try {
       for (const group of result.groups) {
         await applyGenerationBatch(group.batch_id, {
           group_order: group.group_order,
           replace_existing: result.replace_existing,
+          case_scores: group.cases.map((item) => item.score_points),
         });
       }
       setDraft(await getAdminProblem(existingId));
@@ -426,13 +440,22 @@ function AutomaticTestGenerator({ existingId, draft, setDraft, zh }: DraftProps 
     <section className={panelClass}>
       <SectionTitle title={zh ? "AI 自動產生隱藏測資" : "AI hidden-test generation"} detail={zh ? "AI 會分析已儲存的完整題意、範例與每組得分條件；每組至少建立一筆經後端確認的邊界測資。" : "AI analyzes the saved statement, samples, and every scoring condition. Every group must include a server-verified boundary case."} />
       {!existingId ? <p className="mt-3 text-[10px] text-amber-200">{zh ? "請先儲存題目。" : "Save the problem first."}</p> : <p className="mt-3 text-[10px] text-slate-500">{zh ? "若剛修改題意或配分條件，請先按頁面底部的「翻譯並儲存題目」。" : "Save recent statement or scoring edits before generation."}</p>}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <Field label={zh ? "每組測資數量" : "Cases per group"}><input className={inputClass} type="number" min="2" max="50" value={casesPerGroup} onChange={(event) => setCasesPerGroup(Number(event.target.value))} /></Field>
-        <Field label={zh ? "套用方式" : "Apply mode"}><select className={inputClass} value={replaceCases ? "replace" : "append"} onChange={(event) => setReplaceCases(event.target.value === "replace")}><option value="replace">{zh ? "取代各組現有測資" : "Replace group cases"}</option><option value="append">{zh ? "附加到各組末尾" : "Append to group cases"}</option></select></Field>
+      <div className="mt-4 space-y-3">
+        {draft.test_groups.map((_, index) => {
+          const order = index + 1;
+          const settings = settingsFor(order);
+          return <div key={order} className="grid gap-3 rounded-xl border border-white/8 p-3 sm:grid-cols-[1fr_10rem_10rem_auto] sm:items-end">
+            <strong className="pb-3 text-[11px] text-slate-200">{scoringGroupLabel(index, zh)}</strong>
+            <Field label={zh ? "生成數量" : "Case count"}><input className={inputClass} type="number" min="1" max="50" value={settings.count} onChange={(event) => setGroupSettings((current) => ({ ...current, [order]: { ...settings, count: Number(event.target.value) } }))} /></Field>
+            <Field label={zh ? "每筆預設分數" : "Default points"}><input className={inputClass} type="number" min="0" max="100" value={settings.points} onChange={(event) => setGroupSettings((current) => ({ ...current, [order]: { ...settings, points: Number(event.target.value) } }))} /></Field>
+            <span className="pb-3 text-[10px] text-slate-500">{settings.count * settings.points} {zh ? "分" : "points"}</span>
+          </div>;
+        })}
+        <Field label={zh ? "套用方式" : "Apply mode"}><select className={`${inputClass} max-w-sm`} value={replaceCases ? "replace" : "append"} onChange={(event) => setReplaceCases(event.target.value === "replace")}><option value="replace">{zh ? "取代各組現有測資" : "Replace group cases"}</option><option value="append">{zh ? "附加到各組末尾" : "Append to group cases"}</option></select></Field>
       </div>
       <details className="mt-4 rounded-xl border border-white/6 px-3 py-2 text-[10px] text-slate-500"><summary className="cursor-pointer font-semibold text-slate-400">{zh ? "進階設定" : "Advanced settings"}</summary><div className="mt-3 max-w-xs"><Field label={zh ? "起始 seed（一般不需調整）" : "First seed"}><input className={inputClass} type="number" min="0" max="2147400000" value={firstSeed} onChange={(event) => setFirstSeed(Number(event.target.value))} /></Field></div></details>
       <div className="mt-4 flex justify-end"><button type="button" disabled={busy || !existingId} onClick={() => void generate()} className="rounded-xl bg-violet-400 px-5 py-3 text-[11px] font-bold text-slate-950 disabled:opacity-40">{busy ? (zh ? "AI 分析與驗證中…" : "Analyzing and validating…") : (zh ? "AI 分析並產生測資" : "Analyze and generate with AI")}</button></div>
-      {result ? <div className="mt-5 space-y-3"><div className="flex items-center justify-between gap-3"><strong className="text-xs text-violet-200">{zh ? "待套用的測資摘要" : "Test draft summary"}</strong><span className="font-mono text-[9px] text-slate-600">{result.version}</span></div>{result.groups.map((group) => <div key={group.group_order} className="rounded-xl border border-white/8 bg-white/[0.02] p-3"><div className="flex items-center justify-between text-[11px]"><strong className="text-slate-200">{scoringGroupLabel(group.group_order - 1, zh)}</strong><span className="text-cyan-300">{group.accepted} {zh ? "筆" : "cases"}</span></div><p className="mt-2 text-[10px] text-slate-400">{zh ? "邊界證據" : "Boundary evidence"}：{group.boundary.actual_value} ≈ {group.boundary.target_value}</p><p className="mt-1 text-[9px] text-slate-600">seed {group.boundary.generator_seed} · {zh ? `嘗試 ${group.attempted}，捨棄非法 ${group.discarded_invalid}、重複 ${group.discarded_duplicate}` : `attempted ${group.attempted}; invalid ${group.discarded_invalid}; duplicates ${group.discarded_duplicate}`}</p></div>)}<div className="flex justify-end"><button type="button" disabled={busy} onClick={() => void applyAll()} className="rounded-xl bg-cyan-400 px-5 py-3 text-[11px] font-bold text-slate-950 disabled:opacity-40">{zh ? "套用全部測資" : "Apply all tests"}</button></div></div> : null}
+      {result ? <div className="mt-5 space-y-3"><div className="flex items-center justify-between gap-3"><strong className="text-xs text-violet-200">{zh ? "待套用的測資摘要" : "Test draft summary"}</strong><span className="font-mono text-[9px] text-slate-600">{result.version}</span></div>{result.groups.map((group) => <div key={group.group_order} className="rounded-xl border border-white/8 bg-white/[0.02] p-3"><div className="flex items-center justify-between text-[11px]"><strong className="text-slate-200">{scoringGroupLabel(group.group_order - 1, zh)}</strong><span className="text-cyan-300">{group.accepted} {zh ? "筆" : "cases"}</span></div><p className="mt-2 text-[10px] text-slate-400">{zh ? "邊界證據" : "Boundary evidence"}：{group.boundary.actual_value} ≈ {group.boundary.target_value}</p><p className="mt-1 text-[9px] text-slate-600">seed {group.boundary.generator_seed} · {zh ? `嘗試 ${group.attempted}，捨棄非法 ${group.discarded_invalid}、重複 ${group.discarded_duplicate}` : `attempted ${group.attempted}; invalid ${group.discarded_invalid}; duplicates ${group.discarded_duplicate}`}</p><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.cases.map((testCase, caseIndex) => <label key={testCase.case_order} className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[10px] ${testCase.generation_strategy === "boundary" ? "border-cyan-300/25 bg-cyan-300/[0.04]" : "border-white/6"}`}><span className="text-slate-400">{zh ? `測資 ${caseIndex + 1}` : `Case ${caseIndex + 1}`} · {testCase.generation_strategy === "boundary" ? (zh ? "邊界優先" : "Boundary first") : testCase.generation_strategy}</span><span className="flex items-center gap-1"><input aria-label={zh ? `測資 ${caseIndex + 1} 配分` : `Case ${caseIndex + 1} points`} className="w-16 rounded-md border border-white/8 bg-[#090f18] px-2 py-1 text-right text-slate-200" type="number" min="0" max="100" value={testCase.score_points} onChange={(event) => setResult((current) => current ? { ...current, groups: current.groups.map((item) => item.group_order === group.group_order ? { ...item, cases: item.cases.map((caseItem) => caseItem.case_order === testCase.case_order ? { ...caseItem, score_points: Number(event.target.value) } : caseItem) } : item) } : current)} />{zh ? "分" : "pt"}</span></label>)}</div></div>)}<div className="flex items-center justify-between gap-3"><strong className="text-xs text-slate-300">{zh ? "套用後總分" : "Total after apply"}：{(result.replace_existing ? 0 : draft.test_groups.reduce((sum, group) => sum + group.score_percent, 0)) + result.groups.reduce((sum, group) => sum + group.cases.reduce((caseSum, item) => caseSum + item.score_points, 0), 0)}</strong><button type="button" disabled={busy} onClick={() => void applyAll()} className="rounded-xl bg-cyan-400 px-5 py-3 text-[11px] font-bold text-slate-950 disabled:opacity-40">{zh ? "套用全部測資" : "Apply all tests"}</button></div></div> : null}
       {error ? <Feedback tone="error" text={error} /> : null}{message ? <Feedback tone="success" text={message} /> : null}
     </section>
     <details className="rounded-2xl border border-white/8 bg-[#0d141f] p-4 sm:p-5"><summary className="cursor-pointer text-xs font-semibold text-slate-400">{zh ? "進階手動生成模式" : "Advanced manual generation"}</summary><div className="mt-4"><ManualTestGenerator existingId={existingId} draft={draft} setDraft={setDraft} zh={zh} /></div></details>
@@ -444,6 +467,7 @@ function ManualTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & {
   const [version, setVersion] = useState("v1");
   const [targetGroup, setTargetGroup] = useState(0);
   const [count, setCount] = useState(100);
+  const [defaultPoints, setDefaultPoints] = useState(5);
   const [firstSeed, setFirstSeed] = useState(1);
   const [generatorLanguage, setGeneratorLanguage] = useState<"cpp" | "python">("python");
   const [generatorSource, setGeneratorSource] = useState("");
@@ -514,7 +538,7 @@ function ManualTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & {
     }
     setBusy(true); setError(""); setReport("");
     try {
-      const result = await generateHiddenTests(existingId, { version, count, first_seed: firstSeed, strategy_allocations: allocations });
+      const result = await generateHiddenTests(existingId, { version, count, first_seed: firstSeed, default_points_per_case: defaultPoints, group_order: safeTargetGroup + 1, strategy_allocations: allocations });
       setPendingBatch(result);
       setReport(zh
         ? `伺服器草稿已通過：接受 ${result.report.accepted} 筆／嘗試 ${result.report.attempted} 筆；捨棄非法 ${result.report.discarded_invalid}、重複 ${result.report.discarded_duplicate}。確認摘要後再套用到配分群組。`
@@ -526,11 +550,21 @@ function ManualTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & {
 
   const applyBatch = async () => {
     if (!existingId || !pendingBatch) return;
+    const generatedScore = pendingBatch.cases.reduce((sum, item) => sum + item.score_points, 0);
+    const currentTotal = draft.test_groups.reduce((sum, group) => sum + group.score_percent, 0);
+    const finalTotal = replaceCases
+      ? currentTotal - draft.test_groups[safeTargetGroup].score_percent + generatedScore
+      : currentTotal + generatedScore;
+    if (finalTotal !== 100) {
+      setError(zh ? `套用後總分會是 ${finalTotal} 分，請先調整逐筆配分。` : `The applied total would be ${finalTotal}. Adjust case scores first.`);
+      return;
+    }
     setBusy(true); setError("");
     try {
       const applied = await applyGenerationBatch(pendingBatch.batch_id, {
         group_order: safeTargetGroup + 1,
         replace_existing: replaceCases,
+        case_scores: pendingBatch.cases.map((item) => item.score_points),
       });
       setDraft(await getAdminProblem(existingId));
       setPendingBatch(null);
@@ -580,13 +614,14 @@ function ManualTestGenerator({ existingId, draft, setDraft, zh }: DraftProps & {
     {useValidator ? <div className="mt-3"><ProgramField zh={zh} title="Validator" language={validatorLanguage} setLanguage={setValidatorLanguage} source={validatorSource} setSource={setValidatorSource} placeholder={zh ? "從 stdin 讀取測資；不合法時 return 1" : "Read input from stdin; exit 1 when invalid"} /></div> : null}
     <div className="mt-4 flex justify-end"><button type="button" disabled={busy || !existingId} onClick={() => void uploadVersion()} className="rounded-xl border border-cyan-300/20 px-4 py-2.5 text-[11px] font-semibold text-cyan-300 disabled:opacity-40">{zh ? "安全儲存此版本" : "Store private version"}</button></div>
     <div className="mt-5 border-t border-white/8 pt-4"><div className="flex flex-wrap items-center justify-between gap-3"><p className="text-[11px] font-semibold text-slate-300">{zh ? "測資策略與建議比例" : "Test strategies and recommended mix"}</p><button type="button" disabled={busy} onClick={() => void suggestStrategies()} className="rounded-lg border border-violet-300/20 px-3 py-2 text-[10px] font-semibold text-violet-200 disabled:opacity-40">{zh ? "AI 建議測資策略" : "AI strategy suggestions"}</button></div><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{generationStrategies.map((strategy) => <label key={strategy.id} className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-[10px] ${selectedStrategies.includes(strategy.id) ? "border-cyan-300/20 bg-cyan-300/[0.04] text-cyan-200" : "border-white/8 text-slate-600"}`}><span className="flex items-center gap-2"><input type="checkbox" checked={selectedStrategies.includes(strategy.id)} onChange={(event) => setSelectedStrategies((items) => event.target.checked ? [...items, strategy.id] : items.filter((item) => item !== strategy.id))} />{strategy[zh ? "zh" : "en"]}</span><span>{strategy.weight}%</span></label>)}</div>{strategySuggestion ? <div className="mt-3 whitespace-pre-wrap rounded-xl border border-violet-300/15 bg-violet-300/[0.03] p-3 text-[10px] leading-5 text-slate-300">{strategySuggestion}</div> : null}<p className="mt-2 text-[9px] text-slate-600">{zh ? "AI 僅接收公開題目敘述與限制，不會接收隱藏測資、Generator 或標準解答。" : "AI receives only the public statement and constraints, never hidden cases, Generator, or Reference source."}</p></div>
-    <div className="mt-5 grid gap-4 border-t border-white/8 pt-4 sm:grid-cols-4">
+    <div className="mt-5 grid gap-4 border-t border-white/8 pt-4 sm:grid-cols-5">
       <Field label={zh ? "產生數量（最多 100）" : "Case count (max 100)"}><input className={inputClass} type="number" min="1" max="100" value={count} onChange={(event) => setCount(Number(event.target.value))} /></Field>
+      <Field label={zh ? "每筆預設分數" : "Default points"}><input className={inputClass} type="number" min="0" max="100" value={defaultPoints} onChange={(event) => setDefaultPoints(Number(event.target.value))} /></Field>
       <Field label={zh ? "起始 seed" : "First seed"}><input className={inputClass} type="number" min="0" value={firstSeed} onChange={(event) => setFirstSeed(Number(event.target.value))} /></Field>
       <Field label={zh ? "加入方式" : "Insert mode"}><select className={inputClass} value={replaceCases ? "replace" : "append"} onChange={(event) => setReplaceCases(event.target.value === "replace")}><option value="replace">{zh ? "取代群組現有測資" : "Replace group cases"}</option><option value="append">{zh ? "加到群組末尾" : "Append to group"}</option></select></Field>
       <div className="flex items-end"><button type="button" disabled={busy || !existingId || !versions.some((item) => item.version === version)} onClick={() => void generate()} className="h-10 w-full rounded-xl bg-violet-400 px-4 text-[11px] font-bold text-slate-950 disabled:opacity-40">{busy ? (zh ? "處理中…" : "Working…") : (zh ? "產生並檢查" : "Generate and validate")}</button></div>
     </div>
-    {pendingBatch ? <div className="mt-4 rounded-xl border border-violet-300/15 bg-violet-300/[0.03] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><strong className="text-xs text-violet-200">{zh ? "待套用的伺服器測資草稿" : "Server test draft ready"}</strong><p className="mt-1 text-[10px] text-slate-500">ID {pendingBatch.batch_id} · {pendingBatch.report.accepted} {zh ? "筆" : "cases"} · {pendingBatch.report.total_input_bytes} bytes</p></div><button type="button" disabled={busy} onClick={() => void applyBatch()} className="rounded-xl bg-cyan-400 px-4 py-2.5 text-[11px] font-bold text-slate-950 disabled:opacity-40">{zh ? "套用到配分群組" : "Apply to scoring group"}</button></div><div className="mt-3 flex flex-wrap gap-2">{Object.entries(pendingBatch.report.strategy_counts).map(([strategy, strategyCount]) => <span key={strategy} className="rounded-full border border-white/8 px-2 py-1 text-[9px] text-slate-400">{strategy}: {strategyCount}</span>)}</div><p className="mt-3 text-[9px] text-slate-600">{zh ? "隱藏 Input／Expected Output 沒有傳到此頁面。" : "Hidden inputs and expected outputs were not sent to this page."}</p></div> : null}
+    {pendingBatch ? <div className="mt-4 rounded-xl border border-violet-300/15 bg-violet-300/[0.03] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><strong className="text-xs text-violet-200">{zh ? "待套用的伺服器測資草稿" : "Server test draft ready"}</strong><p className="mt-1 text-[10px] text-slate-500">ID {pendingBatch.batch_id} · {pendingBatch.report.accepted} {zh ? "筆" : "cases"} · {pendingBatch.report.total_input_bytes} bytes</p></div><button type="button" disabled={busy} onClick={() => void applyBatch()} className="rounded-xl bg-cyan-400 px-4 py-2.5 text-[11px] font-bold text-slate-950 disabled:opacity-40">{zh ? "套用到配分群組" : "Apply to scoring group"}</button></div><div className="mt-3 flex flex-wrap gap-2">{Object.entries(pendingBatch.report.strategy_counts).map(([strategy, strategyCount]) => <span key={strategy} className="rounded-full border border-white/8 px-2 py-1 text-[9px] text-slate-400">{strategy}: {strategyCount}</span>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{pendingBatch.cases.map((testCase, index) => <label key={testCase.case_order} className="flex items-center justify-between gap-2 rounded-lg border border-white/6 px-3 py-2 text-[10px] text-slate-400"><span>{zh ? `測資 ${index + 1}` : `Case ${index + 1}`}</span><input aria-label={zh ? `測資 ${index + 1} 配分` : `Case ${index + 1} points`} className="w-16 rounded-md border border-white/8 bg-[#090f18] px-2 py-1 text-right text-slate-200" type="number" min="0" max="100" value={testCase.score_points} onChange={(event) => setPendingBatch((current) => current ? { ...current, cases: current.cases.map((item) => item.case_order === testCase.case_order ? { ...item, score_points: Number(event.target.value) } : item) } : current)} /></label>)}</div><p className="mt-3 text-[9px] text-slate-600">{zh ? "隱藏 Input／Expected Output 沒有傳到此頁面。" : "Hidden inputs and expected outputs were not sent to this page."}</p></div> : null}
     {error ? <Feedback tone="error" text={error} /> : null}{report ? <Feedback tone="success" text={report} /> : null}
   </section>;
 }
@@ -601,7 +636,7 @@ function TestGroupEditor({ draft, setDraft, zh }: DraftProps) {
     <section className={panelClass}>
       <SectionTitle
         title={zh ? "配分群組與隱藏測資" : "Scoring groups and hidden cases"}
-        detail={zh ? "此區只有管理員可讀取。每組全數通過才取得該組分數，總分必須為 100%。" : "Only admins can read this section. A group awards points only when every case passes. Total score must be 100%."}
+        detail={zh ? "此區只有管理員可讀取。每通過一筆就取得該筆分數；所有測資總分必須為 100。" : "Only admins can read this section. Each passed case awards its own points; all cases must total 100."}
       />
       <div className={`mt-3 text-xs font-semibold ${totalScore === 100 ? "text-emerald-300" : "text-rose-300"}`}>
         {zh ? "目前總分" : "Current total"}：{totalScore}%
@@ -614,7 +649,7 @@ function TestGroupEditor({ draft, setDraft, zh }: DraftProps) {
           <input className={inputClass} type="number" min="16" max="1024" value={draft.memory_limit_mb} onChange={(event) => setDraft({ ...draft, memory_limit_mb: Number(event.target.value) })} />
         </Field>
       </div>
-      <button type="button" onClick={() => setDraft({ ...draft, test_groups: [...draft.test_groups, { name: blankLocalized(), condition: blankLocalized(), score_percent: 0, cases: [{ input: "", expected_output: "" }] }] })} className="mt-3 text-[10px] text-cyan-300">
+      <button type="button" onClick={() => setDraft({ ...draft, test_groups: [...draft.test_groups, { name: blankLocalized(), condition: blankLocalized(), score_percent: 5, cases: [{ input: "", expected_output: "", score_points: 5 }] }] })} className="mt-3 text-[10px] text-cyan-300">
         ＋ {zh ? "新增配分群組" : "Add scoring group"}
       </button>
       <div className="mt-4 space-y-5">
@@ -628,25 +663,24 @@ function TestGroupEditor({ draft, setDraft, zh }: DraftProps) {
             </div>
             <LocalizedEditor zh={zh} label={zh ? "群組名稱" : "Group name"} value={group.name} onChange={(name) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, name } : item) })} />
             <LocalizedEditor zh={zh} label={zh ? "得分條件" : "Scoring condition"} value={group.condition} onChange={(condition) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, condition } : item) })} multiline />
-            <Field label={zh ? "占分百分比" : "Score percent"}>
-              <input className={`${inputClass} max-w-40`} type="number" min="1" max="100" value={group.score_percent} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, score_percent: Number(event.target.value) } : item) })} />
-            </Field>
+            <p className="mt-3 text-[10px] font-semibold text-slate-400">{zh ? "本組配分" : "Group points"}：{group.score_percent}</p>
             <div className="mt-5 flex items-center justify-between">
               <p className="text-[10px] font-semibold text-slate-300">{zh ? `隱藏測資：${group.cases.length} 筆` : `Hidden cases: ${group.cases.length}`}</p>
-              <button type="button" onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: [...item.cases, { input: "", expected_output: "" }] } : item) })} className="text-[10px] text-cyan-300">
+              <button type="button" onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, score_percent: item.score_percent + 5, cases: [...item.cases, { input: "", expected_output: "", score_points: 5 }] } : item) })} className="text-[10px] text-cyan-300">
                 ＋ {zh ? "新增測資" : "Add case"}
               </button>
             </div>
             <div className="mt-2 space-y-3">
               {group.cases.map((testCase, caseIndex) => (
-                <div key={caseIndex} className="grid gap-3 rounded-xl border border-white/6 p-3 sm:grid-cols-[1fr_1fr_auto]">
+                <div key={caseIndex} className="grid gap-3 rounded-xl border border-white/6 p-3 sm:grid-cols-[1fr_1fr_7rem_auto]">
                   <Field label={zh ? `輸入 ${caseIndex + 1}` : `Input ${caseIndex + 1}`}>
                     <textarea className={textareaClass} value={testCase.input} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, input: event.target.value } : caseItem) } : item) })} />
                   </Field>
                   <Field label={zh ? `預期輸出 ${caseIndex + 1}` : `Expected output ${caseIndex + 1}`}>
                     <textarea className={textareaClass} value={testCase.expected_output} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, expected_output: event.target.value } : caseItem) } : item) })} />
                   </Field>
-                  <button type="button" disabled={group.cases.length === 1} onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, cases: item.cases.filter((_, indexOfCase) => indexOfCase !== caseIndex) } : item) })} className="self-end pb-3 text-[9px] text-rose-300 disabled:opacity-25">
+                  <Field label={zh ? "配分" : "Points"}><input className={inputClass} type="number" min="0" max="100" value={testCase.score_points} onChange={(event) => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, score_percent: item.score_percent - testCase.score_points + Number(event.target.value), cases: item.cases.map((caseItem, indexOfCase) => indexOfCase === caseIndex ? { ...caseItem, score_points: Number(event.target.value) } : caseItem) } : item) })} /></Field>
+                  <button type="button" disabled={group.cases.length === 1} onClick={() => setDraft({ ...draft, test_groups: draft.test_groups.map((item, index) => index === groupIndex ? { ...item, score_percent: item.score_percent - testCase.score_points, cases: item.cases.filter((_, indexOfCase) => indexOfCase !== caseIndex) } : item) })} className="self-end pb-3 text-[9px] text-rose-300 disabled:opacity-25">
                     {zh ? "移除" : "Remove"}
                   </button>
                 </div>
