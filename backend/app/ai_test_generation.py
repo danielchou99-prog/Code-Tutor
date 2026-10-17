@@ -22,11 +22,12 @@ from .ai_connections import (
 from .ai_tutor import AiConnectionRequired, AiProviderRateLimited, _retry_after_seconds
 from .auth import AuthenticatedUser
 from .compiler import CompilerService, CompilerUnavailable
-from .judge import normalize_output
+from .scoring import normalize_output
 from .problem_admin import AdminProblem
 from .test_generation import (
     GenerateCasesRequest,
     GenerationBatchResponse,
+    GeneratedCasePreview,
     GenerationStrategy,
     GenerationStrategyAllocation,
     GenerationVersionMetadata,
@@ -60,10 +61,24 @@ class AiTestBlueprint(BaseModel):
         return self
 
 
+class AiGroupGenerationSettings(BaseModel):
+    group_order: int = Field(ge=1, le=20)
+    count: int = Field(default=10, ge=1, le=50)
+    default_points_per_case: int = Field(default=5, ge=0, le=100)
+
+
 class AiAutoGenerateRequest(BaseModel):
-    cases_per_group: int = Field(default=10, ge=2, le=50)
+    groups: list[AiGroupGenerationSettings] = Field(default_factory=list, max_length=20)
+    cases_per_group: int | None = Field(default=None, ge=1, le=50)
     first_seed: int = Field(default=1, ge=0, le=2_147_400_000)
     replace_existing: bool = True
+
+    @model_validator(mode="after")
+    def unique_groups(self) -> "AiAutoGenerateRequest":
+        orders = [group.group_order for group in self.groups]
+        if len(orders) != len(set(orders)):
+            raise ValueError("Generation group orders must be unique.")
+        return self
 
 
 class BoundaryEvidence(BaseModel):
@@ -83,6 +98,7 @@ class AiGeneratedGroup(BaseModel):
     discarded_duplicate: int
     strategy_counts: dict[str, int]
     boundary: BoundaryEvidence
+    cases: list[GeneratedCasePreview]
 
 
 class AiAutoGenerateResponse(BaseModel):
@@ -211,14 +227,27 @@ def required_boundary_values(problem: AdminProblem) -> dict[int, float]:
 
 
 def _allocations(count: int, strategies: list[GenerationStrategy]) -> list[GenerationStrategyAllocation]:
-    unique: list[GenerationStrategy] = ["boundary"]
-    unique.extend(strategy for strategy in strategies if strategy != "boundary" and strategy not in unique)
-    unique = unique[:count]
-    base, remainder = divmod(count, len(unique))
-    return [
-        GenerationStrategyAllocation(strategy=strategy, count=base + (1 if index < remainder else 0))
-        for index, strategy in enumerate(unique)
+    others = [
+        strategy
+        for strategy in strategies
+        if strategy != "boundary"
     ]
+    others = list(dict.fromkeys(others))
+    boundary_count = count if not others else max(1, math.ceil(count * 0.4))
+    allocations = [GenerationStrategyAllocation(strategy="boundary", count=boundary_count)]
+    remaining = count - boundary_count
+    if remaining == 0:
+        return allocations
+    active = others[:remaining]
+    base, remainder = divmod(remaining, len(active))
+    allocations.extend(
+        GenerationStrategyAllocation(
+            strategy=strategy,
+            count=base + (1 if index < remainder else 0),
+        )
+        for index, strategy in enumerate(active)
+    )
+    return allocations
 
 
 def _boundary_evidence(cases, target: float) -> BoundaryEvidence:
@@ -261,7 +290,8 @@ class AiHiddenTestGenerationService:
         if encrypted_key is None:
             raise AiConnectionRequired("Connect Groq before generating hidden tests.")
         boundary_values = required_boundary_values(problem)
-        payload = self._public_payload(problem, boundary_values, request.cases_per_group)
+        group_settings = self._group_settings(problem, request)
+        payload = self._public_payload(problem, boundary_values, group_settings)
         blueprint = self.provider.create_blueprint(self.cipher.decrypt(encrypted_key), payload)
         expected_orders = set(range(1, len(problem.test_groups) + 1))
         plans = {group.group_order: group for group in blueprint.groups}
@@ -283,15 +313,17 @@ class AiHiddenTestGenerationService:
         generated_groups: list[AiGeneratedGroup] = []
         generator = HiddenTestGenerationService(store=self.store, compiler=self.compiler)
         for group_order in sorted(plans):
+            settings = group_settings[group_order]
             generated = generator.generate(
                 problem.id,
                 GenerateCasesRequest(
                     version=version,
-                    count=request.cases_per_group,
+                    count=settings.count,
                     first_seed=request.first_seed + (group_order - 1) * 1_000,
                     group_order=group_order,
+                    default_points_per_case=settings.default_points_per_case,
                     strategy_allocations=_allocations(
-                        request.cases_per_group, plans[group_order].strategies
+                        settings.count, plans[group_order].strategies
                     ),
                 ),
             )
@@ -310,6 +342,7 @@ class AiHiddenTestGenerationService:
                     discarded_duplicate=generated.report.discarded_duplicate,
                     strategy_counts=generated.report.strategy_counts,
                     boundary=evidence,
+                    cases=batch.cases,
                 )
             )
         return AiAutoGenerateResponse(
@@ -337,8 +370,26 @@ class AiHiddenTestGenerationService:
                 raise AiHiddenTestError(f"AI reference solution did not pass public sample {index}.")
 
     @staticmethod
+    def _group_settings(
+        problem: AdminProblem, request: AiAutoGenerateRequest
+    ) -> dict[int, AiGroupGenerationSettings]:
+        expected_orders = set(range(1, len(problem.test_groups) + 1))
+        if request.groups:
+            settings = {group.group_order: group for group in request.groups}
+            if set(settings) != expected_orders:
+                raise AiHiddenTestError("Provide generation settings for every scoring group.")
+            return settings
+        count = request.cases_per_group or 10
+        return {
+            order: AiGroupGenerationSettings(group_order=order, count=count)
+            for order in expected_orders
+        }
+
+    @staticmethod
     def _public_payload(
-        problem: AdminProblem, boundary_values: dict[int, float], cases_per_group: int
+        problem: AdminProblem,
+        boundary_values: dict[int, float],
+        group_settings: dict[int, AiGroupGenerationSettings],
     ) -> dict[str, Any]:
         return {
             "title": problem.title.zh,
@@ -350,13 +401,14 @@ class AiHiddenTestGenerationService:
             "samples": [{"input": item.input, "output": item.output} for item in problem.samples],
             "time_limit_ms": problem.time_limit_ms,
             "memory_limit_mb": problem.memory_limit_mb,
-            "cases_per_group": cases_per_group,
             "groups": [
                 {
                     "group_order": order,
                     "name": group.name.zh,
                     "condition": group.condition.zh,
                     "score_percent": group.score_percent,
+                    "requested_case_count": group_settings[order].count,
+                    "default_points_per_case": group_settings[order].default_points_per_case,
                     "required_boundary_value": boundary_values[order],
                 }
                 for order, group in enumerate(problem.test_groups, start=1)

@@ -22,12 +22,12 @@ class FakeJudgeStore:
                 JudgeGroup(
                     group_order=1,
                     score_percent=40,
-                    cases=(JudgeCase("1 2", "3"), JudgeCase("-5 12", "7")),
+                    cases=(JudgeCase("1 2", "3", 20), JudgeCase("-5 12", "7", 20)),
                 ),
                 JudgeGroup(
                     group_order=2,
                     score_percent=60,
-                    cases=(JudgeCase("20 22", "42"),),
+                    cases=(JudgeCase("20 22", "42", 60),),
                 ),
             ),
         )
@@ -198,7 +198,7 @@ def test_judge_persists_peak_memory_and_memory_limit_status() -> None:
     assert result.groups[1].status == "not_run"
 
 
-def test_judge_uses_all_or_nothing_group_scoring_for_wrong_answer() -> None:
+def test_judge_awards_individual_case_points_for_wrong_answer() -> None:
     store = FakeJudgeStore()
     service = JudgeService(
         store,
@@ -208,8 +208,9 @@ def test_judge_uses_all_or_nothing_group_scoring_for_wrong_answer() -> None:
     result = service.submit(user, "1001", SubmitRequest(code="solution"))
 
     assert result.status == "wrong_answer"
-    assert result.score == 60
+    assert result.score == 80
     assert result.passed_cases == 2
+    assert [group.earned_score for group in result.groups] == [20, 60]
     assert [group.status for group in result.groups] == ["failed", "passed"]
 
 

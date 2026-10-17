@@ -324,13 +324,34 @@ def test_missing_generation_strategy_reports_required_migration(monkeypatch) -> 
             }
 
     monkeypatch.setattr(
-        "app.problem_admin.secure_http_request",
+        "app.supabase_rest.secure_http_request",
         lambda *args, **kwargs: MissingColumnResponse(),
     )
     store = SupabaseProblemAdminStore("https://project.supabase.co", "sb_secret_test")
 
     with pytest.raises(ProblemAdminUnavailable, match="202608250003"):
         store._request("GET", "problem_test_cases?select=generation_strategy")
+
+
+def test_missing_case_score_reports_required_migration(monkeypatch) -> None:
+    class MissingColumnResponse:
+        status_code = 400
+
+        @staticmethod
+        def json():
+            return {
+                "code": "42703",
+                "message": "column problem_test_cases.score_points does not exist",
+            }
+
+    monkeypatch.setattr(
+        "app.supabase_rest.secure_http_request",
+        lambda *args, **kwargs: MissingColumnResponse(),
+    )
+    store = SupabaseProblemAdminStore("https://project.supabase.co", "sb_secret_test")
+
+    with pytest.raises(ProblemAdminUnavailable, match="202609040001"):
+        store._request("GET", "problem_test_cases?select=score_points")
 
 
 def test_legacy_problem_id_constraint_reports_latest_migration(monkeypatch) -> None:
@@ -345,7 +366,7 @@ def test_legacy_problem_id_constraint_reports_latest_migration(monkeypatch) -> N
             }
 
     monkeypatch.setattr(
-        "app.problem_admin.secure_http_request",
+        "app.supabase_rest.secure_http_request",
         lambda *args, **kwargs: LegacyConstraintResponse(),
     )
     store = SupabaseProblemAdminStore("https://project.supabase.co", "sb_secret_test")
@@ -366,7 +387,7 @@ def test_problem_primary_key_collision_has_a_distinct_error(monkeypatch) -> None
             }
 
     monkeypatch.setattr(
-        "app.problem_admin.secure_http_request",
+        "app.supabase_rest.secure_http_request",
         lambda *args, **kwargs: DuplicateResponse(),
     )
     store = SupabaseProblemAdminStore("https://project.supabase.co", "sb_secret_test")

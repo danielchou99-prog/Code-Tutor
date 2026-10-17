@@ -4,13 +4,10 @@ from collections import defaultdict
 import hashlib
 import secrets
 import string
-from typing import Any, Literal
+from typing import Any
 from urllib.parse import quote
 
 import httpx
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-from .ai_connections import secure_http_request
 from .test_generation import (
     GeneratedCasesResponse,
     GenerationBatchResponse,
@@ -19,6 +16,21 @@ from .test_generation import (
     GenerationVersionUpload,
     StoredGenerationVersion,
 )
+from .problem_models import (  # noqa: F401  (re-exported for existing imports)
+    DEFAULT_CASE_POINTS,
+    LocalizedText,
+    AdminTag,
+    AdminSample,
+    AdminTestCase,
+    AdminTestGroup,
+    AdminStarterCode,
+    AdminProblemContent,
+    AdminProblemCreate,
+    AdminProblem,
+    AdminProblemSummary,
+    AdminStatusResponse,
+)
+from .supabase_rest import SupabaseRestClient
 
 
 class ProblemAdminUnavailable(RuntimeError):
@@ -33,147 +45,49 @@ def generate_problem_id() -> str:
     return f"{secrets.choice(string.ascii_lowercase)}{secrets.randbelow(1000):03d}"
 
 
-class LocalizedText(BaseModel):
-    zh: str = Field(max_length=4_000)
-    en: str = Field(max_length=4_000)
-
-    @field_validator("zh", "en")
-    @classmethod
-    def strip_text(cls, value: str) -> str:
-        return value.strip()
-
-
-class AdminTag(BaseModel):
-    slug: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=60)
-    label_zh: str = Field(min_length=1, max_length=40)
-    label_en: str = Field(min_length=1, max_length=60)
-
-
-class AdminSample(BaseModel):
-    input: str = Field(max_length=65_536)
-    output: str = Field(max_length=65_536)
-    explanation: LocalizedText | None = None
-
-
-class AdminTestCase(BaseModel):
-    input: str = Field(max_length=65_536)
-    expected_output: str = Field(max_length=65_536)
-    source_kind: Literal["manual", "generated"] = "manual"
-    generator_version: str | None = Field(default=None, max_length=40)
-    generator_seed: int | None = None
-    input_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    generation_strategy: Literal[
-        "manual", "basic", "boundary", "extreme", "special",
-        "duplicate", "ordered", "large_random"
-    ] = "manual"
-
-    @model_validator(mode="after")
-    def validate_generation_metadata(self) -> "AdminTestCase":
-        if self.source_kind == "manual":
-            self.generator_version = None
-            self.generator_seed = None
-            self.input_sha256 = None
-            self.generation_strategy = "manual"
-        elif not (
-            self.generator_version is not None
-            and self.generator_seed is not None
-            and self.input_sha256 is not None
-        ):
-            raise ValueError("Generated cases require version, seed, and input hash metadata.")
-        return self
-
-
-class AdminTestGroup(BaseModel):
-    name: LocalizedText
-    condition: LocalizedText
-    score_percent: int = Field(ge=1, le=100)
-    cases: list[AdminTestCase] = Field(min_length=1, max_length=500)
-
-
-class AdminStarterCode(BaseModel):
-    cpp: str = Field(max_length=65_536)
-    python: str = Field(max_length=65_536)
-
-
-class AdminProblemContent(BaseModel):
-    title: LocalizedText
-    summary: LocalizedText
-    description: list[LocalizedText] = Field(min_length=1, max_length=30)
-    input_format: LocalizedText
-    output_format: LocalizedText
-    constraints: list[LocalizedText] = Field(max_length=30)
-    starter_code: AdminStarterCode
-    difficulty: Literal["easy", "medium", "hard"]
-    time_limit_ms: int = Field(ge=100, le=10_000)
-    memory_limit_mb: int = Field(ge=16, le=1_024)
-    published: bool = False
-    tags: list[AdminTag] = Field(max_length=8)
-    samples: list[AdminSample] = Field(min_length=1, max_length=20)
-    test_groups: list[AdminTestGroup] = Field(min_length=1, max_length=20)
-
-    @model_validator(mode="after")
-    def validate_problem(self) -> "AdminProblemContent":
-        if sum(group.score_percent for group in self.test_groups) != 100:
-            raise ValueError("Test group scores must add up to 100.")
-        tag_slugs = [tag.slug for tag in self.tags]
-        if len(tag_slugs) != len(set(tag_slugs)):
-            raise ValueError("Tag slugs must be unique.")
-        public_text_is_complete = (
-            bool(self.title.zh and self.title.en)
-            and bool(self.summary.zh and self.summary.en)
-            and any(item.zh and item.en for item in self.description)
-            and bool(self.input_format.zh and self.input_format.en)
-            and bool(self.output_format.zh and self.output_format.en)
-            and bool(self.tags)
-            and all(
-                group.name.zh
-                and group.name.en
-                and group.condition.zh
-                and group.condition.en
-                for group in self.test_groups
-            )
+def _explain_database_rejection(response: Any) -> None:
+    """Raise a specific error when a rejected request points to a known cause."""
+    try:
+        database_error = response.json()
+    except ValueError:
+        database_error = {}
+    error_code = str(database_error.get("code", ""))
+    error_message = str(database_error.get("message", ""))
+    if error_code == "42703" and "generation_strategy" in error_message:
+        raise ProblemAdminUnavailable(
+            "Supabase is missing the hidden-test quality schema. Run "
+            "202608250003_hidden_test_quality_and_judge_metrics.sql, then save again."
         )
-        if self.published and not public_text_is_complete:
-            self.published = False
-        return self
-
-
-class AdminProblemCreate(AdminProblemContent):
-    pass
-
-
-class AdminProblem(AdminProblemContent):
-    # Legacy IDs remain readable during the deployment-to-migration window.
-    # Create always allocates the exact four-character format, and the database
-    # migration ultimately enforces it for every stored problem.
-    id: str = Field(pattern=r"^(?:[0-9]{4,12}|[a-z][0-9]{3,11})$")
-
-
-class AdminProblemSummary(BaseModel):
-    id: str
-    title: LocalizedText
-    difficulty: Literal["easy", "medium", "hard"]
-    published: bool
-    updated_at: str
-
-
-class AdminStatusResponse(BaseModel):
-    is_admin: bool
+    if (error_code == "42703" and "score_points" in error_message) or (
+        error_code == "42883" and "apply_problem_generation_batch" in error_message
+    ):
+        raise ProblemAdminUnavailable(
+            "Supabase is missing individual test scoring. Run "
+            "202609040001_individual_test_scoring.sql, then try again."
+        )
+    if error_code == "23514" and "problems_id_check" in error_message:
+        raise ProblemAdminUnavailable(
+            "Supabase is missing the random problem ID schema. Run the latest "
+            "random problem ID migration, then save again."
+        )
+    if error_code == "23505" and "problems_pkey" in error_message:
+        raise ProblemIdCollision("The generated problem ID already exists.")
 
 
 class SupabaseProblemAdminStore:
     def __init__(self, supabase_url: str, server_key: str, timeout_seconds: float = 10) -> None:
-        self.rest_url = f"{supabase_url.rstrip('/')}/rest/v1"
-        self.server_key = server_key
-        self.timeout_seconds = timeout_seconds
+        self._rest = SupabaseRestClient(
+            supabase_url,
+            server_key,
+            timeout_seconds,
+            error_type=ProblemAdminUnavailable,
+            unavailable_message="The problem database is unavailable.",
+            rejected_message="The problem database rejected the admin request.",
+            on_rejection=_explain_database_rejection,
+        )
 
     def _headers(self, prefer: str | None = None) -> dict[str, str]:
-        headers = {"apikey": self.server_key, "Content-Type": "application/json"}
-        if not self.server_key.startswith("sb_secret_"):
-            headers["Authorization"] = f"Bearer {self.server_key}"
-        if prefer:
-            headers["Prefer"] = prefer
-        return headers
+        return self._rest.headers(prefer)
 
     def _request(
         self,
@@ -183,37 +97,7 @@ class SupabaseProblemAdminStore:
         json: Any = None,
         prefer: str | None = None,
     ) -> httpx.Response:
-        try:
-            response = secure_http_request(
-                method,
-                f"{self.rest_url}/{path}",
-                headers=self._headers(prefer),
-                json=json,
-                timeout=self.timeout_seconds,
-            )
-        except httpx.RequestError as error:
-            raise ProblemAdminUnavailable("The problem database is unavailable.") from error
-        if response.status_code >= 400:
-            try:
-                database_error = response.json()
-            except ValueError:
-                database_error = {}
-            error_code = str(database_error.get("code", ""))
-            error_message = str(database_error.get("message", ""))
-            if error_code == "42703" and "generation_strategy" in error_message:
-                raise ProblemAdminUnavailable(
-                    "Supabase is missing the hidden-test quality schema. Run "
-                    "202608250003_hidden_test_quality_and_judge_metrics.sql, then save again."
-                )
-            if error_code == "23514" and "problems_id_check" in error_message:
-                raise ProblemAdminUnavailable(
-                    "Supabase is missing the random problem ID schema. Run the latest "
-                    "random problem ID migration, then save again."
-                )
-            if error_code == "23505" and "problems_pkey" in error_message:
-                raise ProblemIdCollision("The generated problem ID already exists.")
-            raise ProblemAdminUnavailable("The problem database rejected the admin request.")
-        return response
+        return self._rest.request(method, path, json=json, prefer=prefer)
 
     def list_problems(self) -> list[AdminProblemSummary]:
         response = self._request(
@@ -264,7 +148,7 @@ class SupabaseProblemAdminStore:
                 "GET",
                 "problem_test_cases"
                 f"?group_id=in.({encoded_group_ids})&select=group_id,input,expected_output,case_order,"
-                "source_kind,generator_version,generator_seed,input_sha256,generation_strategy"
+                "score_points,source_kind,generator_version,generator_seed,input_sha256,generation_strategy"
                 "&order=group_id.asc,case_order.asc",
             ).json()
             for case in case_rows:
@@ -272,6 +156,7 @@ class SupabaseProblemAdminStore:
                     {
                         "input": str(case["input"]),
                         "expected_output": str(case["expected_output"]),
+                        "score_points": int(case.get("score_points", DEFAULT_CASE_POINTS)),
                         "source_kind": case.get("source_kind") or "manual",
                         "generator_version": case.get("generator_version"),
                         "generator_seed": case.get("generator_seed"),
@@ -411,6 +296,7 @@ class SupabaseProblemAdminStore:
                         "case_order": case_order,
                         "input": case.input,
                         "expected_output": case.expected_output,
+                        "score_points": case.score_points,
                         "source_kind": case.source_kind,
                         "generator_version": case.generator_version,
                         "generator_seed": case.generator_seed,
@@ -554,6 +440,7 @@ class SupabaseProblemAdminStore:
                         "input_sha256": case.input_sha256,
                         "input_bytes": len(case.input.encode("utf-8")),
                         "output_bytes": len(case.expected_output.encode("utf-8")),
+                        "score_points": case.score_points,
                     }
                     for index, case in enumerate(generated.cases, start=1)
                 ],
@@ -572,6 +459,7 @@ class SupabaseProblemAdminStore:
                 input_sha256=case.input_sha256,
                 input_bytes=len(case.input.encode("utf-8")),
                 output_bytes=len(case.expected_output.encode("utf-8")),
+                score_points=case.score_points,
             )
             for index, case in enumerate(generated.cases, start=1)
         ]
@@ -582,7 +470,8 @@ class SupabaseProblemAdminStore:
         )
 
     def apply_generation_batch(
-        self, batch_id: str, group_order: int, replace_existing: bool
+        self, batch_id: str, group_order: int, replace_existing: bool,
+        case_scores: list[int] | None = None,
     ) -> int:
         response = self._request(
             "POST",
@@ -591,6 +480,7 @@ class SupabaseProblemAdminStore:
                 "p_batch_id": batch_id,
                 "p_group_order": group_order,
                 "p_replace_existing": replace_existing,
+                "p_case_scores": case_scores,
             },
         )
         try:

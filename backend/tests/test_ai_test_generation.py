@@ -9,6 +9,7 @@ from app.ai_test_generation import (
     AiHiddenTestError,
     AiHiddenTestGenerationService,
     AiTestBlueprint,
+    _allocations,
     _boundary_evidence,
     required_boundary_values,
 )
@@ -21,7 +22,7 @@ from app.main import (
 )
 from app.models import RunResponse
 from app.problem_admin import AdminProblem
-from app.test_generation import GenerationVersionMetadata, StoredGenerationVersion
+from app.test_generation import GeneratedCasePreview, GenerationVersionMetadata, StoredGenerationVersion
 
 
 def problem() -> AdminProblem:
@@ -137,7 +138,21 @@ class FakeStore:
     def save_generation_batch(self, problem_id, generator_version, generated, created_by):
         batch_id = f"batch-{len(self.saved_batches) + 1}"
         self.saved_batches.append(generated)
-        return SimpleNamespace(batch_id=batch_id)
+        return SimpleNamespace(
+            batch_id=batch_id,
+            cases=[
+                GeneratedCasePreview(
+                    case_order=index,
+                    generator_seed=case.generator_seed,
+                    generation_strategy=case.generation_strategy,
+                    input_sha256=case.input_sha256,
+                    input_bytes=len(case.input.encode()),
+                    output_bytes=len(case.expected_output.encode()),
+                    score_points=case.score_points,
+                )
+                for index, case in enumerate(generated.cases, start=1)
+            ],
+        )
 
 
 class FakeEndpointService:
@@ -164,6 +179,18 @@ class FakeEndpointService:
                         "tolerance": 1,
                         "generator_seed": 1,
                     },
+                    "cases": [
+                        {
+                            "case_order": index,
+                            "generator_seed": index,
+                            "generation_strategy": "boundary" if index == 1 else "basic",
+                            "input_sha256": "a" * 64,
+                            "input_bytes": 2,
+                            "output_bytes": 2,
+                            "score_points": 5,
+                        }
+                        for index in range(1, 5)
+                    ],
                 }
             ],
         }
@@ -171,6 +198,34 @@ class FakeEndpointService:
 
 def test_extracts_group_boundary_then_falls_back_to_global_limit() -> None:
     assert required_boundary_values(problem()) == {1: 100.0, 2: 1_000_000.0}
+
+
+def test_boundary_cases_are_allocated_first_and_have_priority() -> None:
+    allocations = _allocations(10, ["basic", "boundary", "large_random"])
+
+    assert allocations[0].strategy == "boundary"
+    assert allocations[0].count == 4
+    assert sum(item.count for item in allocations) == 10
+
+
+def test_each_group_can_request_a_different_count_and_default_score() -> None:
+    store = FakeStore()
+    result = AiHiddenTestGenerationService(
+        FakeKeyStore(), FakeCipher(), FakeProvider(), store, FakeCompiler()
+    ).generate(
+        AuthenticatedUser(user_id="admin", access_token="token"),
+        problem(),
+        AiAutoGenerateRequest(
+            groups=[
+                {"group_order": 1, "count": 1, "default_points_per_case": 40},
+                {"group_order": 2, "count": 3, "default_points_per_case": 20},
+            ]
+        ),
+    )
+
+    assert [group.accepted for group in result.groups] == [1, 3]
+    assert [case.score_points for case in result.groups[0].cases] == [40]
+    assert [case.score_points for case in result.groups[1].cases] == [20, 20, 20]
 
 
 def test_ai_generation_covers_every_group_and_boundary() -> None:
@@ -188,6 +243,8 @@ def test_ai_generation_covers_every_group_and_boundary() -> None:
 
     assert len(result.groups) == 2
     assert [group.accepted for group in result.groups] == [4, 4]
+    assert all(case.score_points == 5 for group in result.groups for case in group.cases)
+    assert all(group.cases[0].generation_strategy == "boundary" for group in result.groups)
     assert result.groups[0].boundary.actual_value == 100
     assert result.groups[1].boundary.actual_value == 1_000_000
     assert provider.payload["groups"][1]["required_boundary_value"] == 1_000_000

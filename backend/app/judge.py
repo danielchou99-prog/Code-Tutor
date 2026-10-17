@@ -6,10 +6,12 @@ from urllib.parse import quote
 
 import httpx
 
-from .ai_connections import secure_http_request
 from .auth import AuthenticatedUser
 from .compiler import CompilerService, CompilerUnavailable
-from .models import JudgeGroupResult, RunResponse, SubmitRequest, SubmitResponse
+from .problem_models import DEFAULT_CASE_POINTS
+from .models import JudgeStatus, RunResponse, SubmitRequest, SubmitResponse
+from .scoring import ScoreCalculator, outputs_match
+from .supabase_rest import SupabaseRestClient
 
 
 class JudgeStorageUnavailable(RuntimeError):
@@ -24,6 +26,7 @@ class ProblemNotFound(RuntimeError):
 class JudgeCase:
     input: str
     expected_output: str
+    score_points: int = DEFAULT_CASE_POINTS
 
 
 @dataclass(frozen=True)
@@ -63,42 +66,27 @@ class SupabaseJudgeStore:
         server_key: str,
         timeout_seconds: float = 10,
     ) -> None:
-        self.rest_url = f"{supabase_url.rstrip('/')}/rest/v1"
-        self.server_key = server_key
-        self.timeout_seconds = timeout_seconds
+        self._rest = SupabaseRestClient(
+            supabase_url,
+            server_key,
+            timeout_seconds,
+            error_type=JudgeStorageUnavailable,
+            unavailable_message="The Judge database is unavailable.",
+            rejected_message="The Judge database rejected the request.",
+        )
 
     def _headers(self, prefer: str | None = None) -> dict[str, str]:
-        headers = {
-            "apikey": self.server_key,
-            "Content-Type": "application/json",
-        }
-        if not self.server_key.startswith("sb_secret_"):
-            headers["Authorization"] = f"Bearer {self.server_key}"
-        if prefer:
-            headers["Prefer"] = prefer
-        return headers
+        return self._rest.headers(prefer)
 
     def _request(
         self,
         method: str,
         path: str,
         *,
-        json: dict[str, Any] | None = None,
+        json: Any = None,
         prefer: str | None = None,
     ) -> httpx.Response:
-        try:
-            response = secure_http_request(
-                method,
-                f"{self.rest_url}/{path}",
-                headers=self._headers(prefer),
-                json=json,
-                timeout=self.timeout_seconds,
-            )
-        except httpx.RequestError as error:
-            raise JudgeStorageUnavailable("The Judge database is unavailable.") from error
-        if response.status_code >= 400:
-            raise JudgeStorageUnavailable("The Judge database rejected the request.")
-        return response
+        return self._rest.request(method, path, json=json, prefer=prefer)
 
     def get_problem(self, problem_id: str) -> JudgeProblem:
         encoded_id = quote(problem_id, safe="")
@@ -125,7 +113,7 @@ class SupabaseJudgeStore:
         cases_response = self._request(
             "GET",
             "problem_test_cases"
-            f"?group_id=in.({encoded_group_ids})&select=group_id,case_order,input,expected_output"
+            f"?group_id=in.({encoded_group_ids})&select=group_id,case_order,input,expected_output,score_points"
             "&order=group_id.asc,case_order.asc",
         )
         case_records = cases_response.json()
@@ -141,6 +129,7 @@ class SupabaseJudgeStore:
                 JudgeCase(
                     input=str(record.get("input", "")),
                     expected_output=str(record.get("expected_output", "")),
+                    score_points=int(record.get("score_points", DEFAULT_CASE_POINTS)),
                 )
             )
 
@@ -192,18 +181,16 @@ class SupabaseJudgeStore:
         return str(records[0]["id"])
 
 
-def normalize_output(value: str) -> str:
-    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
-    lines = [line.rstrip(" \t") for line in normalized.split("\n")]
-    while lines and lines[-1] == "":
-        lines.pop()
-    return "\n".join(lines)
-
-
 class JudgeService:
-    def __init__(self, store: JudgeStore, compiler: CompilerService) -> None:
+    def __init__(
+        self,
+        store: JudgeStore,
+        compiler: CompilerService,
+        calculator: ScoreCalculator | None = None,
+    ) -> None:
         self.store = store
         self.compiler = compiler
+        self.calculator = calculator or ScoreCalculator()
 
     def submit(
         self,
@@ -231,16 +218,16 @@ class JudgeService:
             except CompilerUnavailable:
                 batch_unavailable = True
 
-        groups: list[JudgeGroupResult] = []
-        passed_cases = 0
+        executed: list[list[bool]] = []
         result_index = 0
         duration_ms = 0
         peak_memory_kb = 0
-        fatal_status: str | None = None
+        fatal_status: JudgeStatus | None = None
         fatal_message = ""
 
-        for group_index, group in enumerate(problem.groups):
-            group_passed = 0
+        for group in problem.groups:
+            outcomes: list[bool] = []
+            executed.append(outcomes)
             for case in group.cases:
                 if batch_unavailable:
                     fatal_status = "system_error"
@@ -267,55 +254,24 @@ class JudgeService:
                 duration_ms += run_result.duration_ms
                 peak_memory_kb = max(peak_memory_kb, run_result.peak_memory_kb)
                 if run_result.status != "accepted":
-                    fatal_status = run_result.status
+                    fatal_status = run_result.status  # type: ignore[assignment]
                     fatal_message = run_result.stderr[:2000]
                     break
-                if normalize_output(run_result.stdout) == normalize_output(case.expected_output):
-                    group_passed += 1
-                    passed_cases += 1
-
-            group_complete = group_passed == len(group.cases) and fatal_status is None
-            groups.append(
-                JudgeGroupResult(
-                    group_order=group.group_order,
-                    score_percent=group.score_percent,
-                    earned_score=group.score_percent if group_complete else 0,
-                    passed_cases=group_passed,
-                    total_cases=len(group.cases),
-                    status="passed" if group_complete else "failed",
-                )
-            )
+                outcomes.append(outputs_match(run_result.stdout, case.expected_output))
             if fatal_status is not None:
-                for remaining in problem.groups[group_index + 1 :]:
-                    groups.append(
-                        JudgeGroupResult(
-                            group_order=remaining.group_order,
-                            score_percent=remaining.score_percent,
-                            earned_score=0,
-                            passed_cases=0,
-                            total_cases=len(remaining.cases),
-                            status="not_run",
-                        )
-                    )
                 break
 
-        score = sum(group.earned_score for group in groups)
-        status = (
-            fatal_status
-            if fatal_status is not None
-            else "accepted"
-            if passed_cases == problem.total_cases
-            else "wrong_answer"
-        )
+        summary = self.calculator.calculate(problem.groups, executed, fatal_status)
         result = SubmitResponse(
             problem_id=problem_id,
-            status=status,  # type: ignore[arg-type]
-            score=score,
-            passed_cases=passed_cases,
-            total_cases=problem.total_cases,
+            status=summary.status,
+            score=summary.score,
+            max_score=summary.max_score,
+            passed_cases=summary.passed_cases,
+            total_cases=summary.total_cases,
             duration_ms=duration_ms,
             peak_memory_kb=peak_memory_kb,
-            groups=groups,
+            groups=summary.groups,
             message=fatal_message,
         )
         result.submission_id = self.store.save_submission(user, request, result)

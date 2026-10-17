@@ -126,6 +126,7 @@ class SubmitResponse(BaseModel):
     problem_id: str
     status: JudgeStatus
     score: int = 0
+    max_score: int = 100
     passed_cases: int = 0
     total_cases: int = 0
     duration_ms: int = 0

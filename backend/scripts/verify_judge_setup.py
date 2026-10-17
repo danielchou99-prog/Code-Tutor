@@ -13,7 +13,8 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.compiler import DockerCompiler
 from app.config import settings
-from app.judge import SupabaseJudgeStore, normalize_output
+from app.judge import SupabaseJudgeStore
+from app.scoring import normalize_output
 
 
 CPP_SOLUTION = """#include <iostream>

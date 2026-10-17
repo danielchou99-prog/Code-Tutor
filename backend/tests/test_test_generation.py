@@ -99,6 +99,17 @@ def test_generation_is_deterministic_and_records_provenance() -> None:
     assert first.report.validator_enabled is True
 
 
+def test_generation_assigns_configured_points_to_every_case() -> None:
+    result = HiddenTestGenerationService(FakeGenerationStore(), FakeCompiler()).generate(
+        "1001",
+        GenerateCasesRequest(
+            version="v1", count=2, first_seed=40, default_points_per_case=7
+        ),
+    )
+
+    assert [case.score_points for case in result.cases] == [7, 7]
+
+
 def test_duplicate_generated_inputs_are_rejected() -> None:
     service = HiddenTestGenerationService(
         FakeGenerationStore(generator_source="duplicate-generator"), FakeCompiler()

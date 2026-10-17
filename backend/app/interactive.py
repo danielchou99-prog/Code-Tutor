@@ -16,6 +16,17 @@ from .models import ProjectSourceFile
 READY_MARKER = "__CODE_TUTOR_INTERACTIVE_READY__"
 
 
+def final_interactive_status(ready: bool, return_code: int) -> str:
+    """Map an interactive process exit to the status sent to the browser."""
+    if not ready:
+        return "compile_error"
+    if return_code == 0:
+        return "accepted"
+    if return_code in (124, 137):
+        return "timeout"
+    return "runtime_error"
+
+
 class InteractiveSessionProtocol(Protocol):
     process: asyncio.subprocess.Process
     container_name: str

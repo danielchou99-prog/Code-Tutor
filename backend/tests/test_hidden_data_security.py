@@ -35,6 +35,7 @@ def test_generation_batch_api_shape_never_contains_hidden_values() -> None:
     assert "expected_output" not in serialized
     assert "generator_source" not in serialized
     assert "reference_source" not in serialized
+    assert '"score_points":5' in serialized
 
 
 def test_ai_judge_context_contains_aggregate_summary_only() -> None:

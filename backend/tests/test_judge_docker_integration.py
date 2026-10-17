@@ -21,7 +21,7 @@ class IntegrationStore:
             JudgeGroup(
                 group_order=1,
                 score_percent=100,
-                cases=(JudgeCase("1 2", "3"), JudgeCase("-5 12", "7")),
+                cases=(JudgeCase("1 2", "3", 50), JudgeCase("-5 12", "7", 50)),
             ),
         ),
     )

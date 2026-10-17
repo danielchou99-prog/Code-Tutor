@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .compiler import CompilerService, CompilerUnavailable
 from .models import RunResponse
+from .problem_models import DEFAULT_CASE_POINTS
 
 
 ProgramLanguage = Literal["cpp", "python"]
@@ -64,6 +65,7 @@ class GenerateCasesRequest(BaseModel):
     count: int = Field(ge=1, le=100)
     first_seed: int = Field(default=1, ge=0, le=2_147_483_647)
     group_order: int = Field(default=1, ge=1, le=20)
+    default_points_per_case: int = Field(default=DEFAULT_CASE_POINTS, ge=0, le=100)
     strategy_allocations: list[GenerationStrategyAllocation] = Field(
         default_factory=list, max_length=7
     )
@@ -88,6 +90,7 @@ class GeneratedTestCase(BaseModel):
     generator_seed: int
     input_sha256: str
     generation_strategy: GenerationStrategy
+    score_points: int = Field(default=DEFAULT_CASE_POINTS, ge=0, le=100)
 
 
 class GenerationQualityReport(BaseModel):
@@ -110,6 +113,7 @@ class GeneratedCasePreview(BaseModel):
     input_sha256: str
     input_bytes: int
     output_bytes: int
+    score_points: int = Field(default=DEFAULT_CASE_POINTS, ge=0, le=100)
 
 
 class GenerationBatchResponse(BaseModel):
@@ -121,6 +125,13 @@ class GenerationBatchResponse(BaseModel):
 class ApplyGenerationBatchRequest(BaseModel):
     group_order: int = Field(ge=1, le=20)
     replace_existing: bool = True
+    case_scores: list[int] | None = Field(default=None, min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_case_scores(self) -> "ApplyGenerationBatchRequest":
+        if self.case_scores is not None and any(score < 0 or score > 100 for score in self.case_scores):
+            raise ValueError("Each case score must be between 0 and 100.")
+        return self
 
 
 class ApplyGenerationBatchResponse(BaseModel):
@@ -241,6 +252,7 @@ class HiddenTestGenerationService:
                 generator_seed=seed,
                 input_sha256=input_hash,
                 generation_strategy=strategy,
+                score_points=request.default_points_per_case,
             )
             for (seed, strategy, generated, input_hash, _input_bytes), expected in zip(
                 accepted, expected_outputs, strict=True
