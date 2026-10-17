@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { authErrorText } from "@/lib/supabase/auth-errors";
 
 export function UpdatePasswordForm() {
   const { loading, user, updatePassword } = useAuth();
@@ -30,7 +31,7 @@ export function UpdatePasswordForm() {
     setSubmitting(true);
     const result = await updatePassword(password);
     setSubmitting(false);
-    if (result.error) setError(result.error);
+    if (result.error) setError(authErrorText(result, t));
     else setComplete(true);
   };
 

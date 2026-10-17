@@ -5,8 +5,9 @@ import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProblemAdminSettings } from "@/components/settings/problem-admin-settings";
 import { connectAi, getAiConnection, type AiConnectionStatus, removeAiConnection } from "@/lib/ai-connection-api";
-import { useAuth } from "@/lib/auth-context";
+import { type AuthResult, useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { authErrorText } from "@/lib/supabase/auth-errors";
 import { getProblemAdminStatus } from "@/lib/problem-admin-api";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { type AppSettings, useSettings } from "@/lib/settings-context";
@@ -147,10 +148,10 @@ export function SettingsPage() {
   }, [checkProblemAdminAccess]);
 
   const clearFeedback = () => { setMessage(null); setError(null); };
-  const showResult = (result: { error: string | null }, success: string) => {
+  const showResult = (result: AuthResult, success: string) => {
     if (result.error) {
       setMessage(null);
-      setError(result.error);
+      setError(authErrorText(result, t));
     } else {
       setError(null);
       setMessage(success);

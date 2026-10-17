@@ -4,9 +4,10 @@ import type { User } from "@supabase/supabase-js";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { type AuthErrorCode, classifyAuthError } from "@/lib/supabase/auth-errors";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-type AuthResult = { error: string | null };
+export type AuthResult = { error: string | null; errorCode?: AuthErrorCode };
 
 type AuthContextValue = {
   configured: boolean;
@@ -26,6 +27,23 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 function unavailableResult(): AuthResult {
   return { error: "Supabase public configuration is missing." };
+}
+
+async function runAuth(action: () => Promise<{ error: unknown }>): Promise<AuthResult> {
+  try {
+    const { error } = await action();
+    if (!error) return { error: null };
+    const message = (error as { message?: unknown }).message;
+    return {
+      error: typeof message === "string" && message ? message : "Authentication failed.",
+      errorCode: classifyAuthError(error),
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : "Authentication failed.",
+      errorCode: classifyAuthError(error),
+    };
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -72,58 +90,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       async signIn(email, password) {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.signInWithPassword({
+        return runAuth(() => getSupabaseBrowserClient().auth.signInWithPassword({
           email,
           password,
-        });
-        return { error: error?.message ?? null };
+        }));
       },
       async signUp(name, email, password) {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.signUp({
+        return runAuth(() => getSupabaseBrowserClient().auth.signUp({
           email,
           password,
           options: {
             data: { display_name: name },
             emailRedirectTo: `${window.location.origin}/auth/confirm`,
           },
-        });
-        return { error: error?.message ?? null };
+        }));
       },
       async sendPasswordReset(email) {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.resetPasswordForEmail(email, {
+        return runAuth(() => getSupabaseBrowserClient().auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/auth/confirm?next=/auth/update-password`,
-        });
-        return { error: error?.message ?? null };
+        }));
       },
       async signOut() {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.signOut();
-        return { error: error?.message ?? null };
+        return runAuth(() => getSupabaseBrowserClient().auth.signOut());
       },
       async signOutAll() {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.signOut({ scope: "global" });
-        return { error: error?.message ?? null };
+        return runAuth(() => getSupabaseBrowserClient().auth.signOut({ scope: "global" }));
       },
       async updateEmail(email) {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.updateUser(
+        return runAuth(() => getSupabaseBrowserClient().auth.updateUser(
           { email },
           { emailRedirectTo: `${window.location.origin}/auth/confirm` },
-        );
-        return { error: error?.message ?? null };
+        ));
       },
       async updatePassword(password) {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.updateUser({ password });
-        return { error: error?.message ?? null };
+        return runAuth(() => getSupabaseBrowserClient().auth.updateUser({ password }));
       },
       async updateProfile(profile) {
         if (!configured) return unavailableResult();
-        const { error } = await getSupabaseBrowserClient().auth.updateUser({ data: profile });
-        return { error: error?.message ?? null };
+        return runAuth(() => getSupabaseBrowserClient().auth.updateUser({ data: profile }));
       },
     }),
     [configured, loading, user],

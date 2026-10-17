@@ -4,6 +4,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { authErrorText } from "@/lib/supabase/auth-errors";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -81,7 +82,7 @@ export function AccountControl({
     setSubmitting(false);
 
     if (result.error) {
-      setError(result.error);
+      setError(authErrorText(result, t));
       return;
     }
 
@@ -98,7 +99,7 @@ export function AccountControl({
     const result = await signOut();
     resetForm();
     if (result.error) {
-      setError(result.error);
+      setError(authErrorText(result, t));
       return;
     }
     setOpen(false);
