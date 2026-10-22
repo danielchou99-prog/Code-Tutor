@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useState } from "react";
 
-import type { FileProject, ProjectFile } from "@/lib/file-items";
+import type { FileProject, ProgrammingLanguage, ProjectFile } from "@/lib/file-items";
 import { useSettings } from "@/lib/settings-context";
 import { AiTutorPanel } from "./ai-tutor-panel";
 import { HistoryPanel } from "./history-panel";
@@ -12,10 +12,12 @@ export function ProjectWorkspace({
   project,
   onBack,
   onDirtyChange,
+  onSwitchLanguage,
 }: {
   project: FileProject;
   onBack: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  onSwitchLanguage?: (language: ProgrammingLanguage) => void;
 }) {
   const { settings } = useSettings();
   const [code, setCode] = useState("");
@@ -38,6 +40,7 @@ export function ProjectWorkspace({
           files={projectFiles}
           onBack={onBack}
           onOpenFile={setRequestedFileId}
+          onSwitchLanguage={onSwitchLanguage}
           project={project}
         />
       </div>

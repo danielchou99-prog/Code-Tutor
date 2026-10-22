@@ -10,21 +10,16 @@ import { useAuth } from "@/lib/auth-context";
 import {
   clearProjectDraft,
   completeProjectFileName,
-  createProjectFile,
-  deleteProjectFile,
   isValidProjectFileName,
-  listProjectFiles,
-  listProjectFileSources,
   loadActiveProjectFileId,
   loadProjectDraft,
-  loadProjectFileContent,
   type FileProject,
   type ProjectFile,
-  type ProjectFileSource,
   saveActiveProjectFileId,
   saveProjectDraft,
-  saveProjectFileContent,
+  supabaseProjectFileStore,
 } from "@/lib/file-items";
+import { guestProjectFileStore, requestSignInToSave } from "@/lib/guest-workspace";
 import type { SourceFile } from "@/lib/compiler-api";
 import { useLanguage } from "@/lib/language-context";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
@@ -86,6 +81,8 @@ export function CodeEditorPanel({
   const { user } = useAuth();
   const { t } = useLanguage();
   const { settings } = useSettings();
+  const isGuest = project.guest === true;
+  const store = isGuest ? guestProjectFileStore : supabaseProjectFileStore;
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [openFileIds, setOpenFileIds] = useState<string[]>([]);
   const [activeFile, setActiveFile] = useState<ProjectFile | null>(null);
@@ -104,6 +101,7 @@ export function CodeEditorPanel({
   const [deleting, setDeleting] = useState(false);
   const [preparingRun, setPreparingRun] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
+  const [guestSaveNotice, setGuestSaveNotice] = useState(false);
   const [pendingFileAction, setPendingFileAction] = useState<(() => void) | null>(null);
   const [clearStep, setClearStep] = useState<0 | 1 | 2>(0);
   const [hydratedTabsStateKey, setHydratedTabsStateKey] = useState<string | null>(null);
@@ -117,9 +115,12 @@ export function CodeEditorPanel({
   const openFileRequestRef = useRef<(file: ProjectFile) => void>(() => undefined);
   const runProjectRef = useRef<() => void>(() => undefined);
   const settingsRef = useRef(settings);
-  const isDirty = hasLoadedCode && code !== savedCode;
+  // A guest workspace is written to this browser as they type, so nothing is ever "unsaved" in it.
+  const isDirty = !isGuest && hasLoadedCode && code !== savedCode;
   const tabsStateKey = pageStateKey(`projects:${project.id}:open-files`, user?.id);
-  const displayedSaveStatus: SaveStatus = saveStatus === "saving" || saveStatus === "failed"
+  const displayedSaveStatus: SaveStatus = isGuest
+    ? "saved"
+    : saveStatus === "saving" || saveStatus === "failed"
     ? saveStatus
     : isDirty ? "unsaved" : "saved";
   const openFiles = openFileIds
@@ -144,7 +145,7 @@ export function CodeEditorPanel({
     setFileError(null);
     onDirtyChange(false);
 
-    const { data, error } = await loadProjectFileContent(file.id);
+    const { data, error } = await store.loadContent(file.id);
     if (sequence !== loadSequence.current || activeFileRef.current?.id !== file.id) return;
     if (error) {
       setCode("");
@@ -153,7 +154,7 @@ export function CodeEditorPanel({
       setFileError(t("thisFileCouldNotBe"));
     } else {
       const persistedCode = typeof data?.content === "string" ? data.content : "";
-      const restoredDraft = loadProjectDraft(project.id, file.id);
+      const restoredDraft = isGuest ? null : loadProjectDraft(project.id, file.id);
       const nextCode = restoredDraft ?? persistedCode;
       latestCode.current = nextCode;
       setCode(nextCode);
@@ -162,12 +163,12 @@ export function CodeEditorPanel({
     }
     hasLoadedCodeRef.current = true;
     setHasLoadedCode(true);
-  }, [onDirtyChange, project.id, t]);
+  }, [isGuest, onDirtyChange, project.id, store, t]);
 
   useEffect(() => {
     let cancelled = false;
     const restoreTimer = window.setTimeout(() => {
-      void listProjectFiles(project.id).then(({ data, error }) => {
+      void store.list(project.id).then(({ data, error }) => {
         if (cancelled) return;
         if (error) {
           setFileError(
@@ -207,7 +208,7 @@ export function CodeEditorPanel({
       cancelled = true;
       window.clearTimeout(restoreTimer);
     };
-  }, [loadFile, onDirtyChange, project.id, project.language, tabsStateKey, t]);
+  }, [loadFile, onDirtyChange, project.id, project.language, store, tabsStateKey, t]);
 
   useEffect(() => {
     if (hydratedTabsStateKey === tabsStateKey) savePageState(tabsStateKey, openFileIds);
@@ -219,11 +220,15 @@ export function CodeEditorPanel({
     latestCode.current = code;
     onCodeChange(code);
     if (!hasLoadedCode || !activeFile) return;
+    if (isGuest) {
+      void guestProjectFileStore.saveContent(activeFile.id, code);
+      return;
+    }
     const dirty = code !== savedCode;
     onDirtyChange(dirty);
     if (dirty) saveProjectDraft(project.id, code, activeFile.id);
     else clearProjectDraft(project.id, activeFile.id);
-  }, [activeFile, code, hasLoadedCode, onCodeChange, onDirtyChange, project.id, savedCode]);
+  }, [activeFile, code, hasLoadedCode, isGuest, onCodeChange, onDirtyChange, project.id, savedCode]);
 
   useEffect(() => {
     onProjectFilesChange(files, activeFile?.id ?? null);
@@ -232,9 +237,15 @@ export function CodeEditorPanel({
   const saveCode = useCallback((nextCode: string) => {
     const file = activeFileRef.current;
     if (!file || !hasLoadedCodeRef.current || isSavingRef.current) return;
+    if (isGuest) {
+      // Guests keep working locally; only saving to an account needs a sign-in.
+      setGuestSaveNotice(true);
+      requestSignInToSave();
+      return;
+    }
     isSavingRef.current = true;
     setSaveStatus("saving");
-    void saveProjectFileContent(file.id, nextCode).then(({ error }) => {
+    void store.saveContent(file.id, nextCode).then(({ error }) => {
       if (error) throw error;
       clearProjectDraft(project.id, file.id);
       if (activeFileRef.current?.id === file.id) {
@@ -246,7 +257,7 @@ export function CodeEditorPanel({
     }).finally(() => {
       isSavingRef.current = false;
     });
-  }, [project.id]);
+  }, [isGuest, project.id, store]);
 
   useEffect(() => {
     saveCurrentRef.current = saveCode;
@@ -309,7 +320,7 @@ export function CodeEditorPanel({
   };
 
   const submitNewFile = async () => {
-    if (!user || creating) return;
+    if ((!user && !isGuest) || creating) return;
     const normalizedName = completeProjectFileName(newFileName, project.language);
     if (!isValidProjectFileName(normalizedName, project.language)) {
       setCreateError(project.language === "python"
@@ -323,8 +334,8 @@ export function CodeEditorPanel({
     }
     setCreating(true);
     setCreateError(null);
-    const { data, error } = await createProjectFile({
-      userId: user.id,
+    const { data, error } = await store.create({
+      userId: user?.id ?? "guest",
       projectId: project.id,
       name: normalizedName,
     });
@@ -347,7 +358,7 @@ export function CodeEditorPanel({
     if (!deleteTarget || deleting) return;
     setDeleting(true);
     const target = deleteTarget;
-    const { error } = await deleteProjectFile(target.id);
+    const { error } = await store.remove(target.id);
     setDeleting(false);
     if (error) {
       setFileError(t("thisFileCouldNotBe2"));
@@ -449,7 +460,7 @@ export function CodeEditorPanel({
     setRunError(null);
     if (settings.saveBeforeRun && isDirty) {
       setSaveStatus("saving");
-      const { error: saveError } = await saveProjectFileContent(activeFile.id, code);
+      const { error: saveError } = await store.saveContent(activeFile.id, code);
       if (saveError) {
         setSaveStatus("failed");
         setRunError(t("saveBeforeRunFailedSo"));
@@ -460,17 +471,17 @@ export function CodeEditorPanel({
       setSavedCode(code);
       setSaveStatus("saved");
     }
-    const { data, error } = await listProjectFileSources(project.id);
+    const { data, error } = await store.listSources(project.id);
     if (error || !data) {
       setRunError(t("projectFilesCouldNotBe2"));
       setPreparingRun(false);
       return;
     }
-    const sources = (data as ProjectFileSource[]).map((file) => ({
+    const sources = data.map((file) => ({
       name: file.name,
       content: file.id === activeFile.id
         ? code
-        : (loadProjectDraft(project.id, file.id) ?? file.content),
+        : ((isGuest ? null : loadProjectDraft(project.id, file.id)) ?? file.content),
     }));
     setPreparingRun(false);
     await onRun(sources);
@@ -479,7 +490,7 @@ export function CodeEditorPanel({
     runProjectRef.current = () => { void runProject(); };
   });
 
-  const statusLabel = {
+  const statusLabel = isGuest ? t("guestDraftStatus") : {
     saved: t("saved"),
     unsaved: t("unsaved2"),
     saving: t("saving"),
@@ -591,7 +602,7 @@ export function CodeEditorPanel({
           <button
             type="button"
             onClick={() => saveCode(code)}
-            disabled={!activeFile || !isDirty || saveStatus === "saving"}
+            disabled={!activeFile || (!isGuest && (!isDirty || saveStatus === "saving"))}
             className="h-7 rounded-lg border border-cyan-300/20 px-2.5 text-[10px] font-semibold text-cyan-200 transition-colors hover:border-cyan-300/40 disabled:cursor-default disabled:border-white/8 disabled:text-slate-600"
           >
             Save
@@ -616,6 +627,12 @@ export function CodeEditorPanel({
           </button>
         </div>
       </div>
+
+      {guestSaveNotice ? (
+        <div className="shrink-0 border-b border-cyan-300/15 bg-cyan-300/[0.04] px-4 py-2 text-[10px] text-cyan-200" role="status">
+          {t("guestSaveNeedsSignIn")}
+        </div>
+      ) : null}
 
       {runError ? (
         <div className="shrink-0 border-b border-rose-400/15 bg-rose-400/[0.04] px-4 py-2 text-[10px] text-rose-300" role="alert">

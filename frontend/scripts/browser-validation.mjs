@@ -236,7 +236,7 @@ if (action === "files-guest") {
   const clicked = await evaluate(
     client,
     `(() => {
-      const button = [...document.querySelectorAll("button")].find(
+      const button = [...document.querySelectorAll("a, button")].find(
         (candidate) => candidate.textContent.trim() === "檔案",
       );
       if (!button) return false;
@@ -245,16 +245,36 @@ if (action === "files-guest") {
     })()`,
   );
   if (!clicked) throw new Error("File navigation button was not found.");
-  await sleep(500);
-  actionSucceeded = await evaluate(
+  await sleep(1_500);
+  // Guests get the editor straight away; only pressing Save asks them to sign in.
+  const guestEditorShown = await evaluate(
     client,
     `(() => {
       const text = document.body.innerText;
-      return text.includes("請先登入，才能建立並保存自己的資料夾與專案。") &&
+      return text.includes("main.cpp") &&
+        !text.includes("請先登入，才能建立並保存自己的資料夾與專案。") &&
         !text.includes("C++ 基礎練習") &&
         !text.includes("APCS 題目整理");
     })()`,
   );
+  const saveClicked = await evaluate(
+    client,
+    `(() => {
+      const button = [...document.querySelectorAll("button")].find(
+        (candidate) => candidate.textContent.trim() === "Save" && !candidate.disabled,
+      );
+      if (!button) return false;
+      button.click();
+      return true;
+    })()`,
+  );
+  await sleep(500);
+  const signInOpened = await evaluate(
+    client,
+    `Boolean(document.querySelector('[role="dialog"][aria-label="帳號"]')) &&
+      document.body.innerText.includes("請先登入才能儲存")`,
+  );
+  actionSucceeded = guestEditorShown && saveClicked && signInOpened;
 }
 if (action === "language-menu") {
   const opened = await evaluate(

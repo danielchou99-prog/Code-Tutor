@@ -15,7 +15,11 @@ export type FileItem = {
   updated_at: string;
 };
 
-export type FileProject = Pick<FileItem, "id" | "name"> & { language: ProgrammingLanguage };
+export type FileProject = Pick<FileItem, "id" | "name"> & {
+  language: ProgrammingLanguage;
+  /** A guest workspace lives only in this browser; saving it requires signing in. */
+  guest?: boolean;
+};
 
 export type ProjectFile = {
   id: string;
@@ -308,3 +312,43 @@ export async function saveProjectFileContent(fileId: string, content: string) {
 export async function deleteProjectFile(fileId: string) {
   return getSupabaseBrowserClient().from("project_files").delete().eq("id", fileId);
 }
+
+export type FileStoreError = { code?: string; message?: string } | null;
+type StoreResult<T> = Promise<{ data: T | null; error: FileStoreError }>;
+
+/** Everything the editor needs from project storage, so a guest workspace can stand in for Supabase. */
+export type ProjectFileStore = {
+  list: (projectId: string) => StoreResult<ProjectFile[]>;
+  listSources: (projectId: string) => StoreResult<ProjectFileSource[]>;
+  create: (input: { userId: string; projectId: string; name: string }) => StoreResult<ProjectFile>;
+  loadContent: (fileId: string) => StoreResult<{ content: string | null }>;
+  saveContent: (fileId: string, content: string) => Promise<{ error: FileStoreError }>;
+  remove: (fileId: string) => Promise<{ error: FileStoreError }>;
+};
+
+export const supabaseProjectFileStore: ProjectFileStore = {
+  list: async (projectId) => {
+    const { data, error } = await listProjectFiles(projectId);
+    return { data: data as ProjectFile[] | null, error };
+  },
+  listSources: async (projectId) => {
+    const { data, error } = await listProjectFileSources(projectId);
+    return { data: data as ProjectFileSource[] | null, error };
+  },
+  create: async (input) => {
+    const { data, error } = await createProjectFile(input);
+    return { data: data as ProjectFile | null, error };
+  },
+  loadContent: async (fileId) => {
+    const { data, error } = await loadProjectFileContent(fileId);
+    return { data: data as { content: string | null } | null, error };
+  },
+  saveContent: async (fileId, content) => {
+    const { error } = await saveProjectFileContent(fileId, content);
+    return { error };
+  },
+  remove: async (fileId) => {
+    const { error } = await deleteProjectFile(fileId);
+    return { error };
+  },
+};

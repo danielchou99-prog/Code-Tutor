@@ -3,6 +3,7 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/lib/auth-context";
+import { requestSignInEvent } from "@/lib/guest-workspace";
 import { useLanguage } from "@/lib/language-context";
 import { authErrorText } from "@/lib/supabase/auth-errors";
 
@@ -49,6 +50,17 @@ export function AccountControl({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [closePanel, open]);
+
+  // Other pages (for example a guest pressing Save) can ask for the sign-in panel to open.
+  useEffect(() => {
+    if (user) return;
+    const openSignIn = () => {
+      setMode("signin");
+      setOpen(true);
+    };
+    window.addEventListener(requestSignInEvent, openSignIn);
+    return () => window.removeEventListener(requestSignInEvent, openSignIn);
+  }, [user]);
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
