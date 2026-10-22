@@ -34,3 +34,4 @@
 - [檔案管理與自訂標籤計畫](file-management-and-tags.md)：使用者專屬資料夾與專案、`#` 多標籤、階層導覽及專案程式碼保存。
 - [Groq AI 安全連線實作計畫](groq-ai-connection.md)：AI 連線資料表、API Key 加密保存、受保護的後端 API 與帳號設定介面。
 - [訪客檔案工作區計畫](guest-file-workspace.md)：未登入也能使用檔案編輯器，按 Save 時才要求登入，登入後自動匯入成專案。
+- [新專案預設 Hello world! 計畫](default-hello-world.md)：新建專案與訪客工作區的預設程式統一為輸出 Hello world!。

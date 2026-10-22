@@ -99,27 +99,14 @@ export function saveActiveProjectFileId(projectId: string, fileId: string | null
 }
 
 export const defaultCppCode = `#include <iostream>
-#include <vector>
 using namespace std;
 
 int main() {
-    int n;
-    cin >> n;
-
-    vector<int> numbers(n);
-    long long sum = 0;
-
-    for (int i = 0; i < n; ++i) {
-        cin >> numbers[i];
-        sum += numbers[i];
-    }
-
-    cout << sum << '\\n';
+    cout << "Hello world!" << '\\n';
     return 0;
 }`;
 
-export const defaultPythonCode = `numbers = list(map(int, input().split()))
-print(sum(numbers))`;
+export const defaultPythonCode = `print("Hello world!")`;
 
 export function languageLabel(language: ProgrammingLanguage): string {
   return language === "python" ? "Python" : "C++";
