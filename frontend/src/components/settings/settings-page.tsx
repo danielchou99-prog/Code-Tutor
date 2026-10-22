@@ -310,7 +310,7 @@ function ProfileSettings({ user, busy, setBusy, updateProfile, showResult }: { u
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <label className="text-[11px] text-slate-400">{t("displayName2")}<input className={inputClass} value={displayName} maxLength={50} onChange={(event) => setDisplayName(event.target.value)} /></label>
-            <label className="text-[11px] text-slate-400">Username<input className={inputClass} value={username} maxLength={24} placeholder="daniel_chou" onChange={(event) => setUsername(event.target.value)} /></label>
+            <label className="text-[11px] text-slate-400">Username<input className={inputClass} value={username} maxLength={24} onChange={(event) => setUsername(event.target.value)} /></label>
           </div>
           <label className="mt-4 block text-[11px] text-slate-400">{t("avatarUrl")}<input className={inputClass} type="url" value={avatarUrl} placeholder="https://…" onChange={(event) => setAvatarUrl(event.target.value)} /></label>
           <label className="mt-4 block text-[11px] text-slate-400">{t("bio")}<textarea className="mt-2 min-h-24 w-full resize-y rounded-xl border border-white/8 bg-[#090f18] p-3 text-xs leading-6 text-slate-200 outline-none focus:border-cyan-300/30" value={bio} maxLength={240} onChange={(event) => setBio(event.target.value)} /></label>

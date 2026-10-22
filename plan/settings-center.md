@@ -113,3 +113,4 @@
 - [x] 將淺色模式由接近白色調整為低亮度的淺藍灰基底，並重新驗證文字對比。
 - Frontend ESLint、TypeScript 與 Next.js production build 通過。
 - 驗收截圖位於 `plan/evidence/settings-center/`。
+- [x] 移除個人資料頁 Username 欄位寫死的 `daniel_chou` 提示文字（開發者名字不應出現在正式站），欄位改為不顯示提示。2026-10-22。
