@@ -52,3 +52,20 @@ def test_fatal_error_marks_remaining_cases_and_groups_not_run():
 def test_max_score_follows_case_points_not_hard_coded_100():
     summary = ScoreCalculator().calculate([group(1, 100, 7, 3)], [[True, True]])
     assert (summary.score, summary.max_score) == (10, 10)
+
+
+def test_wrong_answer_group_reports_wrong_answer_kind():
+    summary = ScoreCalculator().calculate(GROUPS, [[True, False], [True, True]])
+    assert [g.failure_kind for g in summary.groups] == ["wrong_answer", None]
+
+
+def test_fatal_error_reports_its_kind_only_on_the_group_it_stopped_in():
+    summary = ScoreCalculator().calculate(GROUPS, [[True, True], [True]], fatal_status="timeout")
+    assert [g.status for g in summary.groups] == ["passed", "failed"]
+    assert [g.failure_kind for g in summary.groups] == [None, "timeout"]
+
+
+def test_groups_after_a_fatal_error_have_no_failure_kind():
+    summary = ScoreCalculator().calculate(GROUPS, [[]], fatal_status="runtime_error")
+    assert [g.status for g in summary.groups] == ["failed", "not_run"]
+    assert [g.failure_kind for g in summary.groups] == ["runtime_error", None]

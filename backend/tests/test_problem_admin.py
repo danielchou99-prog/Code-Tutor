@@ -394,3 +394,40 @@ def test_problem_primary_key_collision_has_a_distinct_error(monkeypatch) -> None
 
     with pytest.raises(ProblemIdCollision):
         store._request("POST", "problems", json=[])
+
+
+def test_apcs_level_is_optional_and_limited_to_one_through_five() -> None:
+    assert AdminProblem.model_validate(problem_payload()).apcs_level is None
+    for level in (1, 3, 5):
+        payload = problem_payload()
+        payload["apcs_level"] = level
+        assert AdminProblem.model_validate(payload).apcs_level == level
+    for invalid in (0, 6, -1):
+        payload = problem_payload()
+        payload["apcs_level"] = invalid
+        with pytest.raises(ValidationError):
+            AdminProblem.model_validate(payload)
+
+
+def test_saving_a_problem_writes_its_apcs_level(monkeypatch) -> None:
+    sent: list[tuple[str, str, object]] = []
+
+    class Response:
+        @staticmethod
+        def json():
+            return [{"id": "a001"}]
+
+    def fake_request(method, path, *, json=None, prefer=None):
+        sent.append((method, path, json))
+        return Response()
+
+    store = SupabaseProblemAdminStore("https://project.supabase.co", "sb_secret_test")
+    monkeypatch.setattr(store, "_request", fake_request)
+    monkeypatch.setattr(store, "get_problem", lambda problem_id: AdminProblem.model_validate(problem_payload()))
+    payload = problem_payload()
+    payload["apcs_level"] = 4
+
+    store.save_problem(AdminProblem.model_validate(payload))
+
+    patch_row = next(body for method, path, body in sent if method == "PATCH" and path.startswith("problems?id="))
+    assert patch_row["apcs_level"] == 4  # type: ignore[index]

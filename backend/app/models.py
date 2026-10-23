@@ -119,6 +119,8 @@ class JudgeGroupResult(BaseModel):
     passed_cases: int
     total_cases: int
     status: Literal["passed", "failed", "not_run"]
+    # Why a failed group failed. Only the kind, never any test input or output.
+    failure_kind: JudgeStatus | None = None
 
 
 class SubmitResponse(BaseModel):

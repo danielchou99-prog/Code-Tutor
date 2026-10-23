@@ -66,7 +66,12 @@ class ScoreCalculator:
             group_passed = sum(1 for passed in outcomes if passed)
             earned = sum(case.score_points for case, passed in zip(group.cases, outcomes) if passed)
             passed_cases += group_passed
-            group_complete = group_passed == len(group.cases) and fatal_status is None
+            # A fatal error stops judging inside one group, so every earlier group ran fully.
+            group_complete = group_passed == len(group.cases)
+            failure_kind: JudgeStatus | None = None
+            if not group_complete:
+                is_last_executed = index == len(executed) - 1
+                failure_kind = fatal_status if fatal_status is not None and is_last_executed else "wrong_answer"
             results.append(
                 JudgeGroupResult(
                     group_order=group.group_order,
@@ -75,6 +80,7 @@ class ScoreCalculator:
                     passed_cases=group_passed,
                     total_cases=len(group.cases),
                     status="passed" if group_complete else "failed",
+                    failure_kind=failure_kind,
                 )
             )
 

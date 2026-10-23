@@ -283,6 +283,8 @@ export interface components {
              * @enum {string}
              */
             difficulty: "easy" | "medium" | "hard";
+            /** Apcs Level */
+            apcs_level?: number | null;
             /** Time Limit Ms */
             time_limit_ms: number;
             /** Memory Limit Mb */
@@ -317,6 +319,8 @@ export interface components {
              * @enum {string}
              */
             difficulty: "easy" | "medium" | "hard";
+            /** Apcs Level */
+            apcs_level?: number | null;
             /** Time Limit Ms */
             time_limit_ms: number;
             /** Memory Limit Mb */
@@ -772,6 +776,8 @@ export interface components {
              * @enum {string}
              */
             status: "passed" | "failed" | "not_run";
+            /** Failure Kind */
+            failure_kind?: ("accepted" | "wrong_answer" | "compile_error" | "runtime_error" | "timeout" | "memory_limit" | "output_limit" | "service_unavailable" | "server_busy" | "system_error") | null;
         };
         /** LocalizedText */
         LocalizedText: {

@@ -103,6 +103,8 @@ class AdminProblemContent(BaseModel):
     constraints: list[LocalizedText] = Field(max_length=30)
     starter_code: AdminStarterCode
     difficulty: Literal["easy", "medium", "hard"]
+    # Practice level from 1 to 5; not an official APCS score. Empty means unrated.
+    apcs_level: int | None = Field(default=None, ge=1, le=5)
     time_limit_ms: int = Field(ge=100, le=10_000)
     memory_limit_mb: int = Field(ge=16, le=1_024)
     published: bool = False

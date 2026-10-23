@@ -48,6 +48,7 @@ function blankProblem(): AdminProblem {
       python: "print(\"Hello, World!\")\n",
     },
     difficulty: "easy",
+    apcs_level: null,
     time_limit_ms: 1000,
     memory_limit_mb: 256,
     published: false,
@@ -290,9 +291,10 @@ export function ProblemAdminSettings({ zh }: { zh: boolean }) {
       <div className="mt-6 space-y-5">
         <section className={panelClass}>
           <SectionTitle title={t("basicInformation")} />
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field label={t("problemId")}><div className={`${inputClass} flex items-center font-mono`}>{existingId ? `#${existingId}` : (t("generatedOnFirstSave"))}</div></Field>
             <Field label={t("difficulty")}><select className={inputClass} value={draft.difficulty} onChange={(event) => setDraft({ ...draft, difficulty: event.target.value as AdminProblem["difficulty"] })}><option value="easy">{t("easy")}</option><option value="medium">{t("medium")}</option><option value="hard">{t("hard")}</option></select></Field>
+            <Field label={t("apcsLevel")}><select className={inputClass} value={draft.apcs_level ?? ""} onChange={(event) => setDraft({ ...draft, apcs_level: event.target.value ? Number(event.target.value) : null })}><option value="">{t("apcsLevelUnrated")}</option>{[1, 2, 3, 4, 5].map((level) => <option key={level} value={level}>{t("apcsLevelValue", { level: String(level) })}</option>)}</select></Field>
             <Field label={t("publication")}><button type="button" role="switch" aria-checked={draft.published} onClick={() => setDraft({ ...draft, published: !draft.published })} className={`mt-2 flex h-10 w-full items-center justify-between rounded-xl border px-3 text-xs ${draft.published ? "border-emerald-300/25 bg-emerald-300/[0.06] text-emerald-300" : "border-white/8 bg-[#090f18] text-slate-500"}`}><span>{draft.published ? (t("published")) : (t("draft2"))}</span><span>{draft.published ? "●" : "○"}</span></button></Field>
           </div>
           <LocalizedEditor label={t("title")} value={draft.title} onChange={(title) => setDraft({ ...draft, title })} />

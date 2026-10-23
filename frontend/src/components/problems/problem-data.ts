@@ -25,6 +25,8 @@ export type Problem = {
   title: LocalizedText;
   summary: LocalizedText;
   difficulty: ProblemDifficulty;
+  /** Practice level 1-5, not an official APCS score. Missing means unrated. */
+  apcsLevel?: number | null;
   status: ProblemStatus;
   tags: ProblemTag[];
   description: LocalizedText[];

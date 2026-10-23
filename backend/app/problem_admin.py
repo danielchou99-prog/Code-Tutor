@@ -112,7 +112,7 @@ class SupabaseProblemAdminStore:
             "GET",
             "problems"
             f"?id=eq.{encoded_id}&select=id,title,summary,description,input_format,output_format,"
-            "constraints_text,starter_code,difficulty,time_limit_ms,memory_limit_mb,published&limit=1",
+            "constraints_text,starter_code,difficulty,apcs_level,time_limit_ms,memory_limit_mb,published&limit=1",
         ).json()
         if not isinstance(problem_rows, list) or not problem_rows:
             raise ProblemAdminUnavailable("The requested problem does not exist.")
@@ -212,6 +212,7 @@ class SupabaseProblemAdminStore:
             "constraints_text": [item.model_dump() for item in problem.constraints],
             "starter_code": problem.starter_code.model_dump(),
             "difficulty": problem.difficulty,
+            "apcs_level": problem.apcs_level,
             "time_limit_ms": problem.time_limit_ms,
             "memory_limit_mb": problem.memory_limit_mb,
             # Keep a partially written problem away from students if any of the

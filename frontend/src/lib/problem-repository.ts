@@ -58,13 +58,15 @@ export async function loadProblems(): Promise<ProblemLoadResult> {
 
   try {
     const supabase = getSupabaseBrowserClient();
-    const [problemResult, tagResult, linkResult, sampleResult, groupResult, userResult] = await Promise.all([
+    const [problemResult, tagResult, linkResult, sampleResult, groupResult, userResult, levelResult] = await Promise.all([
       supabase.from("problems").select("id,title,summary,description,input_format,output_format,constraints_text,starter_code,difficulty,time_limit_ms,memory_limit_mb").eq("published", true).order("id"),
       supabase.from("problem_tags").select("slug,label_zh,label_en"),
       supabase.from("problem_tag_links").select("problem_id,tag_slug"),
       supabase.from("problem_samples").select("problem_id,sample_order,input,output,explanation").order("sample_order"),
       supabase.from("problem_test_groups").select("problem_id,group_order,name,condition,test_case_count,score_percent").order("group_order"),
       supabase.auth.getUser(),
+      // Kept separate so the list still loads before the apcs_level migration has been applied.
+      supabase.from("problems").select("id,apcs_level").eq("published", true),
     ]);
     const firstError = [problemResult.error, tagResult.error, linkResult.error, sampleResult.error, groupResult.error].find(Boolean);
     if (firstError || !problemResult.data?.length) throw firstError ?? new Error("No published problems were returned.");
@@ -81,6 +83,13 @@ export async function loadProblems(): Promise<ProblemLoadResult> {
           (aliasResult.data as ProblemIdAliasRow[]).map((alias) => [alias.old_id, alias.new_id]),
         );
 
+    const apcsLevels = new Map<string, number>();
+    if (!levelResult.error) {
+      for (const row of (levelResult.data ?? []) as Array<{ id: string; apcs_level: number | null }>) {
+        if (typeof row.apcs_level === "number" && row.apcs_level >= 1 && row.apcs_level <= 5) apcsLevels.set(row.id, row.apcs_level);
+      }
+    }
+
     const tagRows = tagResult.data as TagRow[];
     registerProblemTagLabels(Object.fromEntries(tagRows.map((tag) => [tag.slug, { zh: tag.label_zh, en: tag.label_en }])));
     const links = linkResult.data as TagLinkRow[];
@@ -96,6 +105,7 @@ export async function loadProblems(): Promise<ProblemLoadResult> {
         title: problem.title,
         summary: problem.summary,
         difficulty: problem.difficulty,
+        apcsLevel: apcsLevels.get(problem.id) ?? null,
         status: statuses.get(problem.id) ?? "unsolved",
         tags: links.filter((link) => link.problem_id === problem.id).map((link) => link.tag_slug),
         description: problem.description,

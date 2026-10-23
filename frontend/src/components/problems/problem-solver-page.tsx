@@ -19,6 +19,7 @@ import {
   startInteractiveCode,
 } from "@/lib/interactive-api";
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
+import { findMatchingSample, outputsMatch } from "@/lib/output-compare";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
 import { sectionPaths } from "@/lib/routes";
 import { scoringGroupLabel } from "@/lib/scoring-group-label";
@@ -124,6 +125,8 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
   const [pendingImportedCode, setPendingImportedCode] = useState("");
   const [stdin, setStdin] = useState(problem.samples[0]?.input ?? "");
   const [runResult, setRunResult] = useState<RunResult | null>(null);
+  // The input the current result was produced from, so editing the input never compares stale output.
+  const [runStdin, setRunStdin] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [activeConsoleTab, setActiveConsoleTab] = useState<"output" | "input">("input");
   const [inputMode, setInputMode] = useState<"batch" | "interactive">("batch");
@@ -132,6 +135,10 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
   const [judgeResult, setJudgeResult] = useState<JudgeResult | null>(null);
   const [judgeError, setJudgeError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const matchedSample = runStdin === null ? -1 : findMatchingSample(problem.samples, runStdin);
+  const sampleCheck = runResult?.status === "accepted" && inputMode === "batch" && matchedSample >= 0
+    ? { index: matchedSample, expected: problem.samples[matchedSample].output, matches: outputsMatch(runResult.stdout, problem.samples[matchedSample].output) }
+    : null;
   const [problemWidth, setProblemWidth] = useState(35);
   const [resultWidth, setResultWidth] = useState(22);
   const [resizing, setResizing] = useState<ResizeTarget>(null);
@@ -299,6 +306,7 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
 
     setActiveConsoleTab("output");
     setRunResult(null);
+    setRunStdin(stdin);
     setIsRunning(true);
     try {
       setRunResult(await runCode(sourceFiles(), stdin, programmingLanguage));
@@ -346,6 +354,33 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
     setRunResult(null);
     setInteractiveOutput([]);
     setInteractiveStatus("idle");
+  };
+
+  const [pendingSubmission, setPendingSubmission] = useState<{ language: ProgrammingLanguage; code: string } | null>(null);
+
+  const applySubmission = (submissionLanguage: ProgrammingLanguage, source: string) => {
+    interactiveConnection.current?.stop();
+    interactiveConnection.current = null;
+    editedLanguagesRef.current.add(submissionLanguage);
+    hydratedLanguagesRef.current.add(submissionLanguage);
+    setProgrammingLanguage(submissionLanguage);
+    setCodeByLanguage((current) => ({ ...current, [submissionLanguage]: source }));
+    setSaveNotice("");
+    setRunResult(null);
+    setRunStdin(null);
+    setInteractiveOutput([]);
+    setInteractiveStatus("idle");
+    setIsRunning(false);
+    setPendingSubmission(null);
+  };
+
+  // Only the slot being replaced can lose work; the other language keeps its own code.
+  const requestSubmissionLoad = (submissionLanguage: ProgrammingLanguage, source: string) => {
+    if (codeByLanguage[submissionLanguage] !== savedCodeByLanguage[submissionLanguage]) {
+      setPendingSubmission({ language: submissionLanguage, code: source });
+      return;
+    }
+    applySubmission(submissionLanguage, source);
   };
 
   const requestReset = () => {
@@ -460,7 +495,7 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
       </div>
 
       <div ref={workspaceRef} className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden" style={{ gridTemplateColumns: `minmax(0, ${problemWidth}fr) 6px minmax(0, ${editorWidth}fr) 6px minmax(0, ${resultWidth}fr)` }}>
-        <ProblemStatement problem={problem} textKey={textKey} zh={zh} />
+        <ProblemStatement problem={problem} textKey={textKey} zh={zh} onLoadSample={(input) => { setStdin(input); setInputMode("batch"); setActiveConsoleTab("input"); }} samplesLocked={isRunning} />
         <ResizeHandle label={t("resizeProblemAndEditor")} active={resizing === "problem"} onPointerDown={() => setResizing("problem")} />
 
         <section className="flex min-h-[780px] min-w-0 flex-col border-y border-white/8 bg-[#0c111b] xl:min-h-0 xl:border-y-0" aria-label={t("codeEditor")}>
@@ -499,13 +534,24 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
           <div className="min-h-[390px] flex-1 overflow-hidden xl:min-h-0">
             <MonacoEditor language={programmingLanguage === "python" ? "python" : "cpp"} theme="vs-dark" value={code} onChange={(value) => updateCurrentCode(value ?? "")} options={{ automaticLayout: true, fontFamily: "JetBrains Mono, Fira Code, Consolas, monospace", fontSize: 14, minimap: { enabled: false }, padding: { top: 18 }, scrollBeyondLastLine: false, tabSize: 4, wordWrap: "off" }} />
           </div>
+          {sampleCheck ? (
+            <div role="status" className={`shrink-0 border-t px-4 py-2.5 text-[11px] ${sampleCheck.matches ? "border-emerald-300/15 bg-emerald-400/[0.04] text-emerald-300" : "border-amber-300/20 bg-amber-300/[0.04] text-amber-200"}`}>
+              <p className="font-semibold">{sampleCheck.matches ? "✓ " : "✕ "}{t(sampleCheck.matches ? "sampleMatches" : "sampleDiffers", { n: sampleCheck.index + 1 })}</p>
+              {sampleCheck.matches ? null : (
+                <div className="mt-2">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">{t("sampleExpectedOutput")}</p>
+                  <pre className="mt-1 max-h-24 overflow-auto rounded-lg bg-[#070b11] px-3 py-2 font-mono text-[11px] text-slate-300">{sampleCheck.expected}</pre>
+                </div>
+              )}
+            </div>
+          ) : null}
           <OutputPanel
             activeTab={activeConsoleTab}
             isRunning={isRunning}
             inputMode={inputMode}
             interactiveOutput={interactiveOutput}
             interactiveStatus={interactiveStatus}
-            onClear={() => { setRunResult(null); setInteractiveOutput([]); }}
+            onClear={() => { setRunResult(null); setRunStdin(null); setInteractiveOutput([]); }}
             onInputModeChange={(mode) => { if (!isRunning) { setInputMode(mode); setActiveConsoleTab("input"); } }}
             onInteractiveInput={(data) => {
               const line = data.endsWith("\n") ? data : `${data}\n`;
@@ -523,7 +569,7 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
         </section>
 
         <ResizeHandle label={t("resizeEditorAndResult")} active={resizing === "result"} onPointerDown={() => setResizing("result")} />
-        <JudgeResultPanel error={judgeError} isSubmitting={isSubmitting} result={judgeResult} problem={problem} textKey={textKey} />
+        <JudgeResultPanel error={judgeError} isSubmitting={isSubmitting} result={judgeResult} problem={problem} textKey={textKey} onLoadSubmission={requestSubmissionLoad} />
       </div>
 
       {aiOpen ? (
@@ -547,6 +593,17 @@ export function ProblemSolverPage({ problem, onBack, onSubmitted }: { problem: P
         onClose={() => { setPendingOverwrite(null); setPendingImportedCode(""); }}
         onConfirm={() => applyOverwrite(pendingOverwrite ?? "reset")}
       />
+      <ConfirmDialog
+        open={pendingSubmission !== null}
+        title={t("loadSubmissionTitle")}
+        description={t("loadSubmissionConfirm")}
+        confirmLabel={t("loadSubmissionAction")}
+        cancelLabel={t("cancel")}
+        closeLabel={t("closeConfirmation")}
+        tone="danger"
+        onClose={() => setPendingSubmission(null)}
+        onConfirm={() => { if (pendingSubmission) applySubmission(pendingSubmission.language, pendingSubmission.code); }}
+      />
     </section>
   );
 }
@@ -557,19 +614,19 @@ function ResizeHandle({ label, active, onPointerDown }: { label: string; active:
 
 const problemNoteKeys: TranslationKey[] = ["problemNote1", "problemNote2", "problemNote3", "problemNote4", "problemNote5", "problemNote6", "problemNote7"];
 
-function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey: "zh" | "en"; zh: boolean }) {
+function ProblemStatement({ problem, textKey, zh, onLoadSample, samplesLocked }: { problem: Problem; textKey: "zh" | "en"; zh: boolean; onLoadSample: (input: string) => void; samplesLocked: boolean }) {
   const { t } = useLanguage();
   const difficulty = { easy: t("easy"), medium: t("medium"), hard: t("hard") }[problem.difficulty];
   const totalCases = problem.testGroups.reduce((sum, group) => sum + group.testCaseCount, 0);
   return (
     <article className="min-h-[520px] min-w-0 overflow-y-auto bg-[#0a0f17] p-5 sm:p-6 xl:min-h-0" aria-label={t("problemStatement")}>
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/65">Problem #{problem.id}</p><h1 className="mt-2 text-xl font-semibold text-white">{problem.title[textKey]}</h1></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/10 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/10 text-amber-200" : "bg-rose-400/10 text-rose-300"}`}>{difficulty}</span></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-cyan-300/65">Problem #{problem.id}</p><h1 className="mt-2 text-xl font-semibold text-white">{problem.title[textKey]}</h1></div><span className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/10 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/10 text-amber-200" : "bg-rose-400/10 text-rose-300"}`}>{difficulty}</span>{problem.apcsLevel ? <span className="rounded-full bg-violet-300/10 px-2.5 py-1 text-[10px] font-semibold text-violet-200">APCS {t("apcsLevelValue", { level: String(problem.apcsLevel) })}</span> : null}</span></div>
       <div className="mt-4 flex flex-wrap gap-2">{problem.tags.map((tag) => <span key={tag} className="rounded-full border border-cyan-300/10 bg-cyan-300/[0.04] px-2.5 py-1 text-[10px] text-cyan-200/75">#{getProblemTagLabel(tag)[textKey]}</span>)}</div>
       <StatementSection title={t("description")}>{problem.description.map((paragraph) => <p key={paragraph[textKey]}>{paragraph[textKey]}</p>)}</StatementSection>
       <StatementSection title={t("input2")}><p>{problem.inputFormat[textKey]}</p></StatementSection>
       <StatementSection title={t("output2")}><p>{problem.outputFormat[textKey]}</p></StatementSection>
       <StatementSection title={t("examples")}>
-        {problem.samples.map((sample, index) => <div key={`${sample.input}-${index}`} className="mt-3 overflow-hidden rounded-xl border border-white/8 bg-[#070b11]"><SampleBlock label={`${t("sampleInput")} ${index + 1}`} value={sample.input} /><SampleBlock label={`${t("sampleOutput")} ${index + 1}`} value={sample.output} bordered />{sample.explanation ? <p className="border-t border-white/8 px-4 py-3 text-[11px] text-slate-500">{sample.explanation[textKey]}</p> : null}</div>)}
+        {problem.samples.map((sample, index) => <div key={`${sample.input}-${index}`} className="mt-3 overflow-hidden rounded-xl border border-white/8 bg-[#070b11]"><SampleBlock label={`${t("sampleInput")} ${index + 1}`} value={sample.input} action={<button type="button" disabled={samplesLocked} onClick={() => onLoadSample(sample.input)} className="rounded-md border border-cyan-300/20 px-2 py-1 text-[9px] font-semibold normal-case tracking-normal text-cyan-200 hover:border-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-40">{t("loadSampleToInput")}</button>} /><SampleBlock label={`${t("sampleOutput")} ${index + 1}`} value={sample.output} bordered />{sample.explanation ? <p className="border-t border-white/8 px-4 py-3 text-[11px] text-slate-500">{sample.explanation[textKey]}</p> : null}</div>)}
       </StatementSection>
       <StatementSection title={t("testsAndScoring")}>
         <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2"><span>{t("totalJudgeCases")}</span><strong className="font-mono text-cyan-200">{totalCases}</strong></div>
@@ -588,5 +645,5 @@ function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey:
 
 function StatementSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="mt-8"><h2 className="text-xs font-semibold text-white">{title}</h2><div className="mt-3 space-y-3 text-xs leading-6 text-slate-400">{children}</div></section>; }
 function TestGroupList({ problem, textKey, zh }: { problem: Problem; textKey: "zh" | "en"; zh: boolean }) { const { t } = useLanguage(); return <div className="space-y-2">{problem.testGroups.map((group, index) => <div key={`${group.name[textKey]}-${index}`} className="rounded-lg border border-white/8 bg-white/[0.015] px-3 py-3"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-semibold text-slate-300">{scoringGroupLabel(index, zh)}</span><strong className="font-mono text-[11px] text-cyan-200">{group.scorePercent}%</strong></div><p className="mt-2 text-[11px] leading-5 text-slate-300">{group.condition[textKey]}</p><p className="mt-1 font-mono text-[9px] text-slate-600">{group.testCaseCount} {t("judgeCases2")}</p></div>)}</div>; }
-function SampleBlock({ label, value, bordered = false }: { label: string; value: string; bordered?: boolean }) { return <div className={bordered ? "border-t border-white/8" : ""}><div className="px-4 py-2 text-[9px] font-semibold uppercase tracking-wider text-slate-600">{label}</div><pre className="overflow-x-auto px-4 pb-3 font-mono text-xs text-slate-300">{value}</pre></div>; }
+function SampleBlock({ label, value, bordered = false, action }: { label: string; value: string; bordered?: boolean; action?: React.ReactNode }) { return <div className={bordered ? "border-t border-white/8" : ""}><div className="flex items-center justify-between gap-2 px-4 py-2 text-[9px] font-semibold uppercase tracking-wider text-slate-600"><span>{label}</span>{action}</div><pre className="overflow-x-auto px-4 pb-3 font-mono text-xs text-slate-300">{value}</pre></div>; }
 function LimitCard({ label, value }: { label: string; value: string }) { return <div className="rounded-lg border border-white/8 bg-white/[0.025] p-3"><span className="block text-[9px] uppercase tracking-wider text-slate-600">{label}</span><strong className="mt-1 block font-mono text-[11px] text-slate-300">{value}</strong></div>; }

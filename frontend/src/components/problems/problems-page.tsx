@@ -14,8 +14,12 @@ import { ProblemSolverPage } from "./problem-solver-page";
 const hashtagPattern = /#[^\s#]+/gu;
 const selectedProblemStorageKey = "code-tutor:selected-problem";
 
+type ApcsLevelFilter = "all" | "1" | "2" | "3" | "4" | "5";
+
 type ProblemListState = {
   difficulty: ProblemDifficulty | "all";
+  /** Missing in states saved before the filter existed. */
+  apcsLevel?: ApcsLevelFilter;
   query: string;
   selectedTags: ProblemTag[];
   status: ProblemStatus | "all";
@@ -26,6 +30,7 @@ function isProblemListState(value: unknown): value is ProblemListState {
   const state = value as Partial<ProblemListState>;
   return typeof state.query === "string"
     && ["all", "easy", "medium", "hard"].includes(state.difficulty ?? "")
+    && (state.apcsLevel === undefined || ["all", "1", "2", "3", "4", "5"].includes(state.apcsLevel))
     && ["all", "solved", "attempted", "unsolved"].includes(state.status ?? "")
     && Array.isArray(state.selectedTags)
     && state.selectedTags.every((tag) => typeof tag === "string");
@@ -40,6 +45,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   const [availableProblems, setAvailableProblems] = useState<Problem[]>(problems);
   const [query, setQuery] = useState("");
   const [difficulty, setDifficulty] = useState<ProblemDifficulty | "all">("all");
+  const [apcsLevel, setApcsLevel] = useState<ApcsLevelFilter>("all");
   const [status, setStatus] = useState<ProblemStatus | "all">("all");
   const [selectedTags, setSelectedTags] = useState<ProblemTag[]>([]);
   const previousResetRevision = useRef(resetListRevision);
@@ -53,6 +59,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
       if (restored) {
         setQuery(restored.query);
         setDifficulty(restored.difficulty);
+        setApcsLevel(restored.apcsLevel ?? "all");
         setStatus(restored.status);
         setSelectedTags(restored.selectedTags);
       }
@@ -63,8 +70,8 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
 
   useEffect(() => {
     if (hydratedStateKey !== listStateKey) return;
-    savePageState(listStateKey, { difficulty, query, selectedTags, status });
-  }, [difficulty, hydratedStateKey, listStateKey, query, selectedTags, status]);
+    savePageState(listStateKey, { apcsLevel, difficulty, query, selectedTags, status });
+  }, [apcsLevel, difficulty, hydratedStateKey, listStateKey, query, selectedTags, status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +128,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
 
     return availableProblems.filter((problem) => {
       if (difficulty !== "all" && problem.difficulty !== difficulty) return false;
+      if (apcsLevel !== "all" && problem.apcsLevel !== Number(apcsLevel)) return false;
       if (status !== "all" && problem.status !== status) return false;
       if (hasUnknownTag || !effectiveTags.every((tag) => problem.tags.includes(tag))) return false;
       if (!searchText) return true;
@@ -132,7 +140,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
         .toLocaleLowerCase(language);
       return searchable.includes(searchText);
     });
-  }, [availableProblems, difficulty, language, query, queryTags, selectedTags, status, textKey]);
+  }, [apcsLevel, availableProblems, difficulty, language, query, queryTags, selectedTags, status, textKey]);
 
   if (selectedProblem) {
     return <ProblemSolverPage key={selectedProblem.id} problem={selectedProblem} onBack={() => {
@@ -148,6 +156,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
   const clearFilters = () => {
     setQuery("");
     setDifficulty("all");
+    setApcsLevel("all");
     setStatus("all");
     setSelectedTags([]);
   };
@@ -168,7 +177,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
         </div>
 
         <div className="mt-8 rounded-2xl border border-white/8 bg-[#0d131d] p-4 sm:p-5">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px_180px]">
             <label className="flex h-11 items-center gap-3 rounded-xl border border-white/10 bg-[#090e16] px-4 focus-within:border-cyan-300/30">
               <SearchIcon />
               <span className="sr-only">{t("problemSearchLabel")}</span>
@@ -176,6 +185,9 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
             </label>
             <FilterSelect label={t("difficulty")} value={difficulty} onChange={(value) => setDifficulty(value as ProblemDifficulty | "all")} options={[
               ["all", t("allDifficulties")], ["easy", t("easy")], ["medium", t("medium")], ["hard", t("hard")],
+            ]} />
+            <FilterSelect label={t("apcsLevel")} value={apcsLevel} onChange={(value) => setApcsLevel(value as ApcsLevelFilter)} options={[
+              ["all", t("allApcsLevels")], ...(["1", "2", "3", "4", "5"] as const).map((level): [string, string] => [level, t("apcsLevelValue", { level })]),
             ]} />
             <FilterSelect label={t("status")} value={status} onChange={(value) => setStatus(value as ProblemStatus | "all")} options={[
               ["all", t("allStatuses")], ["solved", t("solved")], ["attempted", t("attempted")], ["unsolved", t("unsolved")],
@@ -187,7 +199,7 @@ export function ProblemsPage({ resetListRevision = 0 }: { resetListRevision?: nu
               const active = selectedTags.includes(tag);
               return <button key={tag} type="button" aria-pressed={active} onClick={() => setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag])} className={`rounded-full border px-3 py-1.5 text-[10px] transition-colors ${active ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-white/8 bg-white/[0.02] text-slate-500 hover:border-white/15 hover:text-slate-300"}`}>#{getProblemTagLabel(tag)[textKey]}</button>;
             })}
-            {(query || difficulty !== "all" || status !== "all" || selectedTags.length > 0) ? <button type="button" onClick={clearFilters} className="ml-auto px-2 py-1 text-[10px] text-slate-600 hover:text-cyan-300">{t("clearFilters2")}</button> : null}
+            {(query || difficulty !== "all" || apcsLevel !== "all" || status !== "all" || selectedTags.length > 0) ? <button type="button" onClick={clearFilters} className="ml-auto px-2 py-1 text-[10px] text-slate-600 hover:text-cyan-300">{t("clearFilters2")}</button> : null}
           </div>
         </div>
 
@@ -236,7 +248,10 @@ function ProblemCard({ problem, textKey, onOpen }: { problem: Problem; textKey: 
           </span>
           <strong className="mt-2 line-clamp-2 text-xs leading-4 text-slate-100 group-hover:text-white xl:text-sm xl:leading-5">{problem.title[textKey]}</strong>
           <span className="mt-auto flex w-full items-end justify-between gap-2 pt-2">
-            <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-semibold ${problem.difficulty === "easy" ? "bg-emerald-400/8 text-emerald-300" : problem.difficulty === "medium" ? "bg-amber-300/8 text-amber-200" : "bg-rose-400/8 text-rose-300"}`}>{difficultyLabel}</span>
+              {problem.apcsLevel ? <span className="w-fit rounded-full bg-violet-300/8 px-2.5 py-1 text-[9px] font-semibold text-violet-200">APCS {t("apcsLevelValue", { level: String(problem.apcsLevel) })}</span> : null}
+            </span>
             <span aria-hidden="true" className="text-xs text-slate-600 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-300">→</span>
           </span>
         </span>
