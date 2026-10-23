@@ -8,7 +8,7 @@ import { type TranslationKey, useLanguage } from "@/lib/language-context";
 import { sectionPaths } from "@/lib/routes";
 import { useSettings } from "@/lib/settings-context";
 
-export type PrimarySection = "home" | "files" | "problems" | "quiz" | "settings";
+export type PrimarySection = "home" | "files" | "problems" | "quiz" | "notices" | "settings";
 
 const primaryItems: Array<{
   id: PrimarySection;
@@ -19,6 +19,7 @@ const primaryItems: Array<{
   { id: "files", labelKey: "navFiles" },
   { id: "problems", labelKey: "navProblems" },
   { id: "quiz", labelKey: "navQuiz", comingSoon: true },
+  { id: "notices", labelKey: "navNotices" },
   { id: "settings", labelKey: "navSettings" },
 ];
 

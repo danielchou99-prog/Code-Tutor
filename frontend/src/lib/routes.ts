@@ -5,6 +5,7 @@ export const sectionPaths = {
   files: "/files",
   problems: "/problems",
   quiz: "/quiz",
+  notices: "/notices",
   settings: "/settings",
 } as const satisfies Record<PrimarySection, string>;
 

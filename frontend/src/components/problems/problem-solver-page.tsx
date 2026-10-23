@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { JudgeResultPanel } from "@/components/problems/judge-result-panel";
@@ -17,8 +18,9 @@ import {
   type InteractiveStatus,
   startInteractiveCode,
 } from "@/lib/interactive-api";
-import { useLanguage } from "@/lib/language-context";
+import { type TranslationKey, useLanguage } from "@/lib/language-context";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
+import { sectionPaths } from "@/lib/routes";
 import { scoringGroupLabel } from "@/lib/scoring-group-label";
 import {
   clearLocalProblemCodeDraft,
@@ -553,6 +555,8 @@ function ResizeHandle({ label, active, onPointerDown }: { label: string; active:
   return <button type="button" aria-label={label} onPointerDown={(event) => { event.preventDefault(); onPointerDown(); }} className={`group relative hidden cursor-col-resize touch-none bg-white/[0.035] outline-none xl:block ${active ? "bg-cyan-300/20" : "hover:bg-cyan-300/10"}`}><span className="absolute left-1/2 top-1/2 h-10 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-700 group-hover:bg-cyan-300/60" /></button>;
 }
 
+const problemNoteKeys: TranslationKey[] = ["problemNote1", "problemNote2", "problemNote3", "problemNote4", "problemNote5", "problemNote6", "problemNote7"];
+
 function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey: "zh" | "en"; zh: boolean }) {
   const { t } = useLanguage();
   const difficulty = { easy: t("easy"), medium: t("medium"), hard: t("hard") }[problem.difficulty];
@@ -571,6 +575,12 @@ function ProblemStatement({ problem, textKey, zh }: { problem: Problem; textKey:
         <div className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2"><span>{t("totalJudgeCases")}</span><strong className="font-mono text-cyan-200">{totalCases}</strong></div>
         <TestGroupList problem={problem} textKey={textKey} zh={zh} />
         <div className="mt-4 grid grid-cols-2 gap-2"><LimitCard label={t("timeLimit")} value={`${problem.timeLimitMs / 1000} sec`} /><LimitCard label={t("memoryLimit")} value={`${problem.memoryLimitMb} MB`} /></div>
+      </StatementSection>
+      <StatementSection title={t("problemNotesTitle")}>
+        <ul className="space-y-2">
+          {problemNoteKeys.map((key) => <li key={key} className="flex gap-3"><span aria-hidden="true" className="mt-2.5 size-1 shrink-0 rounded-full bg-cyan-300/60" /><span className="min-w-0 break-words">{t(key)}</span></li>)}
+        </ul>
+        <p className="border-t border-white/8 pt-3 text-[11px] text-slate-500">{t("problemNoteSource")} <Link href={sectionPaths.notices} target="_blank" rel="noopener" className="text-cyan-300/80 underline-offset-2 hover:underline">{t("problemNotesMore")}</Link></p>
       </StatementSection>
     </article>
   );
