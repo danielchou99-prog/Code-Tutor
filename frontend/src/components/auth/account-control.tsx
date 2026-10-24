@@ -2,11 +2,12 @@
 
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
+import { useTerms } from "@/components/terms/terms-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { requestSignInEvent } from "@/lib/guest-workspace";
 import { useLanguage } from "@/lib/language-context";
 import { authErrorText } from "@/lib/supabase/auth-errors";
-import { termsPath, termsVersion } from "@/lib/terms";
+import { termsVersion } from "@/lib/terms";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -17,6 +18,7 @@ export function AccountControl({
 }) {
   const { configured, loading, user, signIn, signOut, signUp, sendPasswordReset } = useAuth();
   const { t } = useLanguage();
+  const { openTerms } = useTerms();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -297,7 +299,7 @@ export function AccountControl({
                     />
                     <span>
                       {t("termsAgreeBefore")}
-                      <a href={termsPath} target="_blank" rel="noopener" className="text-cyan-300/90 underline-offset-2 hover:underline">{t("termsAgreeLink")}</a>
+                      <button type="button" onClick={openTerms} className="text-cyan-300/90 underline-offset-2 hover:underline">{t("termsAgreeLink")}</button>
                       {t("termsAgreeAfter")}
                     </span>
                   </label>

@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { JudgeResultPanel } from "@/components/problems/judge-result-panel";
+import { useTerms } from "@/components/terms/terms-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AiTutorPanel } from "@/components/workspace/ai-tutor-panel";
 import { OutputPanel } from "@/components/workspace/output-panel";
@@ -21,7 +21,6 @@ import {
 import { type TranslationKey, useLanguage } from "@/lib/language-context";
 import { findMatchingSample, outputsMatch } from "@/lib/output-compare";
 import { loadPageState, pageStateKey, savePageState } from "@/lib/page-state";
-import { sectionPaths } from "@/lib/routes";
 import { scoringGroupLabel } from "@/lib/scoring-group-label";
 import {
   clearLocalProblemCodeDraft,
@@ -616,6 +615,7 @@ const problemNoteKeys: TranslationKey[] = ["problemNote1", "problemNote2", "prob
 
 function ProblemStatement({ problem, textKey, zh, onLoadSample, samplesLocked }: { problem: Problem; textKey: "zh" | "en"; zh: boolean; onLoadSample: (input: string) => void; samplesLocked: boolean }) {
   const { t } = useLanguage();
+  const { openTerms } = useTerms();
   const difficulty = { easy: t("easy"), medium: t("medium"), hard: t("hard") }[problem.difficulty];
   const totalCases = problem.testGroups.reduce((sum, group) => sum + group.testCaseCount, 0);
   return (
@@ -637,7 +637,7 @@ function ProblemStatement({ problem, textKey, zh, onLoadSample, samplesLocked }:
         <ul className="space-y-2">
           {problemNoteKeys.map((key) => <li key={key} className="flex gap-3"><span aria-hidden="true" className="mt-2.5 size-1 shrink-0 rounded-full bg-cyan-300/60" /><span className="min-w-0 break-words">{t(key)}</span></li>)}
         </ul>
-        <p className="border-t border-white/8 pt-3 text-[11px] text-slate-500">{t("problemNoteSource")} <Link href={sectionPaths.terms} target="_blank" rel="noopener" className="text-cyan-300/80 underline-offset-2 hover:underline">{t("problemNotesMore")}</Link></p>
+        <p className="border-t border-white/8 pt-3 text-[11px] text-slate-500">{t("problemNoteSource")} <button type="button" onClick={openTerms} className="text-cyan-300/80 underline-offset-2 hover:underline">{t("problemNotesMore")}</button></p>
       </StatementSection>
     </article>
   );
