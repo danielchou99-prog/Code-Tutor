@@ -14,7 +14,7 @@ type AuthContextValue = {
   loading: boolean;
   user: User | null;
   signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (name: string, email: string, password: string) => Promise<AuthResult>;
+  signUp: (name: string, email: string, password: string, acceptedTermsVersion: string) => Promise<AuthResult>;
   sendPasswordReset: (email: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
   signOutAll: () => Promise<AuthResult>;
@@ -95,13 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
         }));
       },
-      async signUp(name, email, password) {
+      async signUp(name, email, password, acceptedTermsVersion) {
         if (!configured) return unavailableResult();
         return runAuth(() => getSupabaseBrowserClient().auth.signUp({
           email,
           password,
           options: {
-            data: { display_name: name },
+            // Records which version of the Terms of Use was accepted at sign-up.
+            data: {
+              display_name: name,
+              terms_accepted_version: acceptedTermsVersion,
+              terms_accepted_at: new Date().toISOString(),
+            },
             emailRedirectTo: `${window.location.origin}/auth/confirm`,
           },
         }));

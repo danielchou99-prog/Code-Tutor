@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { requestSignInEvent } from "@/lib/guest-workspace";
 import { useLanguage } from "@/lib/language-context";
 import { authErrorText } from "@/lib/supabase/auth-errors";
+import { termsPath, termsVersion } from "@/lib/terms";
 
 type AuthMode = "signin" | "signup" | "forgot";
 
@@ -22,6 +23,7 @@ export function AccountControl({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,7 @@ export function AccountControl({
     setPassword("");
     setConfirmPassword("");
     setDisplayName("");
+    setAcceptedTerms(false);
     setMessage(null);
     setError(null);
   }, []);
@@ -68,6 +71,7 @@ export function AccountControl({
     setError(null);
     setPassword("");
     setConfirmPassword("");
+    setAcceptedTerms(false);
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -84,12 +88,17 @@ export function AccountControl({
       return;
     }
 
+    if (mode === "signup" && !acceptedTerms) {
+      setError(t("termsRequired"));
+      return;
+    }
+
     setSubmitting(true);
     const result =
       mode === "signin"
         ? await signIn(email, password)
         : mode === "signup"
-          ? await signUp(displayName, email, password)
+          ? await signUp(displayName, email, password, termsVersion)
           : await sendPasswordReset(email);
     setSubmitting(false);
 
@@ -274,6 +283,23 @@ export function AccountControl({
                       onChange={(event) => setConfirmPassword(event.target.value)}
                       className="mt-1.5 h-10 w-full rounded-lg border border-white/8 bg-[#0b111a] px-3 text-xs text-slate-200 outline-none focus:border-cyan-300/30"
                     />
+                  </label>
+                )}
+
+                {mode === "signup" && (
+                  <label className="flex items-start gap-2.5 text-[11px] leading-5 text-slate-400">
+                    <input
+                      required
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(event) => setAcceptedTerms(event.target.checked)}
+                      className="mt-0.5 size-4 shrink-0 accent-cyan-400"
+                    />
+                    <span>
+                      {t("termsAgreeBefore")}
+                      <a href={termsPath} target="_blank" rel="noopener" className="text-cyan-300/90 underline-offset-2 hover:underline">{t("termsAgreeLink")}</a>
+                      {t("termsAgreeAfter")}
+                    </span>
                   </label>
                 )}
 

@@ -637,7 +637,7 @@ function ProblemStatement({ problem, textKey, zh, onLoadSample, samplesLocked }:
         <ul className="space-y-2">
           {problemNoteKeys.map((key) => <li key={key} className="flex gap-3"><span aria-hidden="true" className="mt-2.5 size-1 shrink-0 rounded-full bg-cyan-300/60" /><span className="min-w-0 break-words">{t(key)}</span></li>)}
         </ul>
-        <p className="border-t border-white/8 pt-3 text-[11px] text-slate-500">{t("problemNoteSource")} <Link href={sectionPaths.notices} target="_blank" rel="noopener" className="text-cyan-300/80 underline-offset-2 hover:underline">{t("problemNotesMore")}</Link></p>
+        <p className="border-t border-white/8 pt-3 text-[11px] text-slate-500">{t("problemNoteSource")} <Link href={sectionPaths.terms} target="_blank" rel="noopener" className="text-cyan-300/80 underline-offset-2 hover:underline">{t("problemNotesMore")}</Link></p>
       </StatementSection>
     </article>
   );
